@@ -1,0 +1,351 @@
+{
+  "enabled": {
+    "description": "启用 Anima 绘图大师",
+    "type": "bool",
+    "default": true
+  },
+  "preset_profile": {
+    "description": "一键预设配置",
+    "type": "string",
+    "default": "none",
+    "hint": "可选：none / chiyo。选择 chiyo 会应用“千代预设”，包含千代画风、Anima 推荐参数和 prompt 优化规则；狐莉会作为可选固定角色提供，但不会成为默认角色。"
+  },
+  "comfyui_base_url": {
+    "description": "本地 ComfyUI 地址",
+    "type": "string",
+    "default": "http://127.0.0.1:8188"
+  },
+  "workflow": {
+    "description": "ComfyUI 工作流预设",
+    "type": "string",
+    "default": "anima_t2i",
+    "hint": "当前支持：anima_t2i。"
+  },
+  "timeout": {
+    "description": "生成超时时间（秒）",
+    "type": "int",
+    "default": 900
+  },
+  "poll_interval": {
+    "description": "查询生成历史的间隔（秒）",
+    "type": "int",
+    "default": 2
+  },
+  "width": {
+    "description": "默认图片宽度",
+    "type": "int",
+    "default": 832
+  },
+  "height": {
+    "description": "默认图片高度",
+    "type": "int",
+    "default": 1216
+  },
+  "allowed_sizes": {
+    "description": "允许的输出尺寸预设",
+    "type": "list",
+    "default": [
+      "832x1216",
+      "896x1152",
+      "1024x1024",
+      "1152x896",
+      "1216x832",
+      "768x1344",
+      "1344x768"
+    ],
+    "items": {
+      "type": "string"
+    }
+  },
+  "steps": {
+    "description": "默认采样步数",
+    "type": "int",
+    "default": 30
+  },
+  "cfg": {
+    "description": "默认 CFG 强度",
+    "type": "float",
+    "default": 5
+  },
+  "sampler_name": {
+    "description": "ComfyUI 采样器",
+    "type": "string",
+    "default": "er_sde"
+  },
+  "scheduler": {
+    "description": "ComfyUI 调度器",
+    "type": "string",
+    "default": "beta57"
+  },
+  "unet_name": {
+    "description": "UNET / 扩散模型文件名",
+    "type": "string",
+    "default": "anima_baseV10.safetensors"
+  },
+  "clip_name": {
+    "description": "文本编码器文件名",
+    "type": "string",
+    "default": "qwen_3_06b_base.safetensors"
+  },
+  "vae_name": {
+    "description": "VAE 文件名",
+    "type": "string",
+    "default": "qwen_image_vae.safetensors"
+  },
+  "negative_prompt": {
+    "description": "默认负面提示词",
+    "type": "string",
+    "default": "worst quality, low quality, score_1, score_2, score_3, artist name"
+  },
+  "prompt_optimize_enabled": {
+    "description": "文生图时启用 Anima prompt 优化",
+    "type": "bool",
+    "default": true
+  },
+  "prompt_builder_provider_id": {
+    "description": "Prompt 优化使用的聊天模型 Provider ID",
+    "type": "string",
+    "default": "",
+    "hint": "留空时使用当前会话的主聊天模型。"
+  },
+  "prompt_builder_max_tokens": {
+    "description": "Prompt 优化模型最大输出 token",
+    "type": "int",
+    "default": 700
+  },
+  "prompt_builder_max_content_tags": {
+    "description": "具体内容 tags 的最大数量",
+    "type": "int",
+    "default": 120
+  },
+  "prompt_builder_web_search_enabled": {
+    "description": "Prompt 优化时允许联网搜索参考信息",
+    "type": "bool",
+    "default": true,
+    "hint": "需要 AstrBot 全局配置 Tavily key。搜索失败时会自动降级，不会中断生图。"
+  },
+  "prompt_builder_search_max_results": {
+    "description": "Prompt 联网搜索结果数",
+    "type": "int",
+    "default": 5
+  },
+  "prompt_builder_search_depth": {
+    "description": "Prompt 联网搜索深度",
+    "type": "string",
+    "default": "advanced",
+    "hint": "可选：basic / advanced。"
+  },
+  "prompt_builder_search_query_template": {
+    "description": "Prompt 联网搜索查询模板",
+    "type": "string",
+    "default": "{prompt} 角色 外观 立绘 服装 配色 武器 官方图 official art character design outfit appearance wiki fandom",
+    "hint": "{prompt} 会替换为用户的生图要求。"
+  },
+  "prompt_builder_deep_thinking_enabled": {
+    "description": "Prompt 优化时尝试启用深度思考参数",
+    "type": "bool",
+    "default": true,
+    "hint": "会尝试传入 thinking/reasoning_effort；当前模型接口不支持时会自动重试普通调用。"
+  },
+  "prompt_builder_reasoning_effort": {
+    "description": "Prompt 优化思考强度",
+    "type": "string",
+    "default": "max",
+    "hint": "常用：high / max。"
+  },
+  "danbooru_core_tag_lookup_enabled": {
+    "description": "Prompt 优化后校正 Danbooru 角色核心 tag",
+    "type": "bool",
+    "default": true,
+    "hint": "只查询少量疑似角色名，不会查询所有服装、姿势 tag。"
+  },
+  "danbooru_tag_base_urls": {
+    "description": "Danbooru/Safebooru tag 查询地址",
+    "type": "string",
+    "default": "https://safebooru.donmai.us,https://danbooru.donmai.us",
+    "hint": "逗号分隔。仅用于少量核心 tag 查询。"
+  },
+  "danbooru_tag_user_agent": {
+    "description": "Danbooru/Safebooru tag 查询 User-Agent",
+    "type": "string",
+    "default": "AstrBotAnimaMaster/0.14",
+    "hint": "用于 Donmai 只读 tag API。"
+  },
+  "danbooru_tag_lookup_timeout": {
+    "description": "单次核心 tag 查询超时时间（秒）",
+    "type": "float",
+    "default": 6
+  },
+  "danbooru_tag_max_candidates": {
+    "description": "每次最多检查的疑似核心 tag 数量",
+    "type": "int",
+    "default": 6
+  },
+  "quality_prefix": {
+    "description": "默认质量词前缀",
+    "type": "string",
+    "default": "masterpiece, best quality, score_7,"
+  },
+  "default_character_enabled": {
+    "description": "默认启用固定角色 tags",
+    "type": "bool",
+    "default": false
+  },
+  "default_character_name": {
+    "description": "默认角色名称",
+    "type": "string",
+    "default": "",
+    "hint": "仅用于 prompt 优化时辅助理解。"
+  },
+  "default_character_tags": {
+    "description": "默认角色 tags",
+    "type": "string",
+    "default": ""
+  },
+  "fixed_characters": {
+    "description": "固定角色预设",
+    "type": "object",
+    "default": {},
+    "hint": "格式：{\"角色名\": \"danbooru tags\"}。用户在指令中提到角色名时会自动使用。",
+    "items": {}
+  },
+  "default_style_enabled": {
+    "description": "默认启用画风 / 画师 tags",
+    "type": "bool",
+    "default": false
+  },
+  "default_style_name": {
+    "description": "默认画风名称",
+    "type": "string",
+    "default": "",
+    "hint": "千代预设中的默认画风名称为“千代画风”。"
+  },
+  "default_artist_tags": {
+    "description": "默认画风或画师 tags",
+    "type": "string",
+    "default": ""
+  },
+  "sensual_mode_enabled": {
+    "description": "启用表现力模式",
+    "type": "bool",
+    "default": false,
+    "hint": "命中关键词时让 LLM 自行生成更有表现力的 Danbooru tags；不会硬编码固定涩气 tag。"
+  },
+  "sensual_mode_markers": {
+    "description": "触发表现力模式的关键词列表",
+    "type": "list",
+    "default": [
+      "seductive",
+      "sexy",
+      "sensual",
+      "alluring",
+      "see-through",
+      "sheer",
+      "transparent",
+      "lace",
+      "garter"
+    ],
+    "items": {
+      "type": "string"
+    }
+  },
+  "img2img_enabled": {
+    "description": "启用图生图 / 改图入口（开发中）",
+    "type": "bool",
+    "default": false,
+    "hint": "该功能仍在开发中，默认关闭，不建议作为稳定功能使用。关闭后，改图、图生图、重绘、风格化和 comfyui_edit 工具都会返回关闭提示。"
+  },
+  "prompt_optimize_img2img_enabled": {
+    "description": "图生图 / 改图时启用 prompt 优化",
+    "type": "bool",
+    "default": true,
+    "hint": "当前只适合整图 img2img。局部重绘应只描述局部对象。"
+  },
+  "edit_denoise": {
+    "description": "图生图 / 改图默认重绘强度",
+    "type": "float",
+    "default": 0.55
+  },
+  "max_image_side": {
+    "description": "ComfyUI 图生图输入图最长边限制",
+    "type": "int",
+    "default": 1024
+  },
+  "upscale_factor": {
+    "description": "默认放大倍率",
+    "type": "float",
+    "default": 2.0
+  },
+  "remove_bg_model": {
+    "description": "去背景模型",
+    "type": "string",
+    "default": "BiRefNet_lite"
+  },
+  "send_result_to_chat": {
+    "description": "将生成图片发回当前聊天",
+    "type": "bool",
+    "default": true
+  },
+  "max_send_images": {
+    "description": "最多发送到聊天的输出图片数",
+    "type": "int",
+    "default": 1
+  },
+  "admin_only": {
+    "description": "仅管理员可触发 ComfyUI 绘图",
+    "type": "bool",
+    "default": false
+  },
+  "allowed_sender_ids": {
+    "description": "允许使用的发送者 ID 列表",
+    "type": "list",
+    "default": [],
+    "hint": "留空表示不额外限制。",
+    "items": {
+      "type": "string"
+    }
+  },
+  "auto_start": {
+    "description": "生成请求到来但 ComfyUI 离线时自动启动本地 ComfyUI",
+    "type": "bool",
+    "default": false
+  },
+  "startup_command": {
+    "description": "启动本地 ComfyUI 的命令",
+    "type": "string",
+    "default": ""
+  },
+  "startup_workdir": {
+    "description": "启动命令的工作目录",
+    "type": "string",
+    "default": ""
+  },
+  "startup_visible_window": {
+    "description": "Windows 下自动启动 ComfyUI 时打开可见终端窗口",
+    "type": "bool",
+    "default": true
+  },
+  "auto_start_admin_only": {
+    "description": "仅管理员或白名单发送者可触发 ComfyUI 自动启动",
+    "type": "bool",
+    "default": true
+  },
+  "auto_start_allowed_sender_ids": {
+    "description": "允许触发 ComfyUI 自动启动的发送者 ID",
+    "type": "list",
+    "default": [],
+    "items": {
+      "type": "string"
+    }
+  },
+  "startup_wait_seconds": {
+    "description": "自动启动后等待 ComfyUI 就绪的最长秒数",
+    "type": "int",
+    "default": 120
+  },
+  "startup_poll_interval": {
+    "description": "等待启动时的就绪检查间隔（秒）",
+    "type": "int",
+    "default": 3
+  }
+}
