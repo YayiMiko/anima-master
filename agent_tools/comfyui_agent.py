@@ -50,7 +50,7 @@ DEFAULT_CONFIG = {
     "unet_name": "anima_baseV10.safetensors",
     "clip_name": "qwen_3_06b_base.safetensors",
     "vae_name": "qwen_image_vae.safetensors",
-    "negative_prompt": "worst quality, low quality, score_1, score_2, score_3, artist name",
+    "negative_prompt": "worst quality, low quality, artist name",
     "edit_denoise": 0.55,
     "max_image_side": 1024,
     "upscale_factor": 2.0,

@@ -8,7 +8,7 @@
     "description": "一键预设配置",
     "type": "string",
     "default": "none",
-    "hint": "可选：none / chiyo。选择 chiyo 会应用“千代预设”，包含千代画风、Anima 推荐参数和 prompt 优化规则；狐莉会作为可选固定角色提供，但不会成为默认角色。"
+    "hint": "可选：none / chiyo。选择 chiyo 会应用“千代预设”，包含千代画风、Anima 推荐参数和 prompt 优化规则；狐莉会作为可选固定角色提供，只有明确提到狐莉时才会使用。"
   },
   "comfyui_base_url": {
     "description": "本地 ComfyUI 地址",
@@ -95,7 +95,7 @@
   "negative_prompt": {
     "description": "默认负面提示词",
     "type": "string",
-    "default": "worst quality, low quality, score_1, score_2, score_3, artist name"
+    "default": "worst quality, low quality, artist name"
   },
   "prompt_optimize_enabled": {
     "description": "文生图时启用 Anima prompt 优化",
@@ -184,23 +184,7 @@
   "quality_prefix": {
     "description": "默认质量词前缀",
     "type": "string",
-    "default": "masterpiece, best quality, score_7,"
-  },
-  "default_character_enabled": {
-    "description": "默认启用固定角色 tags",
-    "type": "bool",
-    "default": false
-  },
-  "default_character_name": {
-    "description": "默认角色名称",
-    "type": "string",
-    "default": "",
-    "hint": "仅用于 prompt 优化时辅助理解。"
-  },
-  "default_character_tags": {
-    "description": "默认角色 tags",
-    "type": "string",
-    "default": ""
+    "default": "masterpiece, best quality,"
   },
   "fixed_characters": {
     "description": "固定角色预设",

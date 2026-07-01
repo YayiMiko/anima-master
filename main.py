@@ -31,7 +31,6 @@ try:
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
-        wants_default_character,
     )
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_tags import (
@@ -47,7 +46,6 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
-        wants_default_character,
     )
 
 try:
@@ -622,16 +620,14 @@ class ComfyUIAgentPlugin(Star):
         provider_id: str,
         llm_prompt: str,
         use_deep_thinking: bool,
-        default_character: bool,
+        fixed_character: bool,
         character_name: str = "",
     ) -> str:
         if character_name:
             character_rule = f"不要输出固定角色“{character_name}”的固有外观设定。"
         else:
             character_rule = (
-                "不要输出默认角色的固有外观设定。"
-                if default_character
-                else "用户已指定其它角色时，可以并且应该输出该角色的固有外观设定。"
+                "用户没有使用固定角色时，可以并且应该输出主体所需的固有外观设定。"
             )
         kwargs: dict[str, Any] = {
             "chat_provider_id": provider_id,
@@ -656,7 +652,7 @@ class ComfyUIAgentPlugin(Star):
         *,
         llm_content: str,
         user_prompt: str,
-        default_character: bool,
+        fixed_character: bool,
     ) -> str:
         if not llm_content or not self._bool("danbooru_core_tag_lookup_enabled", True):
             return llm_content
@@ -677,7 +673,7 @@ class ComfyUIAgentPlugin(Star):
                 resolve_core_tags,
                 llm_content,
                 user_prompt=user_prompt,
-                allow_insert=not default_character,
+                allow_insert=not fixed_character,
                 max_candidates=max_candidates,
                 timeout=timeout,
                 donmai_base_urls=base_urls,
@@ -723,21 +719,15 @@ class ComfyUIAgentPlugin(Star):
             logger.warning("[comfyui_agent] prompt builder has no provider; using original prompt")
             return prompt
 
-        use_default_character = wants_default_character(
-            prompt,
-            self._bool("default_character_enabled", False),
-        )
         fixed_character = selected_fixed_character(prompt, dict(self.config))
         fixed_character_name = fixed_character[0] if fixed_character else ""
-        if fixed_character:
-            use_default_character = True
+        use_fixed_character = fixed_character is not None
         use_sensual_mode = wants_sensual_mode(prompt, dict(self.config))
         required_core_tags = (
-            required_core_tags_for_prompt(prompt) if not use_default_character else ()
+            required_core_tags_for_prompt(prompt) if not use_fixed_character else ()
         )
         logger.info(
-            "[comfyui_agent] prompt builder input default_character=%s fixed_character=%s sensual=%s required_core_tags=%s prompt=%s",
-            use_default_character,
+            "[comfyui_agent] prompt builder input fixed_character=%s sensual=%s required_core_tags=%s prompt=%s",
             fixed_character_name or "none",
             use_sensual_mode,
             ",".join(required_core_tags) or "none",
@@ -758,7 +748,7 @@ class ComfyUIAgentPlugin(Star):
         llm_prompt = build_llm_prompt(
             prompt,
             search_context=search_context,
-            default_character=use_default_character,
+            fixed_character=use_fixed_character,
             character_name=fixed_character_name,
             sensual_mode=use_sensual_mode,
             mode=mode,
@@ -768,7 +758,7 @@ class ComfyUIAgentPlugin(Star):
                 provider_id=provider_id,
                 llm_prompt=llm_prompt,
                 use_deep_thinking=use_deep_thinking,
-                default_character=use_default_character,
+                fixed_character=use_fixed_character,
                 character_name=fixed_character_name,
             )
         except Exception as exc:
@@ -785,7 +775,7 @@ class ComfyUIAgentPlugin(Star):
                         provider_id=provider_id,
                         llm_prompt=llm_prompt,
                         use_deep_thinking=False,
-                        default_character=use_default_character,
+                        fixed_character=use_fixed_character,
                         character_name=fixed_character_name,
                     )
                 except Exception as retry_exc:
@@ -795,7 +785,7 @@ class ComfyUIAgentPlugin(Star):
         llm_content = await self._resolve_danbooru_core_tags(
             llm_content=llm_content,
             user_prompt=prompt,
-            default_character=use_default_character,
+            fixed_character=use_fixed_character,
         )
         built = build_final_prompt(
             user_prompt=prompt,
@@ -804,13 +794,13 @@ class ComfyUIAgentPlugin(Star):
             required_core_tags=required_core_tags,
         )
         logger.info(
-            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s default_character=%s default_style=%s required_core_tags=%s content_chars=%s final_chars=%s final_head=%s",
+            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s required_core_tags=%s content_chars=%s final_chars=%s final_head=%s",
             built.raw_mode,
             bool(search_context),
             use_deep_thinking,
             built.character_name or "none",
             built.used_sensual_mode,
-            built.used_default_character,
+            built.used_fixed_character,
             built.used_default_style,
             ",".join(built.required_core_tags) or "none",
             len(built.content_tags),

@@ -3,13 +3,16 @@ from dataclasses import dataclass
 from typing import Any
 
 
-DEFAULT_QUALITY_TAGS = "masterpiece, best quality, score_7,"
+DEFAULT_QUALITY_TAGS = "masterpiece, best quality,"
+OLD_SCORE_QUALITY_TAGS = "masterpiece, best quality, score_7,"
 DEFAULT_CHARACTER_TAGS = ""
 FIXED_CHARACTER_TAGS: dict[str, str] = {}
 DEFAULT_ARTIST_TAGS = ""
 CHIYO_PRESET_ALIASES = {"chiyo", "chiyo_preset", "千代", "千代预设", "千代配置"}
 CHIYO_STYLE_NAME = "千代画风"
-CHIYO_QUALITY_TAGS = "masterpiece, best quality, score_7, nsfw,"
+CHIYO_QUALITY_TAGS = "masterpiece, best quality, nsfw,"
+CHIYO_NEGATIVE_PROMPT = "worst quality, low quality, artist name"
+OLD_SCORE_NEGATIVE_PROMPT = "worst quality, low quality, score_1, score_2, score_3, artist name"
 CHIYO_CHARACTER_NAME = "狐莉"
 CHIYO_CHARACTER_TAGS = (
     "1 girl, solo, fox girl, (fox ears, inner ear hair), "
@@ -88,15 +91,9 @@ NO_STYLE_MARKERS = (
 )
 
 NO_CHARACTER_MARKERS = (
-    "不要默认角色",
-    "不用默认角色",
-    "no default character",
-)
-
-DEFAULT_CHARACTER_HINTS = (
-    "默认角色",
-    "我的角色",
-    "这个角色",
+    "不要固定角色",
+    "不用固定角色",
+    "no fixed character",
 )
 
 QUALITY_BLOCKLIST = {
@@ -129,7 +126,7 @@ class PromptBuildResult:
     final_prompt: str
     content_tags: str
     raw_mode: bool
-    used_default_character: bool
+    used_fixed_character: bool
     used_default_style: bool
     required_core_tags: tuple[str, ...] = ()
     character_name: str = ""
@@ -155,8 +152,14 @@ def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
     if (
         not str(result.get("quality_prefix") or "").strip()
         or result.get("quality_prefix") == DEFAULT_QUALITY_TAGS
+        or result.get("quality_prefix") == OLD_SCORE_QUALITY_TAGS
     ):
         result["quality_prefix"] = CHIYO_QUALITY_TAGS
+    if (
+        not str(result.get("negative_prompt") or "").strip()
+        or result.get("negative_prompt") == OLD_SCORE_NEGATIVE_PROMPT
+    ):
+        result["negative_prompt"] = CHIYO_NEGATIVE_PROMPT
     if not str(result.get("default_artist_tags") or "").strip():
         result["default_artist_tags"] = CHIYO_ARTIST_TAGS
 
@@ -172,10 +175,6 @@ def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
 def fixed_character_tags(config: dict[str, Any]) -> dict[str, str]:
     """Return built-in and user-configured fixed character tags."""
     characters = {name: str(tags) for name, tags in FIXED_CHARACTER_TAGS.items()}
-    default_name = str(config.get("default_character_name") or "").strip()
-    default_tags = str(config.get("default_character_tags") or "").strip()
-    if default_name and default_tags:
-        characters.setdefault(default_name, default_tags)
     configured = config.get("fixed_characters")
     if isinstance(configured, dict):
         for name, tags in configured.items():
@@ -227,138 +226,10 @@ def wants_sensual_mode(prompt: str, config: dict[str, Any]) -> bool:
     return any(marker.lower() in text for marker in markers)
 
 
-def _has_explicit_nondefault_character(prompt: str) -> bool:
-    text = str(prompt or "").strip()
-    if not text:
-        return False
-    if any(hint in text for hint in DEFAULT_CHARACTER_HINTS):
-        return False
-
-    compact = re.sub(r"\s+", "", text)
-    give_match = re.search(r"给([^，,。；;：:\s]{1,18})(?:穿|换|戴|拿|使用|做|画)", compact)
-    if give_match and give_match.group(1) not in {"她", "它", "ta", "TA"}:
-        return True
-
-    def _trim_subject_action(subject: str) -> str:
-        return re.split(
-            r"(?:但|不过|穿|换|戴|拿|用|使用|风格|画风|格式|立绘|背景|场景|吃|喝|坐|站|躺|跑|跳|拿着|端着|看着)",
-            subject,
-            maxsplit=1,
-        )[0].strip()
-
-    def _extract_character_name(value: str) -> str:
-        subject = str(value or "").strip()
-        if not subject:
-            return ""
-
-        # Common Chinese phrasing: "碧蓝档案的角色妃咲喝茶",
-        # "碧蓝档案里妃咲", "画角色妃咲".
-        role_match = re.search(
-            r"(?:角色|人物|主角|女主|男主)([^，,。；;：:\s的]{2,18})",
-            subject,
-        )
-        if role_match:
-            return _trim_subject_action(role_match.group(1))
-
-        work_match = re.search(
-            r"(?:[^，,。；;：:\s]{2,24}?)(?:里的|中的|里|中|的)([^，,。；;：:\s的]{2,18})",
-            subject,
-        )
-        if work_match:
-            return _trim_subject_action(work_match.group(1))
-
-        return subject
-
-    def is_specific_subject(value: str) -> bool:
-        subject = _extract_character_name(value)
-        if "的" in subject:
-            tail = subject.rsplit("的", 1)[-1].strip()
-            if len(tail) >= 2:
-                subject = tail
-        subject = _trim_subject_action(subject)
-        subject = subject.strip()
-        if not subject:
-            return False
-        generic_subjects = {
-            "女孩",
-            "少女",
-            "女生",
-            "女孩子",
-            "女仆",
-            "猫娘",
-            "狐娘",
-            "犬娘",
-            "角色",
-            "人物",
-            "头像",
-            "表情包",
-            "壁纸",
-            "立绘",
-            "场景",
-            'ͼƬ',
-            'ͼ',
-            "可爱",
-            "漂亮",
-            "好看",
-            "清爽",
-            "白色",
-            "黑色",
-            "蓝色",
-            "红色",
-            "粉色",
-            "金色",
-            "银色",
-            "衣服",
-            "服装",
-            "背景",
-        }
-        return subject not in generic_subjects
-
-    direct_role_match = re.search(
-        r"(?:角色|人物|主角|女主|男主)([^，,。；;：:\s的]{2,18})",
-        compact,
-    )
-    if direct_role_match and is_specific_subject(direct_role_match.group(1)):
-        return True
-
-    replace_match = re.search(
-        r"(?:替换为|替换成|换成|换为|改成|变成)([^，,。；;：:\s]{2,24})",
-        compact,
-    )
-    if replace_match and is_specific_subject(replace_match.group(1)):
-        return True
-
-    draw_match = re.search(
-        r"(?:画|生成|生图|来|做)(?:一?张|一?个|一?位)?(?:正在|在)?([^，,。；;：:\s]{2,24})",
-        compact,
-    )
-    if draw_match and is_specific_subject(draw_match.group(1)):
-        return True
-
-    first_clause = re.split(r"(?:但|不过|，|,|。|；|;)", compact, maxsplit=1)[0]
-    bare_match = re.search(r"^(?:一?张|一?个|一?位)?[^，,。；;：:\s]{0,16}的([^，,。；;：:\s]{2,18})$", first_clause)
-    if bare_match and is_specific_subject(bare_match.group(1)):
-        return True
-
-    return False
-
-
-def wants_default_character(prompt: str, default: bool = True) -> bool:
-    text = str(prompt or "")
-    text_lower = text.lower()
-    if any(marker.lower() in text_lower for marker in NO_CHARACTER_MARKERS):
-        return False
-    if not default:
-        return False
-    if _has_explicit_nondefault_character(text):
-        return False
-    return default
-
-
 def build_llm_prompt(
     theme: str,
     search_context: str = "",
-    default_character: bool = True,
+    fixed_character: bool = False,
     character_name: str = "",
     sensual_mode: bool = False,
     mode: str = "txt2img",
@@ -372,9 +243,9 @@ def build_llm_prompt(
         )
     else:
         character_rule = (
-            "默认会在最终 prompt 前缀中拼接用户配置的默认角色词，因此具体内容段不要重复列出默认角色的固有设定。"
-            if default_character
-            else "用户已经指定其它角色，或没有启用默认角色。请为用户指定的角色列出必要的可识别外观特征、年龄感、发色、瞳色、配饰和标志性元素。"
+            "用户没有使用固定角色。请为用户指定或描述的主体列出必要的可识别外观特征、年龄感、发色、瞳色、配饰和标志性元素。"
+            if not fixed_character
+            else "最终 prompt 前缀中会拼接固定角色词，因此具体内容段不要重复列出该角色的固有设定。"
         )
     search_block = ""
     if search_context:
@@ -439,7 +310,7 @@ def _normalize_tag_key(tag: str) -> str:
 def clean_content_tags(
     text: str,
     max_tags: int = 120,
-    strip_default_character_tags: bool = True,
+    strip_character_tags: bool = True,
     protected_core_tags: tuple[str, ...] = (),
 ) -> str:
     tags = _split_tags(text)
@@ -456,7 +327,7 @@ def clean_content_tags(
             continue
         if key in QUALITY_BLOCKLIST:
             continue
-        if strip_default_character_tags and key in CHARACTER_BLOCKLIST:
+        if strip_character_tags and key in CHARACTER_BLOCKLIST:
             continue
         if protected and parenthesized_core_re.fullmatch(key) and key not in protected:
             continue
@@ -499,7 +370,7 @@ def build_final_prompt(
             final_prompt=final,
             content_tags=final,
             raw_mode=True,
-            used_default_character=False,
+            used_fixed_character=False,
             used_default_style=False,
             required_core_tags=(),
             character_name="",
@@ -507,10 +378,7 @@ def build_final_prompt(
         )
 
     fixed_character = selected_fixed_character(user_prompt, config)
-    use_character = wants_default_character(
-        user_prompt,
-        bool(config.get("default_character_enabled", False)),
-    ) or fixed_character is not None
+    use_character = fixed_character is not None
     use_style = wants_default_style(
         user_prompt,
         bool(config.get("default_style_enabled", False)),
@@ -521,9 +389,7 @@ def build_final_prompt(
     if fixed_character is not None:
         character_name, character = fixed_character
     else:
-        character = str(config.get("default_character_tags") or DEFAULT_CHARACTER_TAGS)
-        if use_character:
-            character_name = str(config.get("default_character_name") or "default character")
+        character = DEFAULT_CHARACTER_TAGS
     if use_character and not character.strip():
         use_character = False
         character_name = ""
@@ -533,7 +399,7 @@ def build_final_prompt(
     content = clean_content_tags(
         llm_content or user_prompt,
         max_tags=int(config.get("prompt_builder_max_content_tags", 120) or 120),
-        strip_default_character_tags=use_character,
+        strip_character_tags=use_character,
         protected_core_tags=required_core_tags,
     )
     parts = [quality]
@@ -548,7 +414,7 @@ def build_final_prompt(
         final_prompt=join_prompt_parts(parts),
         content_tags=content,
         raw_mode=False,
-        used_default_character=use_character,
+        used_fixed_character=use_character,
         used_default_style=use_style,
         required_core_tags=tuple(required_core_tags),
         character_name=character_name,

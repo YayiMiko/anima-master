@@ -9,7 +9,7 @@ Anima 绘图大师是一个 AstrBot 插件，用来把聊天机器人连接到�
 - 使用 `/anm` 在聊天中调用本地 ComfyUI 生图。
 - 将自然语言需求优化为 Danbooru tags。
 - 支持原样 tags 模式，不经过 LLM 改写。
-- 支持固定角色、默认角色、默认画风和画师 tags。
+- 支持固定角色、默认画风和画师 tags。
 - 支持联网搜索少量参考信息，用于补全角色外观、服装和设定。
 - 支持查询 Danbooru / Safebooru 核心角色 tag。
 - 支持解析 PNG 内的生成信息。
@@ -55,7 +55,7 @@ vae_name = 你的 VAE 文件名
 如果你已经写好了完整 tags，不希望插件改写，可以使用：
 
 ```text
-/anm 原样 masterpiece, best quality, score_7, 1girl, solo, white dress, simple background
+/anm 原样 masterpiece, best quality, 1girl, solo, white dress, simple background
 ```
 
 ## 千代预设
@@ -72,12 +72,12 @@ chiyo
 选择 `chiyo` 后会启用“千代预设”，它会自动应用：
 
 - Anima 常用基础参数。
-- 默认质量词：`masterpiece, best quality, score_7, nsfw,`
+- 默认质量词：`masterpiece, best quality, nsfw,`
 - 默认画风名称：千代画风。
 - 默认画师串：`@yukisiannn, @kani biimu, @ixy, @shnva, @shiromochi sakura, @stmast,`
 - 默认 prompt 优化规则：质量词、画师词、具体内容分段拼接。
 
-如果你不想自己写角色 tag，可以试试预设的“狐莉”角色。狐莉不会作为默认角色自动套用；只有当你在指令中明确提到“狐莉”时，插件才会使用这组角色 tags：
+如果你不想自己写角色 tag，可以试试预设的“狐莉”角色。狐莉不会自动套用；只有当你在指令中明确提到“狐莉”时，插件才会使用这组角色 tags：
 
 ```text
 1 girl, solo, fox girl, (fox ears, inner ear hair), (white hair, medium hair, hair ornament, hair between eyes), (heterochromia, ice blue eye and amber eye), fang, black choker,
@@ -85,20 +85,17 @@ chiyo
 
 启用千代预设后，你仍然可以在配置里覆盖默认画风、质量词或画师串。临时不想用画师串时，也可以在指令里写“不使用默认画风”或 “no artist tags”。
 
-## 自定义角色和画风
+## 自定义固定角色和画风
 
 如果你不使用千代预设，也可以自己配置：
 
 ```text
-default_character_enabled = true
-default_character_name = 你的角色名
-default_character_tags = 1girl, solo, ...
 default_style_enabled = true
 default_style_name = 你的画风名
 default_artist_tags = @artist_a, @artist_b, ...
 ```
 
-也可以在 `fixed_characters` 中添加多个角色：
+在 `fixed_characters` 中添加角色：
 
 ```json
 {
@@ -108,13 +105,14 @@ default_artist_tags = @artist_a, @artist_b, ...
 ```
 
 之后聊天里提到角色名时，插件会优先使用对应的固定角色 tags。
+没有明确提到固定角色名时，插件不会自动套用任何角色 tags。
 
 ## 常用指令
 
 ```text
 /anm
 /anm 白色礼服，立绘，简单背景
-/anm 原样 masterpiece, best quality, score_7, 1girl, solo
+/anm 原样 masterpiece, best quality, 1girl, solo
 /anm 解析法术
 /anm 反推这张图的提示词
 ```
@@ -139,7 +137,7 @@ default_artist_tags = @artist_a, @artist_b, ...
 原样 tags：
 
 ```text
-/anm 原样 masterpiece, best quality, score_7, 1girl, solo, white background
+/anm 原样 masterpiece, best quality, 1girl, solo, white background
 ```
 
 这种模式不会调用 prompt 优化模型，适合已经熟悉 Danbooru tags 的用户。
