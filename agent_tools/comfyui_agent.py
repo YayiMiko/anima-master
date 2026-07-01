@@ -96,8 +96,16 @@ def _generation_size(config: dict[str, Any], width: int, height: int) -> tuple[i
     height = int(height)
     allowed = _allowed_sizes(config)
     if allowed and (width, height) not in allowed:
-        choices = ", ".join(f"{w}x{h}" for w, h in allowed)
-        raise ValueError(f"unsupported_size {width}x{height}; allowed sizes: {choices}")
+        requested_ratio = width / height
+        same_orientation = [
+            size
+            for size in allowed
+            if (size[0] >= size[1]) == (width >= height)
+        ] or allowed
+        width, height = min(
+            same_orientation,
+            key=lambda size: (abs((size[0] / size[1]) - requested_ratio), abs(size[0] * size[1] - width * height)),
+        )
     return width, height
 
 def _now() -> str:
@@ -288,6 +296,7 @@ def _available_models(object_info: dict[str, Any], node: str, input_name: str) -
 def _anima_t2i_workflow(
     config: dict[str, Any],
     prompt: str,
+    negative_prompt: str,
     width: int,
     height: int,
     steps: int,
@@ -325,7 +334,7 @@ def _anima_t2i_workflow(
         "12": {
             "class_type": "CLIPTextEncode",
             "inputs": {
-                "text": config.get("negative_prompt", DEFAULT_CONFIG["negative_prompt"]),
+                "text": negative_prompt,
                 "clip": ["45", 0],
             },
         },
@@ -366,7 +375,8 @@ def _anima_img2img_workflow(
     seed: int,
     denoise: float,
 ) -> dict[str, Any]:
-    workflow = _anima_t2i_workflow(config, prompt, width, height, steps, cfg, seed)
+    negative_prompt = str(config.get("negative_prompt", DEFAULT_CONFIG["negative_prompt"]))
+    workflow = _anima_t2i_workflow(config, prompt, negative_prompt, width, height, steps, cfg, seed)
     workflow["10"] = {"class_type": "LoadImage", "inputs": {"image": image_name}}
     workflow["13"] = {
         "class_type": "ImageScale",
@@ -425,11 +435,20 @@ def _remove_bg_workflow(config: dict[str, Any], image_name: str) -> dict[str, An
     }
 
 
-def _workflow(config: dict[str, Any], prompt: str, width: int, height: int, steps: int, cfg: float, seed: int) -> dict[str, Any]:
+def _workflow(
+    config: dict[str, Any],
+    prompt: str,
+    negative_prompt: str,
+    width: int,
+    height: int,
+    steps: int,
+    cfg: float,
+    seed: int,
+) -> dict[str, Any]:
     workflow = str(config.get("workflow") or "anima_t2i")
     if workflow != "anima_t2i":
         raise SystemExit(f"unsupported workflow: {workflow}")
-    return _anima_t2i_workflow(config, prompt, width, height, steps, cfg, seed)
+    return _anima_t2i_workflow(config, prompt, negative_prompt, width, height, steps, cfg, seed)
 
 
 def _history(config: dict[str, Any], prompt_id: str) -> dict[str, Any] | None:
@@ -573,7 +592,8 @@ def generate(args) -> None:
         steps = int(args.steps or config.get("steps", DEFAULT_CONFIG["steps"]))
         cfg = float(args.cfg or config.get("cfg", DEFAULT_CONFIG["cfg"]))
         seed = int(args.seed if args.seed is not None else random.randint(1, 2**32 - 1))
-        prompt_body = _workflow(config, prompt, width, height, steps, cfg, seed)
+        negative_prompt = str(args.negative_prompt or config.get("negative_prompt", DEFAULT_CONFIG["negative_prompt"]))
+        prompt_body = _workflow(config, prompt, negative_prompt, width, height, steps, cfg, seed)
         prompt_id, history = _run_prompt(config, prompt_body)
         status_payload = _history_failed(history)
         if status_payload:
@@ -766,6 +786,7 @@ def main() -> None:
     p.add_argument("--steps", type=int)
     p.add_argument("--cfg", type=float)
     p.add_argument("--seed", type=int)
+    p.add_argument("--negative-prompt")
     p.set_defaults(func=generate)
 
     p = sub.add_parser("edit")

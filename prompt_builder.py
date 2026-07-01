@@ -171,10 +171,7 @@ def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
     if not str(result.get("default_artist_tags") or "").strip():
         result["default_artist_tags"] = CHIYO_ARTIST_TAGS
 
-    fixed_characters = result.get("fixed_characters")
-    if not isinstance(fixed_characters, dict):
-        fixed_characters = {}
-    fixed_characters = dict(fixed_characters)
+    fixed_characters = fixed_character_tags(result)
     fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
     result["fixed_characters"] = fixed_characters
     return result
@@ -188,6 +185,19 @@ def fixed_character_tags(config: dict[str, Any]) -> dict[str, str]:
         for name, tags in configured.items():
             name_text = str(name or "").strip()
             tags_text = str(tags or "").strip()
+            if name_text and tags_text:
+                characters[name_text] = tags_text
+    elif isinstance(configured, list):
+        for item in configured:
+            text = str(item or "").strip()
+            if not text:
+                continue
+            separator = "=" if "=" in text else ":"
+            if separator not in text:
+                continue
+            name, tags = text.split(separator, 1)
+            name_text = name.strip()
+            tags_text = tags.strip()
             if name_text and tags_text:
                 characters[name_text] = tags_text
     return characters

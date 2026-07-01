@@ -299,6 +299,66 @@ class ComfyUIAgentPlugin(Star):
                     return saved
         return None
 
+    def _reply_texts(self, event: AstrMessageEvent) -> list[str]:
+        texts = []
+        for component in event.get_messages():
+            if not isinstance(component, Comp.Reply):
+                continue
+            message = str(component.message_str or component.text or "").strip()
+            if message:
+                texts.append(message)
+        return texts
+
+    def _extract_spell_prompts(self, text: str) -> tuple[str, str] | None:
+        if "法术解析结果" not in text or "正面提示词" not in text:
+            return None
+        positive_match = re.search(
+            r"正面提示词[：:]\s*(.*?)(?:\n\s*负面提示词[：:]|\Z)",
+            text,
+            flags=re.S,
+        )
+        if not positive_match:
+            return None
+        positive = positive_match.group(1).strip()
+        negative = ""
+        negative_match = re.search(r"负面提示词[：:]\s*(.*)\Z", text, flags=re.S)
+        if negative_match:
+            negative = negative_match.group(1).strip()
+        if not positive:
+            return None
+        return self._shorten(positive, 3500), self._shorten(negative, 1600)
+
+    def _wants_quoted_prompt(self, prompt: str) -> bool:
+        text = str(prompt or "")
+        if "引用" not in text:
+            return False
+        return any(marker in text for marker in ("提示词", "法术", "tags", "tag", "咒语"))
+
+    def _augment_prompt_with_quoted_spell(self, event: AstrMessageEvent, prompt: str) -> str:
+        if not self._wants_quoted_prompt(prompt):
+            return prompt
+        for text in self._reply_texts(event):
+            extracted = self._extract_spell_prompts(text)
+            if not extracted:
+                continue
+            positive, negative = extracted
+            lines = [
+                f"用户要求：{prompt}",
+                "引用法术正面提示词：",
+                positive,
+            ]
+            if negative:
+                lines.extend(["引用法术负面提示词：", negative])
+            lines.append(
+                "处理要求：借鉴引用法术中的服饰、动作、构图、氛围和风格；"
+                "如果用户指定了固定角色，只保留固定角色自身设定，不要复制引用法术里的角色身份、发色、眼色、年龄、种族等固有设定。"
+            )
+            augmented = "\n".join(lines)
+            logger.info("[comfyui_agent] prompt augmented with quoted spell chars=%s", len(augmented))
+            return augmented
+        logger.info("[comfyui_agent] quoted prompt requested but no spell result found in reply")
+        return prompt
+
     async def _event_image_input(self, event: AstrMessageEvent) -> str | None:
         direct_images: list[Comp.Image] = []
         reply_images: list[Comp.Image] = []
@@ -1059,6 +1119,7 @@ class ComfyUIAgentPlugin(Star):
         height: int | None = None,
         steps: int | None = None,
         cfg: float | None = None,
+        negative_prompt: str | None = None,
     ) -> dict[str, Any]:
         if not self._is_allowed(event):
             return {"ok": False, "error": "not_permitted"}
@@ -1071,6 +1132,7 @@ class ComfyUIAgentPlugin(Star):
         prompt = await self._augment_prompt_with_reference_image(event, prompt)
         if prompt is None:
             return {"ok": False, "error": "reference_image_not_found"}
+        prompt = self._augment_prompt_with_quoted_spell(event, prompt)
         prompt = await self._build_anima_prompt(event, prompt)
         args = ["generate", "--prompt", prompt]
         if width:
@@ -1081,6 +1143,8 @@ class ComfyUIAgentPlugin(Star):
             args.extend(["--steps", str(int(steps))])
         if cfg:
             args.extend(["--cfg", str(float(cfg))])
+        if negative_prompt:
+            args.extend(["--negative-prompt", str(negative_prompt)])
         return await self._run_tool(args)
 
     async def _generate(
@@ -1091,9 +1155,16 @@ class ComfyUIAgentPlugin(Star):
         height: int | None = None,
         steps: int | None = None,
         cfg: float | None = None,
+        negative_prompt: str | None = None,
     ) -> str:
         payload = await self._generate_payload(
-            event, prompt, width=width, height=height, steps=steps, cfg=cfg
+            event,
+            prompt,
+            width=width,
+            height=height,
+            steps=steps,
+            cfg=cfg,
+            negative_prompt=negative_prompt,
         )
         return await self._send_payload(event, payload)
 
@@ -1322,6 +1393,7 @@ class ComfyUIAgentPlugin(Star):
         height: int | None = None,
         steps: int | None = None,
         cfg: float | None = None,
+        negative_prompt: str | None = None,
     ) -> str:
         """Generate an image with local ComfyUI from the provided prompt/tags.
 
@@ -1331,9 +1403,16 @@ class ComfyUIAgentPlugin(Star):
             height(number): Optional height paired with width.
             steps(number): Optional sampling steps.
             cfg(number): Optional CFG scale.
+            negative_prompt(string): Optional negative prompt to use for this generation.
         """
         return await self._generate(
-            event, prompt, width=width, height=height, steps=steps, cfg=cfg
+            event,
+            prompt,
+            width=width,
+            height=height,
+            steps=steps,
+            cfg=cfg,
+            negative_prompt=negative_prompt,
         )
 
     @filter.llm_tool(name="comfyui_edit")

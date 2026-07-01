@@ -188,10 +188,12 @@
   },
   "fixed_characters": {
     "description": "固定角色预设",
-    "type": "object",
-    "default": {},
-    "hint": "格式：{\"角色名\": \"danbooru tags\"}。用户在指令中提到角色名时会自动使用。",
-    "items": {}
+    "type": "list",
+    "default": [],
+    "hint": "每行一个角色，格式：角色名=danbooru tags。用户在指令中提到角色名时会自动使用。",
+    "items": {
+      "type": "string"
+    }
   },
   "default_style_enabled": {
     "description": "默认启用画风 / 画师 tags",
