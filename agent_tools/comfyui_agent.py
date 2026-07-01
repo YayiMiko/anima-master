@@ -42,7 +42,16 @@ DEFAULT_CONFIG = {
     "poll_interval": 2,
     "width": 832,
     "height": 1216,
-    "allowed_sizes": ["832x1216", "896x1152", "1024x1024", "1152x896", "1216x832", "768x1344", "1344x768"],
+    "allowed_sizes": [
+        "832x1216",
+        "896x1152",
+        "1024x1024",
+        "1152x896",
+        "1216x832",
+        "768x1344",
+        "1344x768",
+        "1024x1536",
+    ],
     "steps": 30,
     "cfg": 5.0,
     "sampler_name": "er_sde",
@@ -59,8 +68,13 @@ DEFAULT_CONFIG = {
 
 
 def _parse_size(value: Any) -> tuple[int, int] | None:
-    if isinstance(value, str) and "x" in value.lower():
-        left, right = value.lower().split("x", 1)
+    if isinstance(value, str):
+        text = value.strip().lower()
+        for separator in ("x", "×", "*", "＊", "✕", "✖", "х"):
+            text = text.replace(separator, "x")
+        if "x" not in text:
+            return None
+        left, right = text.split("x", 1)
         try:
             width = int(left.strip())
             height = int(right.strip())

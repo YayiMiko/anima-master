@@ -51,8 +51,10 @@
       "1152x896",
       "1216x832",
       "768x1344",
-      "1344x768"
+      "1344x768",
+      "1024x1536"
     ],
+    "hint": "推荐使用英文半角 x 书写：宽x高，例如 1024x1536。程序也会兼容 1024×1536、1024*1536 等常见写法；如果 width/height 不在此列表中，会自动改用最接近的允许尺寸。",
     "items": {
       "type": "string"
     }
@@ -101,6 +103,12 @@
     "description": "文生图时启用 Anima prompt 优化",
     "type": "bool",
     "default": true
+  },
+  "prompt_builder_style": {
+    "description": "Prompt 生成风格",
+    "type": "string",
+    "default": "",
+    "hint": "可选：千代风格2 / chiyo_style_v2。启用后，LLM 会根据用户需求在立绘取向和插画取向之间选择，不会机械套用固定 tags。"
   },
   "prompt_builder_provider_id": {
     "description": "Prompt 优化使用的聊天模型 Provider ID",

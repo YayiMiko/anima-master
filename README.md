@@ -47,6 +47,14 @@ clip_name = 你的文本编码器文件名
 vae_name = 你的 VAE 文件名
 ```
 
+尺寸配置由 `width`、`height` 和 `allowed_sizes` 共同决定。`allowed_sizes` 推荐使用英文半角 `x` 书写为 `宽x高`，例如：
+
+```text
+1024x1536
+```
+
+插件也会兼容 `1024×1536`、`1024*1536` 等常见写法。注意：如果 `width` 和 `height` 组成的尺寸不在 `allowed_sizes` 中，插件会自动改用最接近的允许尺寸。
+
 然后在聊天里发送：
 
 ```text
@@ -77,6 +85,7 @@ chiyo
 - 默认画风名称：千代画风。
 - 默认画师串：`@yukisiannn, @kani biimu, @ixy, @shnva, @shiromochi sakura, @stmast,`
 - 默认 prompt 优化规则：质量词、画师词、具体内容分段拼接。
+- 默认 Prompt 生成风格：千代风格2。它会让 LLM 在“立绘取向”和“插画取向”之间按需求选择，不机械套用固定 tags。
 
 如果你不想自己写角色 tag，可以试试预设的“狐莉”角色。狐莉不会自动套用；只有当你在指令中明确提到“狐莉”时，插件才会使用这组角色 tags：
 

@@ -10,6 +10,8 @@ FIXED_CHARACTER_TAGS: dict[str, str] = {}
 DEFAULT_ARTIST_TAGS = ""
 CHIYO_PRESET_ALIASES = {"chiyo", "chiyo_preset", "千代", "千代预设", "千代配置"}
 CHIYO_STYLE_NAME = "千代画风"
+CHIYO_PROMPT_STYLE_V2_NAME = "千代风格2"
+CHIYO_PROMPT_STYLE_V2_ALIASES = {"千代风格2", "chiyo_style_v2", "chiyo_v2"}
 CHIYO_QUALITY_TAGS = "masterpiece, best quality, nsfw,"
 CHIYO_NEGATIVE_PROMPT = "worst quality, low quality, artist name"
 OLD_SCORE_NEGATIVE_PROMPT = "worst quality, low quality, score_1, score_2, score_3, artist name"
@@ -128,6 +130,30 @@ CHARACTER_BLOCKLIST = {
     "kawaii",
 }
 
+MULTI_CHARACTER_BLOCKLIST = {
+    "2girls",
+    "3girls",
+    "4girls",
+    "5girls",
+    "6+girls",
+    "multiple girls",
+    "2boys",
+    "3boys",
+    "4boys",
+    "5boys",
+    "6+boys",
+    "multiple boys",
+    "multiple people",
+    "crowd",
+    "group",
+    "background characters",
+    "extra girl",
+    "extra person",
+    "clone",
+    "duplicate",
+    "twins",
+}
+
 
 @dataclass(frozen=True)
 class PromptBuildResult:
@@ -170,6 +196,8 @@ def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
         result["negative_prompt"] = CHIYO_NEGATIVE_PROMPT
     if not str(result.get("default_artist_tags") or "").strip():
         result["default_artist_tags"] = CHIYO_ARTIST_TAGS
+    if not str(result.get("prompt_builder_style") or "").strip():
+        result["prompt_builder_style"] = CHIYO_PROMPT_STYLE_V2_NAME
 
     fixed_characters = fixed_character_tags(result)
     fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
@@ -251,9 +279,11 @@ def build_llm_prompt(
     character_name: str = "",
     sensual_mode: bool = False,
     mode: str = "txt2img",
+    prompt_builder_style: str = "",
 ) -> str:
     theme = str(theme or "").strip()
     search_context = str(search_context or "").strip()
+    prompt_builder_style = str(prompt_builder_style or "").strip()
     if character_name:
         character_rule = (
             f"最终 prompt 前缀中会拼接固定角色“{character_name}”的角色词，"
@@ -287,9 +317,26 @@ def build_llm_prompt(
 这是非 R18 的擦边表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、暧昧姿势等视觉方向。
 不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。
 """
+    style_rule = ""
+    if (
+        prompt_builder_style in CHIYO_PROMPT_STYLE_V2_ALIASES
+        or prompt_builder_style.lower() in CHIYO_PROMPT_STYLE_V2_ALIASES
+    ):
+        style_rule = f"""
+-----------
+当前提示词生成风格：{CHIYO_PROMPT_STYLE_V2_NAME}。
+请在“立绘取向”和“插画取向”之间选择最适合用户需求的一种，但不要机械套用固定词表。
+
+立绘取向适合角色展示、设定图、白底、服装可读性强的画面。请优先描述清楚的姿态、表情、视线、服装部件、饰边、材质、袖口、领口、腰部结构、手部动作等。整体应简洁、清爽、易读，避免把画面写成复杂叙事插画。
+
+插画取向适合更强烈的视觉气质、完整轮廓、华丽衣摆、头发与服装动态、装饰物和氛围感。请优先描述整体剪影、衣物层次、飘动关系、非对称结构、破损或精致边缘、头部装饰、画面重心、角色气质等。整体应更有完成度和视觉冲击，但不要堆复杂背景。
+
+如果用户明确指定“立绘/设定图/白底/角色展示”，采用立绘取向。如果用户明确指定“插画/氛围/华丽/神性/魔女/破碎/气场”，采用插画取向。如果用户未指定，优先采用当前主题更自然的一种；不确定时采用立绘取向。
+"""
     return f"""我是一名AI画师，请根据以下内容设计出大师级的提示词段落。应为适用于anima模型的danbooru tags。
 为画面搭配服饰tag，动作tag，神态tag等。
 {character_rule}
+{style_rule}
 大师之作等前置质量提示词不需要列出。
 服装写的更细，每种应当包含5~10短句或更多。
 部分词直译很可能不会有有效的tag，请尝试用通感来描绘一些danbooru tag可能缺乏词库的词语。以下是一种例子（你不一定要这样做）：苗族少女→银质华丽头饰
@@ -298,6 +345,7 @@ def build_llm_prompt(
 如果用户要求“某角色风格的衣服/动作/姿态”，请先在内部拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成有效的 danbooru tags。
 不要只输出 generic white dress, gold trim, ribbon 这种泛化描述；要保留参考对象最有辨识度的视觉特征。
 即使知道角色的 danbooru 角色 tag，也必须继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。
+Unless the user explicitly asks for multiple characters, write tags for exactly one visible subject only. Use solo and 1girl or 1boy when appropriate. Do not add background people, crowd, twins, clones, extra girls, or multiple character tags.
 {search_block}
 {img2img_rule}
 {sensual_rule}
@@ -331,6 +379,7 @@ def clean_content_tags(
     max_tags: int = 120,
     strip_character_tags: bool = True,
     protected_core_tags: tuple[str, ...] = (),
+    allow_multi_character: bool = False,
 ) -> str:
     tags = _split_tags(text)
     seen: set[str] = set()
@@ -347,6 +396,8 @@ def clean_content_tags(
         if key in QUALITY_BLOCKLIST:
             continue
         if strip_character_tags and key in CHARACTER_BLOCKLIST:
+            continue
+        if not allow_multi_character and key in MULTI_CHARACTER_BLOCKLIST:
             continue
         if protected and parenthesized_core_re.fullmatch(key) and key not in protected:
             continue
@@ -415,11 +466,32 @@ def build_final_prompt(
     artist = str(config.get("default_artist_tags") or DEFAULT_ARTIST_TAGS)
     if use_style and not artist.strip():
         use_style = False
+    prompt_lower = str(user_prompt or "").lower()
+    allow_multi_character = any(
+        marker in prompt_lower
+        for marker in (
+            "2girls",
+            "2 girls",
+            "3girls",
+            "3 girls",
+            "multiple girls",
+            "multiple people",
+            "crowd",
+            "group",
+            "双人",
+            "两人",
+            "二人",
+            "多人",
+            "群像",
+            "一群",
+        )
+    )
     content = clean_content_tags(
         llm_content or user_prompt,
         max_tags=int(config.get("prompt_builder_max_content_tags", 120) or 120),
         strip_character_tags=use_character,
         protected_core_tags=required_core_tags,
+        allow_multi_character=allow_multi_character,
     )
     parts = [quality]
     if required_core_tags:
