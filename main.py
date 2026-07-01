@@ -164,7 +164,14 @@ class ComfyUIAgentPlugin(Star):
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir
 
-    def _write_input_record(self, event: AstrMessageEvent, target: Path, original: str) -> None:
+    def _write_input_record(
+        self,
+        event: AstrMessageEvent,
+        target: Path,
+        original: str,
+        *,
+        details: dict[str, Any] | None = None,
+    ) -> None:
         INPUTS.mkdir(parents=True, exist_ok=True)
         record = {
             "time": datetime.now().isoformat(timespec="seconds"),
@@ -178,6 +185,8 @@ class ComfyUIAgentPlugin(Star):
             "size": target.stat().st_size,
             "source": "comfyui_hard_route",
         }
+        if details:
+            record["details"] = details
         manifest = INPUTS / "manifest.jsonl"
         manifest.parent.mkdir(parents=True, exist_ok=True)
         with manifest.open("a", encoding="utf-8") as f:
@@ -186,6 +195,14 @@ class ComfyUIAgentPlugin(Star):
             json.dumps(record, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+
+    def _image_component_details(self, component: Comp.Image) -> dict[str, str]:
+        return {
+            "file": self._shorten(str(component.file or ""), 500),
+            "url": self._shorten(str(component.url or ""), 500),
+            "path": self._shorten(str(component.path or ""), 500),
+            "type": self._shorten(str(getattr(component, "_type", "") or ""), 120),
+        }
 
     async def _save_image_component(
         self,
@@ -211,9 +228,76 @@ class ComfyUIAgentPlugin(Star):
         filename = f"{timestamp}_{sender}_{label}_image_{index}{ext}"
         target = self._input_target_dir(event) / filename
         shutil.copy2(source, target)
-        self._write_input_record(event, target, original)
-        logger.info("[comfyui_agent] saved %s image input: %s", label, target)
+        details = self._image_component_details(component)
+        details["resolved_source"] = self._shorten(str(source), 500)
+        self._write_input_record(event, target, original, details=details)
+        logger.info(
+            "[comfyui_agent] saved %s image input: %s file=%s url=%s path=%s source=%s",
+            label,
+            target,
+            details.get("file"),
+            details.get("url"),
+            details.get("path"),
+            details.get("resolved_source"),
+        )
         return str(target)
+
+    def _reply_ids_from_raw_event(self, event: AstrMessageEvent) -> list[str]:
+        raw = getattr(event.message_obj, "raw_message", None)
+        segments = raw.get("message") if hasattr(raw, "get") else None
+        if not isinstance(segments, list):
+            return []
+        reply_ids = []
+        for segment in segments:
+            if not isinstance(segment, dict) or segment.get("type") != "reply":
+                continue
+            data = segment.get("data") if isinstance(segment.get("data"), dict) else {}
+            reply_id = data.get("id")
+            if reply_id is not None:
+                reply_ids.append(str(reply_id))
+        return reply_ids
+
+    async def _save_onebot_reply_image(self, event: AstrMessageEvent) -> str | None:
+        bot = getattr(event, "bot", None)
+        if bot is None:
+            return None
+        raw = getattr(event.message_obj, "raw_message", None)
+        routing_params = {"self_id": raw.get("self_id")} if hasattr(raw, "get") and raw.get("self_id") else {}
+        for reply_id in self._reply_ids_from_raw_event(event):
+            try:
+                reply_data = await bot.call_action(
+                    action="get_msg",
+                    message_id=int(reply_id),
+                    **routing_params,
+                )
+            except Exception as exc:
+                logger.warning("[comfyui_agent] failed to fetch raw reply message %s: %s", reply_id, exc)
+                continue
+            segments = reply_data.get("message") if isinstance(reply_data, dict) else None
+            if not isinstance(segments, list):
+                continue
+            image_index = 0
+            for segment in segments:
+                if not isinstance(segment, dict) or segment.get("type") != "image":
+                    continue
+                data = segment.get("data") if isinstance(segment.get("data"), dict) else {}
+                image_index += 1
+                image = Comp.Image(
+                    file=str(data.get("file") or data.get("url") or ""),
+                    url=str(data.get("url") or ""),
+                    path=str(data.get("path") or ""),
+                    _type=str(data.get("sub_type") or data.get("type") or ""),
+                )
+                logger.info(
+                    "[comfyui_agent] raw reply image segment reply_id=%s index=%s data=%s",
+                    reply_id,
+                    image_index,
+                    self._shorten(json.dumps(data, ensure_ascii=False), 1000),
+                )
+                saved = await self._save_image_component(event, image, "reply", image_index)
+                if saved:
+                    return saved
+        return None
 
     async def _event_image_input(self, event: AstrMessageEvent) -> str | None:
         direct_images: list[Comp.Image] = []
@@ -227,6 +311,10 @@ class ComfyUIAgentPlugin(Star):
                         reply_images.append(inner)
 
         # For quoted commands such as "/anm 抠图", the quoted image is the target.
+        if reply_images:
+            saved = await self._save_onebot_reply_image(event)
+            if saved:
+                return saved
         for index, image in enumerate(reply_images or direct_images, start=1):
             saved = await self._save_image_component(
                 event,
@@ -486,7 +574,12 @@ class ComfyUIAgentPlugin(Star):
                 lines.append(f"- 参数：{', '.join(compact_params)}")
         lines.append("")
         lines.append("正面提示词：")
-        lines.append(self._shorten(positive or "未读取到正面提示词", 2200))
+        if positive:
+            lines.append(self._shorten(positive, 2200))
+        elif str(payload.get("format") or "").upper() == "JPEG" and payload.get("metadata_keys") == ["jfif", "jfif_density", "jfif_unit", "jfif_version"]:
+            lines.append("未读取到正面提示词。这张图是 QQ/NapCat 取回的 JPEG 副本，生成信息大概率已经被平台转码时去掉。")
+        else:
+            lines.append("未读取到正面提示词")
         if negative:
             lines.append("")
             lines.append("负面提示词：")

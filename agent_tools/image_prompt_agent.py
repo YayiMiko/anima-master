@@ -20,7 +20,6 @@ WORKSPACE = ROOT / "workspace"
 INPUTS = WORKSPACE / "inputs"
 LATEST_INPUT = INPUTS / "latest.json"
 SUPPORTED_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
-OUTPUT_IMAGES = WORKSPACE / "outputs" / "images"
 
 
 def _inside_workspace(path: Path) -> Path:
@@ -284,39 +283,6 @@ def _has_prompt_payload(payload: dict[str, Any]) -> bool:
     )
 
 
-def _fallback_output_png_for_transcoded_image(path: Path, payload: dict[str, Any]) -> Path | None:
-    """Find the original local PNG when a chat platform returned a metadata-stripped JPG."""
-    if path.suffix.lower() not in {".jpg", ".jpeg"}:
-        return None
-    try:
-        path.relative_to(INPUTS)
-    except ValueError:
-        return None
-    if _has_prompt_payload(payload) or not OUTPUT_IMAGES.exists():
-        return None
-
-    width = payload.get("width")
-    height = payload.get("height")
-    source_mtime = path.stat().st_mtime
-    candidates: list[tuple[float, Path]] = []
-    for candidate in OUTPUT_IMAGES.glob("*.png"):
-        delta = source_mtime - candidate.stat().st_mtime
-        if delta < -30 or delta > 20 * 60:
-            continue
-        try:
-            with Image.open(candidate) as image:
-                if image.width != width or image.height != height:
-                    continue
-        except Exception:
-            continue
-        candidate_payload = inspect_image(candidate)
-        if _has_prompt_payload(candidate_payload):
-            candidates.append((abs(delta), candidate))
-    if not candidates:
-        return None
-    return min(candidates, key=lambda item: item[0])[1]
-
-
 def inspect_image(path: Path, *, include_raw: bool = False) -> dict[str, Any]:
     metadata = _metadata(path)
     payload: dict[str, Any] = {
@@ -401,13 +367,6 @@ def inspect_image(path: Path, *, include_raw: bool = False) -> dict[str, Any]:
 
     if include_raw:
         payload["raw_metadata"] = metadata
-    fallback = _fallback_output_png_for_transcoded_image(path, payload)
-    if fallback:
-        fallback_payload = inspect_image(fallback, include_raw=include_raw)
-        fallback_payload["transcoded_input"] = str(path)
-        fallback_payload["transcoded_metadata_keys"] = payload.get("metadata_keys", [])
-        fallback_payload["fallback_reason"] = "input_image_has_no_generation_metadata"
-        return fallback_payload
     return payload
 
 
