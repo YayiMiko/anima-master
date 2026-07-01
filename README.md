@@ -12,6 +12,7 @@ Anima 绘图大师是一个 AstrBot 插件，用来把聊天机器人连接到�
 - 支持固定角色、默认画风和画师 tags。
 - 支持联网搜索少量参考信息，用于补全角色外观、服装和设定。
 - 支持查询 Danbooru / Safebooru 核心角色 tag。
+- 支持非 R18 擦边表现力模式，让模型按需求生成更有张力的服装、姿态和镜头 tags。
 - 支持解析 PNG 内的生成信息。
 - 支持通过视觉模型反推图片提示词。
 - 支持去背景和自动启动 ComfyUI。
@@ -93,6 +94,7 @@ chiyo
 default_style_enabled = true
 default_style_name = 你的画风名
 default_artist_tags = @artist_a, @artist_b, ...
+sensual_mode_enabled = true
 ```
 
 在 `fixed_characters` 中添加角色：
@@ -106,6 +108,12 @@ default_artist_tags = @artist_a, @artist_b, ...
 
 之后聊天里提到角色名时，插件会优先使用对应的固定角色 tags。
 没有明确提到固定角色名时，插件不会自动套用任何角色 tags。
+
+## 擦边表现力模式
+
+`sensual_mode_enabled` 默认开启。用户在提示中写到“涩气、擦边、透明、魅惑、性感、蕾丝、吊带、紧身、露肩、suggestive”等词时，插件会要求 prompt 优化模型保留这种非 R18 边界感，并自行选择合适的 Danbooru tags。
+
+这个模式不会硬编码固定涩气 tags，也不会在用户没有相关要求时主动添加擦边内容。
 
 ## 常用指令
 

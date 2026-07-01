@@ -210,15 +210,38 @@
     "default": ""
   },
   "sensual_mode_enabled": {
-    "description": "启用表现力模式",
+    "description": "启用非 R18 擦边表现力模式",
     "type": "bool",
-    "default": false,
-    "hint": "命中关键词时让 LLM 自行生成更有表现力的 Danbooru tags；不会硬编码固定涩气 tag。"
+    "default": true,
+    "hint": "命中涩气、擦边、透明、魅惑等关键词时，让 LLM 自行生成更有表现力的 Danbooru tags；不会硬编码固定涩气 tag。"
   },
   "sensual_mode_markers": {
     "description": "触发表现力模式的关键词列表",
     "type": "list",
     "default": [
+      "色气",
+      "涩气",
+      "擦边",
+      "边界感",
+      "性感",
+      "诱惑",
+      "魅惑",
+      "妖艳",
+      "撩人",
+      "暧昧",
+      "挑逗",
+      "诱人",
+      "透明",
+      "透视",
+      "黑纱",
+      "薄纱",
+      "蕾丝",
+      "吊带",
+      "紧身",
+      "露肩",
+      "绝对领域",
+      "小恶魔",
+      "suggestive",
       "seductive",
       "sexy",
       "sensual",
@@ -227,7 +250,8 @@
       "sheer",
       "transparent",
       "lace",
-      "garter"
+      "garter",
+      "teasing"
     ],
     "items": {
       "type": "string"
