@@ -100,75 +100,75 @@
     "default": "worst quality, low quality, artist name"
   },
   "prompt_optimize_enabled": {
-    "description": "[03 Prompt 优化] 文生图时启用 Anima prompt 优化",
+    "description": "[03 提示词优化] 文生图时启用 Anima 提示词优化",
     "type": "bool",
     "default": true
   },
   "prompt_builder_style": {
-    "description": "[03 Prompt 优化] Prompt 生成风格（可填：千代风格2）",
+    "description": "[03 提示词优化] 提示词生成风格（可填：千代风格2）",
     "type": "string",
     "default": "",
-    "hint": "留空表示使用普通 prompt 优化。填“千代风格2”或“chiyo_style_v2”后，LLM 会根据用户需求在立绘取向和插画取向之间选择，不会机械套用固定 tags。"
+    "hint": "留空表示使用普通提示词优化。填“千代风格2”或“chiyo_style_v2”后，LLM 会根据用户需求在立绘取向和插画取向之间选择，不会机械套用固定 tags。"
   },
   "prompt_builder_template": {
-    "description": "[03 Prompt 优化] Prompt 生成模板（发给 LLM 的完整提示词）",
+    "description": "[03 提示词优化] 提示词生成模板（发给 LLM 的完整提示词）",
     "type": "string",
-    "default": "我是一名AI画师，请根据以下内容设计出大师级的提示词段落。应为适用于anima模型的danbooru tags。\n为画面搭配服饰tag，动作tag，神态tag等。\n{character_rule}\n大师之作等前置质量提示词不需要列出。\n服装写的更细，每种应当包含5~10短句或更多。\n部分词直译很可能不会有有效的tag，请尝试用通感来描绘一些danbooru tag可能缺乏词库的词语。以下是一种例子（你不一定要这样做）：苗族少女→银质华丽头饰\n将输出的自然语言汇总到一起。\n提示词在背景方面偏简约即可，可以有设计感，但是不要堆叠过多元素，当前模型对于复杂背景的效果不佳。建议根据情况生成白色背景或立绘式白色主题背景，只带有少量元素。\n如果用户要求“某角色风格的衣服/动作/姿态”，请先在内部拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成有效的 danbooru tags。\n不要只输出 generic white dress, gold trim, ribbon 这种泛化描述；要保留参考对象最有辨识度的视觉特征。\n即使知道角色的 danbooru 角色 tag，也必须继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\nUnless the user explicitly asks for multiple characters, write tags for exactly one visible subject only. Use solo and 1girl or 1boy when appropriate. Do not add background people, crowd, twins, clones, extra girls, or multiple character tags.\n{search_block}\n{reference_rule}\n{img2img_rule}\n{style_block}\n{sensual_rule}\n-----------\n没有特殊要求时，请为目标角色应用可爱风格。注意，这种可爱与用户要求的涩气边界感不冲突。\n-----------\n这次，请为我生成{theme}主题的提示词。",
+    "default": "我是一名AI画师，请根据以下内容设计出大师级的提示词段落。应为适用于anima模型的danbooru tags。\n为画面搭配服饰tag，动作tag，神态tag等。\n{character_rule}\n大师之作等前置质量提示词不需要列出。\n服装写的更细，每种应当包含5~10短句或更多。\n部分词直译很可能不会有有效的tag，请尝试用通感来描绘一些danbooru tag可能缺乏词库的词语。以下是一种例子（你不一定要这样做）：苗族少女→银质华丽头饰\n将输出的自然语言汇总到一起。\n提示词在背景方面偏简约即可，可以有设计感，但是不要堆叠过多元素，当前模型对于复杂背景的效果不佳。建议根据情况生成白色背景或立绘式白色主题背景，只带有少量元素。\n如果用户要求“某角色风格的衣服/动作/姿态”，请先在内部拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成有效的 danbooru tags。\n不要只输出 generic white dress, gold trim, ribbon 这类泛化标签；要保留参考对象最有辨识度的视觉特征。\n即使知道角色的 danbooru 角色 tag，也必须继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n除非用户明确要求多角色，否则只为一个可见主体写 tags。根据主题使用 solo、1girl 或 1boy；不要添加背景人物、人群、双胞胎、分身、额外角色或多个角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{style_block}\n{sensual_rule}\n-----------\n没有特殊要求时，请为目标角色应用可爱风格。注意，这种可爱与用户要求的涩气边界感不冲突。\n-----------\n这次，请为我生成{theme}主题的提示词。",
     "hint": "可直接修改。支持占位符：{theme} 用户主题，{character_rule} 固定角色规则，{search_block} 联网摘要，{reference_rule} 引用图/法术规则，{img2img_rule} 图生图规则，{style_block} 千代风格2规则，{sensual_rule} 涩气表现力规则。留空则使用插件内置默认模板。"
   },
   "prompt_builder_provider_id": {
-    "description": "[03 Prompt 优化] Prompt 优化使用的聊天模型 Provider ID",
+    "description": "[03 提示词优化] 提示词优化使用的聊天模型 Provider ID",
     "type": "string",
     "default": "",
     "hint": "留空时使用当前会话的主聊天模型。"
   },
   "prompt_builder_max_tokens": {
-    "description": "[03 Prompt 优化] Prompt 优化模型最大输出 token",
+    "description": "[03 提示词优化] 提示词优化模型最大输出 token",
     "type": "int",
     "default": 700
   },
   "prompt_builder_max_content_tags": {
-    "description": "[03 Prompt 优化] 具体内容 tags 的最大数量",
+    "description": "[03 提示词优化] 具体内容 tags 的最大数量",
     "type": "int",
     "default": 120
   },
   "prompt_builder_web_search_enabled": {
-    "description": "[03 Prompt 优化] Prompt 优化时允许联网搜索参考信息",
+    "description": "[03 提示词优化] 提示词优化时允许联网搜索参考信息",
     "type": "bool",
     "default": true,
     "hint": "需要 AstrBot 全局配置 Tavily key。搜索失败时会自动降级，不会中断生图。"
   },
   "prompt_builder_search_max_results": {
-    "description": "[03 Prompt 优化] Prompt 联网搜索结果数",
+    "description": "[03 提示词优化] 提示词联网搜索结果数",
     "type": "int",
     "default": 5
   },
   "prompt_builder_search_depth": {
-    "description": "[03 Prompt 优化] Prompt 联网搜索深度",
+    "description": "[03 提示词优化] 提示词联网搜索深度",
     "type": "string",
     "default": "advanced",
     "hint": "可选：basic / advanced。"
   },
   "prompt_builder_search_query_template": {
-    "description": "[03 Prompt 优化] Prompt 联网搜索查询模板",
+    "description": "[03 提示词优化] 提示词联网搜索查询模板",
     "type": "string",
     "default": "{prompt} 角色 外观 立绘 服装 配色 武器 官方图 official art character design outfit appearance wiki fandom",
     "hint": "{prompt} 会替换为用户的生图要求。"
   },
   "prompt_builder_deep_thinking_enabled": {
-    "description": "[03 Prompt 优化] Prompt 优化时尝试启用深度思考参数",
+    "description": "[03 提示词优化] 提示词优化时尝试启用深度思考参数",
     "type": "bool",
     "default": true,
     "hint": "会尝试传入 thinking/reasoning_effort；当前模型接口不支持时会自动重试普通调用。"
   },
   "prompt_builder_reasoning_effort": {
-    "description": "[03 Prompt 优化] Prompt 优化思考强度",
+    "description": "[03 提示词优化] 提示词优化思考强度",
     "type": "string",
     "default": "max",
     "hint": "常用：high / max。"
   },
   "danbooru_core_tag_lookup_enabled": {
-    "description": "[04 Tag 查询] Prompt 优化后校正 Danbooru 角色核心 tag",
+    "description": "[04 Tag 查询] 提示词优化后校正 Danbooru 角色核心 tag",
     "type": "bool",
     "default": true,
     "hint": "只查询少量疑似角色名，不会查询所有服装、姿势 tag。"
@@ -373,7 +373,7 @@
     "default": 3
   },
   "debug_prompt_enabled": {
-    "description": "[09 调试与取证] 记录完整 Prompt 优化输入/输出",
+    "description": "[09 调试与取证] 记录完整提示词优化输入/输出",
     "type": "bool",
     "default": false,
     "hint": "默认关闭。开启后会在日志和 last_task.json 中记录完整 LLM 输入、LLM 输出和最终 prompt，便于排查生图偏题。"

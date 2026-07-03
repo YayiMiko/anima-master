@@ -71,7 +71,7 @@ class CommandActionHandler:
         if not payload.get("ok"):
             return f"ComfyUI 状态检查失败：{payload.get('error')}"
         lines = [
-            "ComfyUI agent 状态：",
+            "ComfyUI 助手状态：",
             f"- 启用：{payload.get('enabled')}",
             f"- 地址：{payload.get('base_url')}",
             f"- 工作流：{payload.get('workflow')}",
@@ -89,13 +89,13 @@ class CommandActionHandler:
         if not self._bool("img2img_enabled", False):
             return "图生图/改图功能已关闭。当前先保留文生图、法术解析和图片反推主线。"
         if not self._is_allowed(event):
-            return "ComfyUI agent is disabled or not permitted for this user."
+            return "ComfyUI 助手已关闭，或当前用户没有使用权限。"
         ready = await self._ensure_ready(event)
         if not ready.get("ok"):
             return await self._send_payload(event, ready)
         prompt = str(prompt or "").strip()
         if not prompt:
-            return "Missing ComfyUI edit prompt."
+            return "请在后面写改图提示词。"
         image_input = await self._event_image_input(event)
         if self._bool("prompt_optimize_img2img_enabled", True):
             prompt = await self._build_prompt(event, prompt, mode="img2img")
@@ -104,13 +104,13 @@ class CommandActionHandler:
 
     async def spell(self, event: Any) -> str:
         if not self._is_allowed(event):
-            return "ComfyUI agent is disabled or not permitted for this user."
+            return "ComfyUI 助手已关闭，或当前用户没有使用权限。"
         payload = await self._reference_context.image_spell_payload(event)
         return self._format_spell_payload(payload)
 
     async def reverse(self, event: Any) -> str:
         if not self._is_allowed(event):
-            return "ComfyUI agent is disabled or not permitted for this user."
+            return "ComfyUI 助手已关闭，或当前用户没有使用权限。"
         image_input = await self._event_image_input(event)
         tags = await self._reference_context.reverse_image_tags(event, image_input)
         if not tags:
@@ -119,7 +119,7 @@ class CommandActionHandler:
 
     async def upscale(self, event: Any) -> str:
         if not self._is_allowed(event):
-            return "ComfyUI agent is disabled or not permitted for this user."
+            return "ComfyUI 助手已关闭，或当前用户没有使用权限。"
         ready = await self._ensure_ready(event)
         if not ready.get("ok"):
             return await self._send_payload(event, ready)
@@ -143,7 +143,7 @@ class CommandActionHandler:
             sends image results directly.
         """
         if not self._is_allowed(event):
-            return "ComfyUI agent is disabled or not permitted for this user."
+            return "ComfyUI 助手已关闭，或当前用户没有使用权限。"
         if action == "help":
             return help_text(self._bool("img2img_enabled", False))
         if action == "status":

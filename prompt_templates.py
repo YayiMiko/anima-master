@@ -15,9 +15,9 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """我是一名AI画师，请根据以下内容设
 将输出的自然语言汇总到一起。
 提示词在背景方面偏简约即可，可以有设计感，但是不要堆叠过多元素，当前模型对于复杂背景的效果不佳。建议根据情况生成白色背景或立绘式白色主题背景，只带有少量元素。
 如果用户要求“某角色风格的衣服/动作/姿态”，请先在内部拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成有效的 danbooru tags。
-不要只输出 generic white dress, gold trim, ribbon 这种泛化描述；要保留参考对象最有辨识度的视觉特征。
+不要只输出 generic white dress, gold trim, ribbon 这类泛化标签；要保留参考对象最有辨识度的视觉特征。
 即使知道角色的 danbooru 角色 tag，也必须继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。
-Unless the user explicitly asks for multiple characters, write tags for exactly one visible subject only. Use solo and 1girl or 1boy when appropriate. Do not add background people, crowd, twins, clones, extra girls, or multiple character tags.
+除非用户明确要求多角色，否则只为一个可见主体写 tags。根据主题使用 solo、1girl 或 1boy；不要添加背景人物、人群、双胞胎、分身、额外角色或多个角色 tag。
 {search_block}
 {reference_rule}
 {img2img_rule}
@@ -95,7 +95,7 @@ def build_llm_prompt(
     if style_name in CHIYO_PROMPT_STYLE_V2_ALIASES or style_name.lower() in CHIYO_PROMPT_STYLE_V2_ALIASES:
         style_block = """
 -----------
-Prompt 生成风格：千代风格2。
+提示词生成风格：千代风格2。
 请根据用户主题自行判断更适合“立绘式”还是“插画式”，不要机械套固定词。
 立绘式更重视清晰单人主体、完整服装轮廓、干净背景、白色或浅色主题背景、少量设计感元素。
 插画式更重视画面完成度、镜头感、姿态张力、光影、氛围和角色魅力，但背景仍要克制，避免堆叠复杂场景。

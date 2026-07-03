@@ -252,7 +252,7 @@ class ComfyUIRuntime:
         if not payload.get("ok"):
             reason = self.failure_reason(payload)
             await event.send(event.plain_result(f"ComfyUI 操作失败：{reason}。"))
-            return f"ComfyUI operation failed. Reason: {reason}."
+            return f"ComfyUI 操作失败：{reason}。"
 
         outputs = [str(item) for item in payload.get("outputs", []) if Path(str(item)).exists()]
         if not outputs:
@@ -270,16 +270,16 @@ class ComfyUIRuntime:
                     if is_action_failed and (retcode == 1200 or "Timeout" in wording):
                         self.logger.warning(
                             "[comfyui_agent] image generated but platform send ACK timed out; "
-                            "the image may already be delivered. path=%s error=%s",
+                            "图片可能已经送达。path=%s error=%s",
                             output,
                             wording[:500],
                         )
-                        return "ComfyUI image created; platform send acknowledgement timed out: " + ", ".join(outputs)
+                        return "ComfyUI 已生成图片，但聊天平台发送回执超时：" + ", ".join(outputs)
                     self.logger.warning(
                         "[comfyui_agent] image generated but sending failed. path=%s error=%s: %s",
                         output,
                         type(exc).__name__,
                         str(exc)[:500],
                     )
-                    return "ComfyUI image created but sending failed: " + ", ".join(outputs)
-        return "ComfyUI image created and sent: " + ", ".join(outputs)
+                    return "ComfyUI 已生成图片，但发送失败：" + ", ".join(outputs)
+        return "ComfyUI 已生成并发送图片：" + ", ".join(outputs)

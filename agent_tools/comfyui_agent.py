@@ -149,11 +149,11 @@ def recent(args) -> None:
 def generate(args) -> None:
     config = load_config()
     if not config.get("enabled", True):
-        result({"ok": False, "error": "comfyui agent is disabled"})
+        result({"ok": False, "error": "comfyui_agent_disabled", "message": "ComfyUI 助手已关闭"})
         return
     prompt = str(args.prompt or "").strip()
     if not prompt:
-        result({"ok": False, "error": "missing prompt"})
+        result({"ok": False, "error": "missing_prompt", "message": "缺少提示词"})
         return
 
     result(run_cli_action(lambda: generate_payload(config, DEFAULT_CONFIG, IMAGE_OUTPUTS, args, prompt)))
@@ -162,11 +162,11 @@ def generate(args) -> None:
 def edit(args) -> None:
     config = load_config()
     if not config.get("enabled", True):
-        result({"ok": False, "error": "comfyui agent is disabled"})
+        result({"ok": False, "error": "comfyui_agent_disabled", "message": "ComfyUI 助手已关闭"})
         return
     prompt = str(args.prompt or "").strip()
     if not prompt:
-        result({"ok": False, "error": "missing prompt"})
+        result({"ok": False, "error": "missing_prompt", "message": "缺少提示词"})
         return
 
     result(run_cli_action(lambda: edit_payload(config, IMAGE_OUTPUTS, resolve_image, args, prompt)))
@@ -175,7 +175,7 @@ def edit(args) -> None:
 def upscale(args) -> None:
     config = load_config()
     if not config.get("enabled", True):
-        result({"ok": False, "error": "comfyui agent is disabled"})
+        result({"ok": False, "error": "comfyui_agent_disabled", "message": "ComfyUI 助手已关闭"})
         return
 
     result(run_cli_action(lambda: upscale_payload(config, IMAGE_OUTPUTS, resolve_image, args)))
@@ -184,14 +184,14 @@ def upscale(args) -> None:
 def remove_bg(args) -> None:
     config = load_config()
     if not config.get("enabled", True):
-        result({"ok": False, "error": "comfyui agent is disabled"})
+        result({"ok": False, "error": "comfyui_agent_disabled", "message": "ComfyUI 助手已关闭"})
         return
 
     result(run_cli_action(lambda: remove_bg_payload(config, IMAGE_OUTPUTS, resolve_image, args)))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="AstrBot ComfyUI agent")
+    parser = argparse.ArgumentParser(description="AstrBot ComfyUI 助手")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("status")

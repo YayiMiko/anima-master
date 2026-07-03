@@ -199,7 +199,7 @@ class ComfyUIAgentPlugin(Star):
         if not route:
             return
         if not self._is_allowed(event):
-            await event.send(event.plain_result("ComfyUI agent is disabled or not permitted for this user."))
+            await event.send(event.plain_result("ComfyUI 助手已关闭，或当前用户没有使用权限。"))
             event.stop_event()
             return
 
