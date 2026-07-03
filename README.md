@@ -213,9 +213,3 @@ sensual_mode_enabled = true
 /anm 原样 你的完整 tags
 ```
 
-## 开发检查
-
-```powershell
-python -m py_compile main.py prompt_builder.py danbooru_tags.py agent_tools/comfyui_agent.py agent_tools/image_prompt_agent.py
-rg -n "<你的私人路径>|<你的账号>|<你的 API Key>" .
-```
