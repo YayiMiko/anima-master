@@ -1,0 +1,308 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable
+
+try:
+    from .danbooru_resolver import DanbooruResolver
+    from .prompt_builder import (
+        build_final_prompt,
+    )
+    from .prompt_presets import (
+        apply_config_preset,
+        selected_fixed_character,
+        strip_raw_prefix,
+        wants_sensual_mode,
+    )
+    from .prompt_research import PromptResearcher
+    from .prompt_templates import build_llm_prompt
+except Exception:  # pragma: no cover - fallback for direct script-style imports.
+    from danbooru_resolver import DanbooruResolver
+    from prompt_builder import (
+        build_final_prompt,
+    )
+    from prompt_presets import (
+        apply_config_preset,
+        selected_fixed_character,
+        strip_raw_prefix,
+        wants_sensual_mode,
+    )
+    from prompt_research import PromptResearcher
+    from prompt_templates import build_llm_prompt
+
+
+@dataclass(frozen=True)
+class PromptPipelineResult:
+    """Prompt pipeline output and debug summary.
+
+    Args:
+        final_prompt: Prompt sent to the ComfyUI tool.
+        summary: Non-secret prompt build summary for logs and last_task.json.
+    """
+
+    final_prompt: str
+    summary: dict[str, Any]
+
+
+class PromptPipeline:
+    """Build Anima prompts from chat text while keeping plugin main thin."""
+
+    def __init__(
+        self,
+        *,
+        context: Any,
+        config: dict[str, Any],
+        logger: Any,
+        danbooru_resolver: DanbooruResolver,
+        researcher: PromptResearcher,
+        get_bool: Callable[[str, bool], bool],
+        get_int: Callable[[str, int], int],
+        get_float: Callable[[str, float], float],
+        get_str: Callable[[str, str], str],
+        shorten: Callable[[str, int], str],
+    ):
+        """Store dependencies supplied by the AstrBot plugin.
+
+        Args:
+            context: AstrBot plugin context used for provider lookup and LLM calls.
+            config: Plugin configuration dict.
+            logger: Logger compatible with AstrBot logger methods.
+            danbooru_resolver: Danbooru core tag resolver.
+            researcher: Optional web/deep-thinking research planner.
+            get_bool: Config boolean accessor.
+            get_int: Config integer accessor.
+            get_float: Config float accessor.
+            get_str: Config string accessor.
+            shorten: Text-shortening helper for summaries.
+        """
+        self.context = context
+        self.config = config
+        self.logger = logger
+        self._danbooru_resolver = danbooru_resolver
+        self._researcher = researcher
+        self._bool = get_bool
+        self._int = get_int
+        self._float = get_float
+        self._str = get_str
+        self._shorten = shorten
+
+    async def _current_chat_provider_id(self, event: Any) -> str:
+        configured = self._str("prompt_builder_provider_id", "").strip()
+        if configured:
+            return configured
+        try:
+            provider_id = await self.context.get_current_chat_provider_id(
+                event.unified_msg_origin
+            )
+            return str(provider_id or "").strip()
+        except Exception as exc:
+            self.logger.warning("[comfyui_agent] failed to get current chat provider: %s", exc)
+        cfg = self.context.get_config(umo=event.unified_msg_origin)
+        return str(cfg.get("provider_settings", {}).get("default_provider_id") or "").strip()
+
+    async def _generate_prompt_tags_with_llm(
+        self,
+        *,
+        provider_id: str,
+        llm_prompt: str,
+        use_deep_thinking: bool,
+        fixed_character: bool,
+        character_name: str = "",
+    ) -> str:
+        if character_name:
+            character_rule = f"不要输出固定角色“{character_name}”的固有外观设定。"
+        else:
+            character_rule = (
+                "用户没有使用固定角色时，可以并且应该输出主体所需的固有外观设定。"
+            )
+        kwargs: dict[str, Any] = {
+            "chat_provider_id": provider_id,
+            "prompt": llm_prompt,
+            "system_prompt": (
+                "你是 Anima 模型的 Danbooru tag 提示词助手。"
+                "请在内部充分推理和校验参考对象的视觉特征，但不要输出思考过程。"
+                "只输出英文 danbooru tags，用英文逗号分隔。"
+                "不要解释，不要 Markdown，不要输出质量词或画师词。"
+                f"{character_rule}"
+            ),
+            "max_tokens": self._int("prompt_builder_max_tokens", 700),
+        }
+        if use_deep_thinking:
+            kwargs["reasoning_effort"] = self._str("prompt_builder_reasoning_effort", "max") or "max"
+            kwargs["thinking"] = {"type": "enabled"}
+        response = await self.context.llm_generate(**kwargs)
+        return str(getattr(response, "completion_text", "") or "").strip()
+
+    async def build(self, event: Any, user_prompt: str, mode: str = "txt2img") -> PromptPipelineResult:
+        """Build the final prompt and summary for one generation request.
+
+        Args:
+            event: AstrBot message event for provider and per-chat config lookup.
+            user_prompt: User prompt after reference-image augmentation.
+            mode: Generation mode, such as `txt2img` or `img2img`.
+
+        Returns:
+            Final prompt plus a serializable summary dict.
+        """
+        prompt = str(user_prompt or "").strip()
+        summary: dict[str, Any] = {
+            "prompt_optimize_enabled": self._bool("prompt_optimize_enabled", True),
+            "mode": mode,
+            "original_prompt_head": self._shorten(prompt, 600),
+        }
+        if not self._bool("prompt_optimize_enabled", True):
+            summary.update(
+                {
+                    "skipped_reason": "prompt_optimize_disabled",
+                    "final_prompt_head": self._shorten(prompt, 600),
+                    "final_prompt_chars": len(prompt),
+                }
+            )
+            return PromptPipelineResult(prompt, summary)
+        raw_mode, raw_prompt = strip_raw_prefix(prompt)
+        if raw_mode:
+            self.logger.info("[comfyui_agent] prompt builder skipped: raw tags mode")
+            summary.update(
+                {
+                    "raw_mode": True,
+                    "skipped_reason": "raw_tags_mode",
+                    "final_prompt_head": self._shorten(raw_prompt, 600),
+                    "final_prompt_chars": len(raw_prompt),
+                }
+            )
+            return PromptPipelineResult(raw_prompt, summary)
+
+        provider_id = await self._current_chat_provider_id(event)
+        if not provider_id:
+            self.logger.warning("[comfyui_agent] prompt builder has no provider; using original prompt")
+            summary.update(
+                {
+                    "skipped_reason": "no_chat_provider",
+                    "final_prompt_head": self._shorten(prompt, 600),
+                    "final_prompt_chars": len(prompt),
+                }
+            )
+            return PromptPipelineResult(prompt, summary)
+
+        prompt_config = apply_config_preset(dict(self.config))
+        fixed_character = selected_fixed_character(prompt, prompt_config)
+        fixed_character_name = fixed_character[0] if fixed_character else ""
+        use_fixed_character = fixed_character is not None
+        use_sensual_mode = wants_sensual_mode(prompt, prompt_config)
+        required_core_tags = (
+            self._danbooru_resolver.required_core_tags_for_prompt(prompt) if not use_fixed_character else ()
+        )
+        self.logger.info(
+            "[comfyui_agent] prompt builder input fixed_character=%s sensual=%s required_core_tags=%s prompt=%s",
+            fixed_character_name or "none",
+            use_sensual_mode,
+            ",".join(required_core_tags) or "none",
+            prompt[:180],
+        )
+        research_plan = self._researcher.plan(prompt)
+        self.logger.info(
+            "[comfyui_agent] prompt strategy web_search=%s deep_thinking=%s search_reason=%s thinking_reason=%s",
+            research_plan.use_web_search,
+            research_plan.use_deep_thinking,
+            research_plan.search_reason or "none",
+            research_plan.thinking_reason or "none",
+        )
+        search_context = await self._researcher.search_context(event, prompt) if research_plan.use_web_search else ""
+        llm_prompt = build_llm_prompt(
+            prompt,
+            search_context=search_context,
+            fixed_character=use_fixed_character,
+            character_name=fixed_character_name,
+            sensual_mode=use_sensual_mode,
+            mode=mode,
+            prompt_builder_style=self._str("prompt_builder_style", ""),
+            prompt_builder_template=self._str("prompt_builder_template", ""),
+        )
+        if self._bool("debug_prompt_enabled", False):
+            self.logger.info("[comfyui_agent] prompt builder LLM prompt:\n%s", llm_prompt)
+        try:
+            llm_content = await self._generate_prompt_tags_with_llm(
+                provider_id=provider_id,
+                llm_prompt=llm_prompt,
+                use_deep_thinking=research_plan.use_deep_thinking,
+                fixed_character=use_fixed_character,
+                character_name=fixed_character_name,
+            )
+        except Exception as exc:
+            if not research_plan.use_deep_thinking:
+                self.logger.warning("[comfyui_agent] prompt builder LLM failed: %s", exc)
+                llm_content = ""
+            else:
+                self.logger.warning(
+                    "[comfyui_agent] prompt builder deep thinking failed, retrying without it: %s",
+                    exc,
+                )
+                try:
+                    llm_content = await self._generate_prompt_tags_with_llm(
+                        provider_id=provider_id,
+                        llm_prompt=llm_prompt,
+                        use_deep_thinking=False,
+                        fixed_character=use_fixed_character,
+                        character_name=fixed_character_name,
+                    )
+                except Exception as retry_exc:
+                    self.logger.warning("[comfyui_agent] prompt builder LLM failed: %s", retry_exc)
+                    llm_content = ""
+
+        if self._bool("debug_prompt_enabled", False):
+            self.logger.info("[comfyui_agent] prompt builder LLM output:\n%s", llm_content)
+        llm_content = await self._danbooru_resolver.resolve(
+            llm_content=llm_content,
+            user_prompt=prompt,
+            fixed_character=use_fixed_character,
+        )
+        built = build_final_prompt(
+            user_prompt=prompt,
+            llm_content=llm_content,
+            config=prompt_config,
+            required_core_tags=required_core_tags,
+        )
+        self.logger.info(
+            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s required_core_tags=%s content_chars=%s final_chars=%s final_head=%s",
+            built.raw_mode,
+            bool(search_context),
+            research_plan.use_deep_thinking,
+            built.character_name or "none",
+            built.used_sensual_mode,
+            built.used_fixed_character,
+            built.used_default_style,
+            ",".join(built.required_core_tags) or "none",
+            len(built.content_tags),
+            len(built.final_prompt),
+            built.final_prompt[:300],
+        )
+        summary.update(
+            {
+                "raw_mode": built.raw_mode,
+                "web_search": bool(search_context),
+                "deep_thinking": research_plan.use_deep_thinking,
+                "search_reason": research_plan.search_reason or "",
+                "thinking_reason": research_plan.thinking_reason or "",
+                "fixed_character": built.used_fixed_character,
+                "fixed_character_name": built.character_name,
+                "sensual_mode": built.used_sensual_mode,
+                "default_style": built.used_default_style,
+                "required_core_tags": list(built.required_core_tags),
+                "llm_content_chars": len(built.content_tags),
+                "final_prompt_chars": len(built.final_prompt),
+                "final_prompt_head": self._shorten(built.final_prompt, 600),
+                "prompt_builder_template_customized": bool(
+                    self._str("prompt_builder_template", "").strip()
+                ),
+            }
+        )
+        if self._bool("debug_prompt_enabled", False):
+            self.logger.info("[comfyui_agent] prompt builder final prompt:\n%s", built.final_prompt)
+            summary.update(
+                {
+                    "llm_prompt": llm_prompt,
+                    "llm_content": llm_content,
+                    "final_prompt": built.final_prompt,
+                }
+            )
+        return PromptPipelineResult(built.final_prompt, summary)
