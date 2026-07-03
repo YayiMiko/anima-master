@@ -1,6 +1,6 @@
 name: astrbot_plugin_anima_master
 display_name: Anima 绘图大师
 desc: 将 AstrBot 连接到本地 ComfyUI / Anima 工作流，提供生图、提示词优化、法术解析和图片反推能力。
-version: 0.22
+version: "0.23"
 author: YayiMiko
 repo: "https://github.com/YayiMiko/anima-master"

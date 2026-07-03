@@ -7,10 +7,11 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlencode
 
 import requests
 from PIL import Image, ImageOps
+
+from comfyui_http import ComfyUIHttpClient
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -251,40 +252,6 @@ def resolve_image(value: str | None) -> Path:
     return path
 
 
-def _base_url(config: dict[str, Any]) -> str:
-    base = str(config.get("comfyui_base_url") or "").strip()
-    if not base:
-        raise SystemExit("comfyui_base_url is not configured")
-    return base.rstrip("/")
-
-
-def _get_json(config: dict[str, Any], path: str, timeout: int = 10) -> dict[str, Any]:
-    response = requests.get(_base_url(config) + path, timeout=timeout)
-    response.raise_for_status()
-    return response.json()
-
-
-def _post_json(config: dict[str, Any], path: str, body: dict[str, Any], timeout: int = 10) -> dict[str, Any]:
-    response = requests.post(_base_url(config) + path, json=body, timeout=timeout)
-    response.raise_for_status()
-    return response.json()
-
-
-def _upload_image(config: dict[str, Any], path: Path) -> str:
-    with path.open("rb") as handle:
-        response = requests.post(
-            _base_url(config) + "/upload/image",
-            files={"image": (path.name, handle, "image/png")},
-            data={"subfolder": "AstrBot", "type": "input", "overwrite": "true"},
-            timeout=120,
-        )
-    response.raise_for_status()
-    payload = response.json()
-    name = str(payload.get("name") or path.name)
-    subfolder = str(payload.get("subfolder") or "").strip("/")
-    return f"{subfolder}/{name}" if subfolder else name
-
-
 def _image_size(path: Path, max_side: int) -> tuple[int, int]:
     image = ImageOps.exif_transpose(Image.open(path))
     width, height = image.size
@@ -466,26 +433,17 @@ def _workflow(
 
 
 def _history(config: dict[str, Any], prompt_id: str) -> dict[str, Any] | None:
-    data = _get_json(config, f"/history/{prompt_id}", timeout=20)
+    data = ComfyUIHttpClient(config).get_json(f"/history/{prompt_id}", timeout=20)
     item = data.get(prompt_id)
     return item if isinstance(item, dict) else None
 
 
 def _download_image(config: dict[str, Any], image: dict[str, Any], index: int) -> Path:
     IMAGE_OUTPUTS.mkdir(parents=True, exist_ok=True)
-    query = urlencode(
-        {
-            "filename": image.get("filename", ""),
-            "subfolder": image.get("subfolder", ""),
-            "type": image.get("type", "output"),
-        }
-    )
-    response = requests.get(_base_url(config) + f"/view?{query}", timeout=120)
-    response.raise_for_status()
     filename = str(image.get("filename") or f"comfyui_{index}.png")
     ext = Path(filename).suffix or ".png"
     output = IMAGE_OUTPUTS / f"{_now()}_comfyui_{index}{ext}"
-    output.write_bytes(response.content)
+    output.write_bytes(ComfyUIHttpClient(config).view_image_bytes(image, timeout=120))
     return output
 
 
@@ -504,7 +462,8 @@ def _output_images(history: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _run_prompt(config: dict[str, Any], prompt_body: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     client_id = str(uuid.uuid4())
-    submit = _post_json(config, "/prompt", {"prompt": prompt_body, "client_id": client_id}, timeout=20)
+    client = ComfyUIHttpClient(config)
+    submit = client.post_json("/prompt", {"prompt": prompt_body, "client_id": client_id}, timeout=20)
     prompt_id = str(submit.get("prompt_id") or "")
     if not prompt_id:
         raise RuntimeError(f"missing prompt_id: {submit}")
@@ -546,8 +505,9 @@ def status(args) -> None:
         "allowed_sizes": [f"{width}x{height}" for width, height in _allowed_sizes(config)],
     }
     try:
-        stats = _get_json(config, "/system_stats", timeout=10)
-        object_info = _get_json(config, "/object_info", timeout=20)
+        client = ComfyUIHttpClient(config)
+        stats = client.get_json("/system_stats", timeout=10)
+        object_info = client.get_json("/object_info", timeout=20)
         devices = stats.get("devices", []) if isinstance(stats, dict) else []
         device = devices[0] if devices else {}
         payload.update(
@@ -660,7 +620,7 @@ def edit(args) -> None:
     try:
         image = resolve_image(args.input)
         width, height = _image_size(image, int(config.get("max_image_side", 1024)))
-        image_name = _upload_image(config, image)
+        image_name = ComfyUIHttpClient(config).upload_image(image)
         steps = int(args.steps or config.get("steps", 20))
         cfg = float(args.cfg or config.get("cfg", 4.0))
         denoise = float(args.denoise or config.get("edit_denoise", 0.55))
@@ -709,7 +669,7 @@ def upscale(args) -> None:
         return
     try:
         image = resolve_image(args.input)
-        image_name = _upload_image(config, image)
+        image_name = ComfyUIHttpClient(config).upload_image(image)
         scale = float(args.scale or config.get("upscale_factor", 2.0))
         prompt_body = _upscale_workflow(config, image_name, scale)
         prompt_id, history = _run_prompt(config, prompt_body)
@@ -750,7 +710,7 @@ def remove_bg(args) -> None:
         return
     try:
         image = resolve_image(args.input)
-        image_name = _upload_image(config, image)
+        image_name = ComfyUIHttpClient(config).upload_image(image)
         prompt_body = _remove_bg_workflow(config, image_name)
         prompt_id, history = _run_prompt(config, prompt_body)
         status_payload = _history_failed(history)
