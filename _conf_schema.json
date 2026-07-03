@@ -13,13 +13,14 @@
   "comfyui_base_url": {
     "description": "[01 ComfyUI 连接] 本地 ComfyUI 地址",
     "type": "string",
-    "default": "http://127.0.0.1:8188"
+    "default": "http://127.0.0.1:8188",
+    "hint": "首次配置必看。填写 AstrBot 所在机器可以访问到的 ComfyUI 地址，默认是本机 ComfyUI。"
   },
   "workflow": {
     "description": "[01 ComfyUI 连接] ComfyUI 工作流预设",
     "type": "string",
     "default": "anima_t2i",
-    "hint": "当前支持：anima_t2i。"
+    "hint": "首次配置必看。公开版内置工作流预设当前为 anima_t2i；如果以后扩展自定义工作流，应填写插件支持的预设名。"
   },
   "timeout": {
     "description": "[01 ComfyUI 连接] 生成超时时间（秒）",
@@ -34,12 +35,14 @@
   "width": {
     "description": "[02 生成参数] 默认图片宽度",
     "type": "int",
-    "default": 832
+    "default": 832,
+    "hint": "首次配置建议确认。width 和 height 组成的尺寸应在 allowed_sizes 中；否则会自动改用最接近的允许尺寸。"
   },
   "height": {
     "description": "[02 生成参数] 默认图片高度",
     "type": "int",
-    "default": 1216
+    "default": 1216,
+    "hint": "首次配置建议确认。常见竖图可用 832x1216 或 1024x1536，前提是 allowed_sizes 中包含该尺寸。"
   },
   "allowed_sizes": {
     "description": "[02 生成参数] 允许的输出尺寸预设",
@@ -82,17 +85,25 @@
   "unet_name": {
     "description": "[02 生成参数] UNET / 扩散模型文件名",
     "type": "string",
-    "default": "anima_baseV10.safetensors"
+    "default": "anima_baseV10.safetensors",
+    "hint": "首次配置必看。必须和 ComfyUI 的 UNETLoader 下拉框中文件名完全一致，只填文件名，不填本机路径。"
   },
   "clip_name": {
     "description": "[02 生成参数] 文本编码器文件名",
     "type": "string",
-    "default": "qwen_3_06b_base.safetensors"
+    "default": "qwen_3_06b_base.safetensors",
+    "hint": "首次配置必看。必须和 ComfyUI 的 CLIPLoader 下拉框中文件名完全一致，只填文件名，不填本机路径。"
   },
   "vae_name": {
     "description": "[02 生成参数] VAE 文件名",
     "type": "string",
-    "default": "qwen_image_vae.safetensors"
+    "default": "qwen_image_vae.safetensors",
+    "hint": "首次配置必看。必须和 ComfyUI 的 VAELoader 下拉框中文件名完全一致，只填文件名，不填本机路径。"
+  },
+  "quality_prefix": {
+    "description": "[02 生成参数] 默认质量词前缀",
+    "type": "string",
+    "default": "masterpiece, best quality,"
   },
   "negative_prompt": {
     "description": "[02 生成参数] 默认负面提示词",
@@ -109,12 +120,6 @@
     "type": "string",
     "default": "",
     "hint": "留空表示使用普通提示词优化。填“千代风格2”或“chiyo_style_v2”后，LLM 会根据用户需求在立绘取向和插画取向之间选择，不会机械套用固定 tags。"
-  },
-  "prompt_builder_template": {
-    "description": "[03 提示词优化] 提示词生成模板（发给 LLM 的完整提示词）",
-    "type": "string",
-    "default": "我是一名AI画师，请根据以下内容设计出大师级的提示词段落。应为适用于anima模型的danbooru tags。\n为画面搭配服饰tag，动作tag，神态tag等。\n{character_rule}\n大师之作等前置质量提示词不需要列出。\n服装写的更细，每种应当包含5~10短句或更多。\n部分词直译很可能不会有有效的tag，请尝试用通感来描绘一些danbooru tag可能缺乏词库的词语。以下是一种例子（你不一定要这样做）：苗族少女→银质华丽头饰\n将输出的自然语言汇总到一起。\n提示词在背景方面偏简约即可，可以有设计感，但是不要堆叠过多元素，当前模型对于复杂背景的效果不佳。建议根据情况生成白色背景或立绘式白色主题背景，只带有少量元素。\n如果用户要求“某角色风格的衣服/动作/姿态”，请先在内部拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成有效的 danbooru tags。\n不要只输出 generic white dress, gold trim, ribbon 这类泛化标签；要保留参考对象最有辨识度的视觉特征。\n即使知道角色的 danbooru 角色 tag，也必须继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n除非用户明确要求多角色，否则只为一个可见主体写 tags。根据主题使用 solo、1girl 或 1boy；不要添加背景人物、人群、双胞胎、分身、额外角色或多个角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{style_block}\n{sensual_rule}\n-----------\n没有特殊要求时，请为目标角色应用可爱风格。注意，这种可爱与用户要求的涩气边界感不冲突。\n-----------\n这次，请为我生成{theme}主题的提示词。",
-    "hint": "可直接修改。支持占位符：{theme} 用户主题，{character_rule} 固定角色规则，{search_block} 联网摘要，{reference_rule} 引用图/法术规则，{img2img_rule} 图生图规则，{style_block} 千代风格2规则，{sensual_rule} 涩气表现力规则。留空则使用插件内置默认模板。"
   },
   "prompt_builder_provider_id": {
     "description": "[03 提示词优化] 提示词优化使用的聊天模型 Provider ID",
@@ -194,11 +199,6 @@
     "description": "[04 Tag 查询] 每次最多检查的疑似核心 tag 数量",
     "type": "int",
     "default": 6
-  },
-  "quality_prefix": {
-    "description": "[02 生成参数] 默认质量词前缀",
-    "type": "string",
-    "default": "masterpiece, best quality,"
   },
   "fixed_characters": {
     "description": "[05 角色与画风] 固定角色预设",
@@ -296,12 +296,12 @@
     "default": 1024
   },
   "upscale_factor": {
-    "description": "[06 开发中旁路] 默认放大倍率",
+    "description": "[06 开发中旁路] 默认放大倍率（聊天入口当前关闭）",
     "type": "float",
     "default": 2.0
   },
   "remove_bg_model": {
-    "description": "[06 开发中旁路] 去背景模型",
+    "description": "[06 开发中旁路] 去背景模型（聊天入口当前关闭）",
     "type": "string",
     "default": "BiRefNet_lite"
   },
@@ -371,6 +371,12 @@
     "description": "[08 自动启动] 等待启动时的就绪检查间隔（秒）",
     "type": "int",
     "default": 3
+  },
+  "prompt_builder_template": {
+    "description": "[09 高级模板] 提示词生成模板（发给 LLM 的完整提示词）",
+    "type": "string",
+    "default": "我是一名AI画师，请根据以下内容设计出大师级的提示词段落。应为适用于anima模型的danbooru tags。\n为画面搭配服饰tag，动作tag，神态tag等。\n{character_rule}\n大师之作等前置质量提示词不需要列出。\n服装写的更细，每种应当包含5~10短句或更多。\n部分词直译很可能不会有有效的tag，请尝试用通感来描绘一些danbooru tag可能缺乏词库的词语。以下是一种例子（你不一定要这样做）：苗族少女→银质华丽头饰\n将输出的自然语言汇总到一起。\n提示词在背景方面偏简约即可，可以有设计感，但是不要堆叠过多元素，当前模型对于复杂背景的效果不佳。建议根据情况生成白色背景或立绘式白色主题背景，只带有少量元素。\n如果用户要求“某角色风格的衣服/动作/姿态”，请先在内部拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成有效的 danbooru tags。\n不要只输出 generic white dress, gold trim, ribbon 这类泛化标签；要保留参考对象最有辨识度的视觉特征。\n即使知道角色的 danbooru 角色 tag，也必须继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n除非用户明确要求多角色，否则只为一个可见主体写 tags。根据主题使用 solo、1girl 或 1boy；不要添加背景人物、人群、双胞胎、分身、额外角色或多个角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{style_block}\n{sensual_rule}\n-----------\n没有特殊要求时，请为目标角色应用可爱风格。注意，这种可爱与用户要求的涩气边界感不冲突。\n-----------\n这次，请为我生成{theme}主题的提示词。",
+    "hint": "高级项，首次配置可以不改。支持占位符：{theme} 用户主题，{character_rule} 固定角色规则，{search_block} 联网摘要，{reference_rule} 引用图/法术规则，{img2img_rule} 图生图规则，{style_block} 千代风格2规则，{sensual_rule} 涩气表现力规则。留空则使用插件内置默认模板。"
   },
   "debug_prompt_enabled": {
     "description": "[09 调试与取证] 记录完整提示词优化输入/输出",
