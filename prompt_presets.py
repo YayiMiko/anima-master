@@ -10,8 +10,6 @@ FIXED_CHARACTER_TAGS: dict[str, str] = {}
 DEFAULT_ARTIST_TAGS = ""
 CHIYO_PRESET_ALIASES = {"chiyo", "chiyo_preset", "千代", "千代预设", "千代配置"}
 CHIYO_STYLE_NAME = "千代画风"
-CHIYO_PROMPT_STYLE_V2_NAME = "千代风格2"
-CHIYO_PROMPT_STYLE_V2_ALIASES = {"千代风格2", "chiyo_style_v2", "chiyo_v2"}
 CHIYO_QUALITY_TAGS = "masterpiece, best quality, nsfw,"
 CHIYO_NEGATIVE_PROMPT = "worst quality, low quality, artist name"
 OLD_SCORE_NEGATIVE_PROMPT = "worst quality, low quality, score_1, score_2, score_3, artist name"
@@ -136,9 +134,6 @@ def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
         result["negative_prompt"] = CHIYO_NEGATIVE_PROMPT
     if not str(result.get("default_artist_tags") or "").strip():
         result["default_artist_tags"] = CHIYO_ARTIST_TAGS
-    if not str(result.get("prompt_builder_style") or "").strip():
-        result["prompt_builder_style"] = CHIYO_PROMPT_STYLE_V2_NAME
-
     fixed_characters = fixed_character_tags(result)
     fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
     result["fixed_characters"] = fixed_characters

@@ -87,7 +87,6 @@ class TaskRecorder:
             "Anima 调试状态：",
             f"- 提示词优化：{_bool(config, 'prompt_optimize_enabled', True)}",
             f"- 自定义 Prompt 模板：{bool(prompt_template)}",
-            f"- 提示词生成风格：{_str(config, 'prompt_builder_style', '') or '默认'}",
             f"- 默认画风：{_bool(config, 'default_style_enabled', False)} / {_str(config, 'default_style_name', '') or '未命名'}",
             f"- 固定角色：{', '.join(characters) if characters else '无'}",
             f"- 联网搜索：{_bool(config, 'prompt_builder_web_search_enabled', True)}",

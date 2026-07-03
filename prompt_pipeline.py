@@ -215,7 +215,6 @@ class PromptPipeline:
             character_name=fixed_character_name,
             sensual_mode=use_sensual_mode,
             mode=mode,
-            prompt_builder_style=self._str("prompt_builder_style", ""),
             prompt_builder_template=self._str("prompt_builder_template", ""),
         )
         if self._bool("debug_prompt_enabled", False):

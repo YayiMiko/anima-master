@@ -1,32 +1,40 @@
 from __future__ import annotations
 
-try:
-    from .prompt_presets import CHIYO_PROMPT_STYLE_V2_ALIASES
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
-    from prompt_presets import CHIYO_PROMPT_STYLE_V2_ALIASES
 
+DEFAULT_LLM_PROMPT_TEMPLATE = """你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。
 
-DEFAULT_LLM_PROMPT_TEMPLATE = """我是一名AI画师，请根据以下内容设计出大师级的提示词段落。应为适用于anima模型的danbooru tags。
-为画面搭配服饰tag，动作tag，神态tag等。
+请先在内部判断用户输入类型：
+1. 如果用户输入很短、只是一两个短句，请主动进行审美补全，重点补出主体外观、服装结构、材质、配色、装饰物、动作和表情，让角色本身完整而精致。
+2. 如果用户输入很具体，请优先精确遵守用户要求，不要擅自改主题、角色身份、服装方向或构图重点。
+3. 如果用户输入已经像完整 Danbooru tags，请尽量保持原意，只做必要的补全和规范化。
+
+画面设计原则：
+- 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。
+- 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。
+- 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。
+- 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。
+- 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。
+- 默认审美为可爱、明亮、精致、干净，适合二次元角色展示；用户要求涩气、阴暗、华丽或其它风格时，以用户要求为准。
+- 部分中文概念直译可能不是有效 tag，请转译为可见的 Danbooru 视觉元素。例如：苗族少女可以转成 ornate silver headdress、silver jewelry、embroidered dress。
+
+角色和参考规则：
 {character_rule}
-大师之作等前置质量提示词不需要列出。
-服装写的更细，每种应当包含5~10短句或更多。
-部分词直译很可能不会有有效的tag，请尝试用通感来描绘一些danbooru tag可能缺乏词库的词语。以下是一种例子（你不一定要这样做）：苗族少女→银质华丽头饰
-将输出的自然语言汇总到一起。
-提示词在背景方面偏简约即可，可以有设计感，但是不要堆叠过多元素，当前模型对于复杂背景的效果不佳。建议根据情况生成白色背景或立绘式白色主题背景，只带有少量元素。
-如果用户要求“某角色风格的衣服/动作/姿态”，请先在内部拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成有效的 danbooru tags。
-不要只输出 generic white dress, gold trim, ribbon 这类泛化标签；要保留参考对象最有辨识度的视觉特征。
-即使知道角色的 danbooru 角色 tag，也必须继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。
-除非用户明确要求多角色，否则只为一个可见主体写 tags。根据主题使用 solo、1girl 或 1boy；不要添加背景人物、人群、双胞胎、分身、额外角色或多个角色 tag。
+如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。
+即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。
 {search_block}
 {reference_rule}
 {img2img_rule}
-{style_block}
 {sensual_rule}
------------
-没有特殊要求时，请为目标角色应用可爱风格。注意，这种可爱与用户要求的涩气边界感不冲突。
------------
-这次，请为我生成{theme}主题的提示词。"""
+
+输出要求：
+- 只输出英文 Danbooru tags，用英文逗号分隔。
+- 不要输出解释、标题、Markdown、编号或中文。
+- 不要输出质量词，例如 masterpiece、best quality、worst quality、low quality、score_7。
+- 不要输出画师词，例如 @artist。
+- 不要重复固定角色已经提供的固有发色、瞳色、种族和固定配饰。
+
+用户主题：
+{theme}"""
 
 
 def build_llm_prompt(
@@ -36,7 +44,6 @@ def build_llm_prompt(
     character_name: str = "",
     sensual_mode: bool = False,
     mode: str = "txt2img",
-    prompt_builder_style: str = "",
     prompt_builder_template: str = "",
 ) -> str:
     """Build the prompt sent to the chat LLM for Danbooru tag generation."""
@@ -90,18 +97,6 @@ def build_llm_prompt(
 这是非 R18 的擦边表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、暧昧姿势等视觉方向。
 不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。
 """
-    style_block = ""
-    style_name = str(prompt_builder_style or "").strip()
-    if style_name in CHIYO_PROMPT_STYLE_V2_ALIASES or style_name.lower() in CHIYO_PROMPT_STYLE_V2_ALIASES:
-        style_block = """
------------
-提示词生成风格：千代风格2。
-请根据用户主题自行判断更适合“立绘式”还是“插画式”，不要机械套固定词。
-立绘式更重视清晰单人主体、完整服装轮廓、干净背景、白色或浅色主题背景、少量设计感元素。
-插画式更重视画面完成度、镜头感、姿态张力、光影、氛围和角色魅力，但背景仍要克制，避免堆叠复杂场景。
-如果用户没有明确指定风格，在不牺牲主题的前提下，优先让画面可爱、明亮、精致、适合二次元角色展示。
-这些只是审美方向，不是固定 tags；不要输出画师词、质量词或角色预设词。
-"""
     template = str(prompt_builder_template or "").strip() or DEFAULT_LLM_PROMPT_TEMPLATE
     values = {
         "theme": theme,
@@ -109,7 +104,7 @@ def build_llm_prompt(
         "search_block": search_block,
         "reference_rule": reference_rule,
         "img2img_rule": img2img_rule,
-        "style_block": style_block,
+        "style_block": "",
         "sensual_rule": sensual_rule,
     }
     try:

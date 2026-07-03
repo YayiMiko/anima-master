@@ -8,7 +8,7 @@
     "description": "[00 总开关] 一键预设配置",
     "type": "string",
     "default": "none",
-    "hint": "可选：none / chiyo。选择 chiyo 会应用“千代预设”，包含千代画风、Anima 推荐参数和 prompt 优化规则；狐莉会作为可选固定角色提供，只有明确提到狐莉时才会使用。"
+    "hint": "可选：none / chiyo。插件默认已经使用内置的“千代预设主提示词”作为 prompt 优化模板；选择 chiyo 会在此基础上追加千代画风、Anima 推荐参数和狐莉可选固定角色。狐莉只有明确提到时才会使用。"
   },
   "comfyui_base_url": {
     "description": "[01 ComfyUI 连接] 本地 ComfyUI 地址",
@@ -114,12 +114,6 @@
     "description": "[03 提示词优化] 文生图时启用 Anima 提示词优化",
     "type": "bool",
     "default": true
-  },
-  "prompt_builder_style": {
-    "description": "[03 提示词优化] 提示词生成风格（可填：千代风格2）",
-    "type": "string",
-    "default": "",
-    "hint": "留空表示使用普通提示词优化。填“千代风格2”或“chiyo_style_v2”后，LLM 会根据用户需求在立绘取向和插画取向之间选择，不会机械套用固定 tags。"
   },
   "prompt_builder_provider_id": {
     "description": "[03 提示词优化] 提示词优化使用的聊天模型 Provider ID",
@@ -373,10 +367,10 @@
     "default": 3
   },
   "prompt_builder_template": {
-    "description": "[09 高级模板] 提示词生成模板（发给 LLM 的完整提示词）",
+    "description": "[09 高级模板] 主提示词模板（默认：千代预设主提示词）",
     "type": "string",
-    "default": "我是一名AI画师，请根据以下内容设计出大师级的提示词段落。应为适用于anima模型的danbooru tags。\n为画面搭配服饰tag，动作tag，神态tag等。\n{character_rule}\n大师之作等前置质量提示词不需要列出。\n服装写的更细，每种应当包含5~10短句或更多。\n部分词直译很可能不会有有效的tag，请尝试用通感来描绘一些danbooru tag可能缺乏词库的词语。以下是一种例子（你不一定要这样做）：苗族少女→银质华丽头饰\n将输出的自然语言汇总到一起。\n提示词在背景方面偏简约即可，可以有设计感，但是不要堆叠过多元素，当前模型对于复杂背景的效果不佳。建议根据情况生成白色背景或立绘式白色主题背景，只带有少量元素。\n如果用户要求“某角色风格的衣服/动作/姿态”，请先在内部拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成有效的 danbooru tags。\n不要只输出 generic white dress, gold trim, ribbon 这类泛化标签；要保留参考对象最有辨识度的视觉特征。\n即使知道角色的 danbooru 角色 tag，也必须继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n除非用户明确要求多角色，否则只为一个可见主体写 tags。根据主题使用 solo、1girl 或 1boy；不要添加背景人物、人群、双胞胎、分身、额外角色或多个角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{style_block}\n{sensual_rule}\n-----------\n没有特殊要求时，请为目标角色应用可爱风格。注意，这种可爱与用户要求的涩气边界感不冲突。\n-----------\n这次，请为我生成{theme}主题的提示词。",
-    "hint": "高级项，首次配置可以不改。支持占位符：{theme} 用户主题，{character_rule} 固定角色规则，{search_block} 联网摘要，{reference_rule} 引用图/法术规则，{img2img_rule} 图生图规则，{style_block} 千代风格2规则，{sensual_rule} 涩气表现力规则。留空则使用插件内置默认模板。"
+    "default": "你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。\n\n请先在内部判断用户输入类型：\n1. 如果用户输入很短、只是一两个短句，请主动进行审美补全，重点补出主体外观、服装结构、材质、配色、装饰物、动作和表情，让角色本身完整而精致。\n2. 如果用户输入很具体，请优先精确遵守用户要求，不要擅自改主题、角色身份、服装方向或构图重点。\n3. 如果用户输入已经像完整 Danbooru tags，请尽量保持原意，只做必要的补全和规范化。\n\n画面设计原则：\n- 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。\n- 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。\n- 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。\n- 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。\n- 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。\n- 默认审美为可爱、明亮、精致、干净，适合二次元角色展示；用户要求涩气、阴暗、华丽或其它风格时，以用户要求为准。\n- 部分中文概念直译可能不是有效 tag，请转译为可见的 Danbooru 视觉元素。例如：苗族少女可以转成 ornate silver headdress、silver jewelry、embroidered dress。\n\n角色和参考规则：\n{character_rule}\n如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。\n即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n输出要求：\n- 只输出英文 Danbooru tags，用英文逗号分隔。\n- 不要输出解释、标题、Markdown、编号或中文。\n- 不要输出质量词，例如 masterpiece、best quality、worst quality、low quality、score_7。\n- 不要输出画师词，例如 @artist。\n- 不要重复固定角色已经提供的固有发色、瞳色、种族和固定配饰。\n\n用户主题：\n{theme}",
+    "hint": "高级项，首次配置可以不改。这是唯一默认应用的千代 prompt 预设；用户想改变提示词风格时，应直接自定义这份主提示词。支持占位符：{theme} 用户主题，{character_rule} 固定角色规则，{search_block} 联网摘要，{reference_rule} 引用图/法术规则，{img2img_rule} 图生图规则，{sensual_rule} 涩气表现力规则。留空则使用插件内置默认模板。旧模板中的 {style_block} 会被兼容为空。"
   },
   "debug_prompt_enabled": {
     "description": "[09 调试与取证] 记录完整提示词优化输入/输出",

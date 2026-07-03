@@ -95,14 +95,17 @@ chiyo
 
 默认是 `none`，表示插件不自动套用任何私人角色或画风。
 
-选择 `chiyo` 后会启用“千代预设”，它会自动应用：
+无论是否选择 `chiyo`，插件都会默认使用一份内置的“千代预设主提示词”作为 prompt 优化模板。它就是配置页里的 `prompt_builder_template`，也是用户最应该自定义的提示词入口。
+
+这份主提示词会在用户只写一两个短句时主动补全角色方案，例如主体外观、服装结构、材质、配色、姿态、表情和可见细节；镜头、背景、光影和氛围只在用户提到相关要求时生成。当用户写得很具体时，则优先精确遵守用户要求。
+
+选择 `chiyo` 后会在主提示词之外额外应用：
 
 - Anima 常用基础参数。
 - 默认质量词：`masterpiece, best quality, nsfw,`
 - 默认画风名称：千代画风。
 - 默认画师串：`@yukisiannn, @kani biimu, @ixy, @shnva, @shiromochi sakura, @stmast,`
 - 默认 prompt 优化规则：质量词、画师词、具体内容分段拼接。
-- 默认提示词生成风格：千代风格2。它会让 LLM 在“立绘取向”和“插画取向”之间按需求选择，不机械套用固定 tags。
 
 如果你不想自己写角色 tag，可以试试预设的“狐莉”角色。狐莉不会自动套用；只有当你在指令中明确提到“狐莉”时，插件才会使用这组角色 tags：
 
@@ -110,7 +113,7 @@ chiyo
 1 girl, solo, fox girl, (fox ears, inner ear hair), (white hair, medium hair, hair ornament, hair between eyes), (heterochromia, ice blue eye and amber eye), fang, black choker,
 ```
 
-启用千代预设后，你仍然可以在配置里覆盖默认画风、质量词或画师串。临时不想用画师串时，也可以在指令里写“不使用默认画风”或 “no artist tags”。
+启用千代预设后，你仍然可以在配置里覆盖默认画风、质量词、画师串或主提示词模板。临时不想用画师串时，也可以在指令里写“不使用默认画风”或 “no artist tags”。
 
 ## 自定义固定角色和画风
 
