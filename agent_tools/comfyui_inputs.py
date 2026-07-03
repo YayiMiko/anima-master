@@ -11,11 +11,12 @@ SUPPORTED_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 class ComfyUIImageResolver:
     """Resolve workspace input images for ComfyUI helper commands."""
 
-    def __init__(self, workspace: Path):
+    def __init__(self, workspace: Path, supported_exts: set[str] | None = None):
         self.workspace = Path(workspace)
         self.inputs = self.workspace / "inputs"
         self.manifest = self.inputs / "manifest.jsonl"
         self.latest_input = self.inputs / "latest.json"
+        self.supported_exts = {item.lower() for item in (supported_exts or SUPPORTED_EXTS)}
 
     def inside_workspace(self, path: Path) -> Path:
         resolved = path.resolve()
@@ -51,7 +52,7 @@ class ComfyUIImageResolver:
             path = self.inside_workspace(path)
         except SystemExit:
             return None
-        if path.exists() and path.is_file() and path.suffix.lower() in SUPPORTED_EXTS:
+        if path.exists() and path.is_file() and path.suffix.lower() in self.supported_exts:
             return path
         return None
 
@@ -72,7 +73,7 @@ class ComfyUIImageResolver:
         candidates = [
             p
             for p in self.inputs.rglob("*")
-            if p.is_file() and p.suffix.lower() in SUPPORTED_EXTS
+            if p.is_file() and p.suffix.lower() in self.supported_exts
         ]
         candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         return candidates[:limit]
@@ -106,7 +107,7 @@ class ComfyUIImageResolver:
         path = self.inside_workspace(path)
         if not path.exists() or not path.is_file():
             raise SystemExit(f"input image not found: {path}")
-        if path.suffix.lower() not in SUPPORTED_EXTS:
+        if path.suffix.lower() not in self.supported_exts:
             raise SystemExit(f"unsupported input image type: {path.suffix}")
         return path
 

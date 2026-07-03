@@ -47,6 +47,20 @@ clip_name = 你的文本编码器文件名
 vae_name = 你的 VAE 文件名
 ```
 
+如果你只是想先跑通一次，可以先按下面的思路填写：
+
+```text
+workflow = anima_t2i
+unet_name = 在 ComfyUI 模型目录中实际存在的 Anima 模型文件名
+clip_name = 在 ComfyUI 文本编码器目录中实际存在的 Qwen 文本编码器文件名
+vae_name = 在 ComfyUI VAE 目录中实际存在的 VAE 文件名
+width = 1024
+height = 1536
+allowed_sizes = 1024x1536
+```
+
+这些文件名必须和 ComfyUI 里看到的文件名完全一致。不同用户的模型文件名可能不同，不要直接照抄示例里的描述文字。
+
 尺寸配置由 `width`、`height` 和 `allowed_sizes` 共同决定。`allowed_sizes` 推荐使用英文半角 `x` 书写为 `宽x高`，例如：
 
 ```text
