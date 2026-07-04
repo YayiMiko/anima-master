@@ -124,13 +124,18 @@ class GenerationTaskRunner:
             return payload
         prompt = await self._augment_reference_image(event, prompt)
         if prompt is None:
-            payload = {"ok": False, "error": "reference_image_not_found"}
+            image_input_summary = dict(self._image_inputs.last_summary)
+            payload = {
+                "ok": False,
+                "error": "reference_image_not_found",
+                "image_input_summary": image_input_summary,
+            }
             task.update(
                 {
                     "ok": False,
                     "error": payload["error"],
                     "reference_image_found": False,
-                    "image_input_summary": dict(self._image_inputs.last_summary),
+                    "image_input_summary": image_input_summary,
                 }
             )
             self._task_recorder.write(task)

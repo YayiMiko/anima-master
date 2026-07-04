@@ -35,6 +35,8 @@ Anima 绘图大师是一个 AstrBot 插件，用来把聊天机器人连接到�
 http://127.0.0.1:8188
 ```
 
+注意：这里的 `127.0.0.1` 指的是 AstrBot 所在机器，不一定是你的电脑，也不一定是 NapCat 所在机器。如果 AstrBot、ComfyUI、NapCat 不在同一台设备上，请填写 AstrBot 能访问到的地址。
+
 ## 快速开始
 
 安装插件后，打开 AstrBot WebUI 的插件配置页，至少确认这些配置已经与你本地 ComfyUI 保持一致：
@@ -83,6 +85,44 @@ allowed_sizes = 1024x1536
 ```text
 /anm 原样 masterpiece, best quality, 1girl, solo, white dress, simple background
 ```
+
+## 部署拓扑
+
+### AstrBot 和 ComfyUI 在同一台机器
+
+这是最简单的部署方式。ComfyUI 使用默认监听地址时，通常可以保持：
+
+```text
+comfyui_base_url = http://127.0.0.1:8188
+```
+
+### AstrBot 在服务器，ComfyUI 在另一台机器
+
+这种情况下，`127.0.0.1` 会指向服务器自身，不能代表家里电脑或其它 ComfyUI 主机。请将 `comfyui_base_url` 改成服务器能访问到的 ComfyUI 地址，例如局域网地址或 Tailscale 地址：
+
+```text
+comfyui_base_url = http://100.x.x.x:8188
+```
+
+同时需要确认 ComfyUI 允许外部访问。常见做法是在启动 ComfyUI 时开启监听，例如：
+
+```text
+--listen 0.0.0.0
+```
+
+并确保防火墙、路由或 Tailscale ACL 没有阻断 8188 端口。
+
+### AstrBot 在本机，NapCat 在服务器
+
+这种部署也可以使用。插件生成图片后，会由 AstrBot 平台适配器发送图片组件，不要求服务器 NapCat 读取本机磁盘路径。
+
+如果发送失败，请优先检查 AstrBot 平台适配器和 OneBot 通道，而不是把本机 `D:\...` 路径配置给 NapCat。
+
+### 关于自动启动 ComfyUI
+
+`auto_start` 只会在 AstrBot 所在机器上执行 `startup_command`。如果 AstrBot 在服务器、ComfyUI 在家里电脑，自动启动不会直接启动家里电脑上的 ComfyUI。
+
+跨机器自动启动需要你自行配置远程命令，例如通过 SSH、Tailscale SSH 或其它运维脚本启动远端 ComfyUI。
 
 ## 千代预设
 

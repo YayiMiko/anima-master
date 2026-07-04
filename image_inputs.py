@@ -9,11 +9,11 @@ from astrbot.core.utils.media_utils import MediaResolver
 try:
     from .image_manifest import ImageInputManifest
     from .image_storage import ImageInputStorage
-    from .onebot_image_resolver import OneBotReplyImageResolver
+    from .onebot_image_resolver import OneBotImageResolver
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from image_manifest import ImageInputManifest
     from image_storage import ImageInputStorage
-    from onebot_image_resolver import OneBotReplyImageResolver
+    from onebot_image_resolver import OneBotImageResolver
 
 
 class ImageInputResolver:
@@ -44,7 +44,7 @@ class ImageInputResolver:
             inputs_dir=self.inputs_dir,
         )
         self._storage = ImageInputStorage(self._manifest)
-        self._onebot_reply_images = OneBotReplyImageResolver(
+        self._onebot_images = OneBotImageResolver(
             logger=self._logger,
             shorten=self._shorten,
             image_component_details=self._image_component_details,
@@ -218,8 +218,31 @@ class ImageInputResolver:
         )
         return str(target)
 
+    def _raw_message_image_segments(self, event: AstrMessageEvent) -> list[dict[str, Any]]:
+        raw = getattr(event.message_obj, "raw_message", None)
+        segments = raw.get("message") if hasattr(raw, "get") else None
+        if not isinstance(segments, list):
+            return []
+        images: list[dict[str, Any]] = []
+        for segment in segments:
+            if not isinstance(segment, dict) or segment.get("type") != "image":
+                continue
+            data = segment.get("data")
+            if isinstance(data, dict):
+                images.append(data)
+        return images
+
+    async def _save_raw_message_image(
+        self,
+        event: AstrMessageEvent,
+        data: dict[str, Any],
+        label: str,
+        index: int,
+    ) -> str | None:
+        return await self._onebot_images.save_raw_message_image(event, data, label, index)
+
     async def _save_onebot_reply_image(self, event: AstrMessageEvent) -> str | None:
-        return await self._onebot_reply_images.save_reply_image(event)
+        return await self._onebot_images.save_reply_image(event)
 
     async def event_image_input(self, event: AstrMessageEvent) -> str | None:
         """Resolve the intended image from direct or quoted chat content.
@@ -254,10 +277,16 @@ class ImageInputResolver:
             )
             if saved:
                 return saved
+        raw_images = self._raw_message_image_segments(event)
+        for index, data in enumerate(raw_images, start=1):
+            saved = await self._save_raw_message_image(event, data, "message", index)
+            if saved:
+                return saved
         self.last_summary = {
             "path": "",
             "source": "not_found",
             "reply_images": len(reply_images),
             "direct_images": len(direct_images),
+            "raw_images": len(raw_images),
         }
         return None

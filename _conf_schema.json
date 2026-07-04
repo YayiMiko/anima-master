@@ -14,7 +14,7 @@
     "description": "[01 ComfyUI 连接] 本地 ComfyUI 地址",
     "type": "string",
     "default": "http://127.0.0.1:8188",
-    "hint": "首次配置必看。填写 AstrBot 所在机器可以访问到的 ComfyUI 地址，默认是本机 ComfyUI。"
+    "hint": "首次配置必看。填写 AstrBot 所在机器可以访问到的 ComfyUI 地址。127.0.0.1 指 AstrBot 所在机器，不一定是你的电脑或 NapCat 所在机器；跨机器部署时请填写局域网或 Tailscale 地址。"
   },
   "workflow": {
     "description": "[01 ComfyUI 连接] ComfyUI 工作流预设",

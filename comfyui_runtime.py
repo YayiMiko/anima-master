@@ -236,6 +236,16 @@ class ComfyUIRuntime:
         if detail == "no recent image found in workspace inputs":
             return "没有找到最近收到的图片"
         if detail == "reference_image_not_found":
+            summary = payload.get("image_input_summary") if isinstance(payload.get("image_input_summary"), dict) else {}
+            direct_count = int(summary.get("direct_images") or 0)
+            reply_count = int(summary.get("reply_images") or 0)
+            raw_count = int(summary.get("raw_images") or 0)
+            if direct_count or reply_count or raw_count:
+                return (
+                    "检测到了图片消息，但没有成功下载/保存参考图。"
+                    f"direct={direct_count} reply={reply_count} raw={raw_count}，"
+                    "请稍后重试，或引用图片消息再试"
+                )
             return "没有拿到参考图。请直接带图发送，或引用一条包含图片的消息再使用 /anm"
         if "unsupported_size" in detail:
             return "尺寸不在当前 Anima 预设范围内"
