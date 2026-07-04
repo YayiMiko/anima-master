@@ -1,275 +1,114 @@
 # Anima 绘图大师
 
-Anima 绘图大师是一个 AstrBot 插件，用来把聊天机器人连接到本地 ComfyUI，并针对 Anima 模型提供更顺手的生图体验。
+Anima 绘图大师是一个 AstrBot 插件，用来把聊天里的自然语言变成适合本地 ComfyUI / Anima 工作流的 Danbooru tags，并把生成结果发回聊天。
 
-它可以把自然语言需求改写成 Danbooru tags，也可以直接接收你写好的 tags。插件默认不绑定任何私人角色或画风；如果你想快速体验一套可用配置，可以在插件配置里启用内置的“千代预设”。
-
-## 主要功能
-
-- 使用 `/anm` 在聊天中调用本地 ComfyUI 生图。
-- 将自然语言需求优化为 Danbooru tags。
-- 支持原样 tags 模式，不经过 LLM 改写。
-- 支持固定角色、默认画风和画师 tags。
-- 支持联网搜索少量参考信息，用于补全角色外观、服装和设定。
-- 支持查询 Danbooru / Safebooru 核心角色 tag。
-- 支持非 R18 擦边表现力模式，让模型按需求生成更有张力的服装、姿态和镜头 tags。
-- 支持解析 PNG 内的生成信息。
-- 支持通过视觉模型反推图片提示词。
-- 支持自动启动 ComfyUI。
-- 去背景和放大相关工具仍保留在底层 helper 中，聊天入口当前默认关闭。
-- 图生图 / 改图功能仍在开发中，默认关闭，不建议作为稳定功能使用。
-
-## 前置要求
-
-你需要先准备好：
-
-- 已安装并可运行的 AstrBot。
-- 已安装并可运行的 ComfyUI。
-- ComfyUI 中已经放好 Anima 所需模型、文本编码器、VAE 和工作流节点。
-- 如果要使用“联网搜索”，需要在 AstrBot 全局配置里填入 Tavily key。
-- 如果要使用“反推图片”，需要在 AstrBot 中配置可识图的聊天模型。
-
-默认 ComfyUI 地址是：
-
-```text
-http://127.0.0.1:8188
-```
-
-注意：这里的 `127.0.0.1` 指的是 AstrBot 所在机器，不一定是你的电脑，也不一定是 NapCat 所在机器。如果 AstrBot、ComfyUI、NapCat 不在同一台设备上，请填写 AstrBot 能访问到的地址。
-
-## 快速开始
-
-安装插件后，打开 AstrBot WebUI 的插件配置页，至少确认这些配置已经与你本地 ComfyUI 保持一致：
-
-```text
-enabled = true
-comfyui_base_url = http://127.0.0.1:8188
-workflow = 你的工作流预设名
-unet_name = 你的模型文件名
-clip_name = 你的文本编码器文件名
-vae_name = 你的 VAE 文件名
-```
-
-首次配置时，可以优先看配置页里的 `[00 总开关]`、`[01 ComfyUI 连接]` 和 `[02 生成参数]`。后面的提示词优化、角色画风、联网搜索和调试项都可以先保持默认，等能稳定出图后再调整。
-
-如果你只是想先跑通一次，可以先按下面的思路填写：
-
-```text
-workflow = anima_t2i
-unet_name = 在 ComfyUI 模型目录中实际存在的 Anima 模型文件名
-clip_name = 在 ComfyUI 文本编码器目录中实际存在的 Qwen 文本编码器文件名
-vae_name = 在 ComfyUI VAE 目录中实际存在的 VAE 文件名
-width = 1024
-height = 1536
-allowed_sizes = 1024x1536
-```
-
-这些文件名必须和 ComfyUI 里看到的文件名完全一致。不同用户的模型文件名可能不同，不要直接照抄示例里的描述文字。
-
-尺寸配置由 `width`、`height` 和 `allowed_sizes` 共同决定。`allowed_sizes` 推荐使用英文半角 `x` 书写为 `宽x高`，例如：
-
-```text
-1024x1536
-```
-
-插件也会兼容 `1024×1536`、`1024*1536` 等常见写法。注意：如果 `width` 和 `height` 组成的尺寸不在 `allowed_sizes` 中，插件会自动改用最接近的允许尺寸。
-
-然后在聊天里发送：
+![使用示意](docs/images/quickstart-chat.svg)
 
 ```text
 /anm 一个女孩，白色裙子，立绘，简单背景
 ```
 
-如果你已经写好了完整 tags，不希望插件改写，可以使用：
+插件会调用聊天模型优化提示词，再把任务发送给 ComfyUI。你也可以使用“原样”模式直接发送自己写好的 tags。
+
+## 适合谁
+
+- 已经在本地或服务器跑好 ComfyUI 的用户。
+- 想在 QQ、群聊或其它 AstrBot 支持的平台里直接生图的用户。
+- 想让聊天模型把中文需求整理成 Danbooru tags 的用户。
+- 想读取图片生成信息，或反推图片提示词的用户。
+
+## 主要功能
+
+- `/anm` 文生图。
+- 自然语言自动优化为 Danbooru tags。
+- 原样 tags 模式。
+- 固定角色、默认画风、画师 tags。
+- 少量联网搜索，用于补充角色外观和服装参考。
+- Danbooru / Safebooru 核心角色 tag 校正。
+- 图片法术解析。
+- 视觉模型反推图片提示词。
+- 可选自动启动 ComfyUI。
+
+图生图、放大和去背景仍处于开发中，当前不作为稳定主功能。
+
+## 快速开始
+
+1. 确认 AstrBot 和 ComfyUI 都能正常运行。
+2. 在插件配置页填写 ComfyUI 地址、工作流和模型文件名。
+3. 在聊天中发送 `/anm 一个女孩，白色裙子，立绘，简单背景`。
+
+最少需要确认这些配置：
 
 ```text
-/anm 原样 masterpiece, best quality, 1girl, solo, white dress, simple background
-```
-
-## 部署拓扑
-
-### AstrBot 和 ComfyUI 在同一台机器
-
-这是最简单的部署方式。ComfyUI 使用默认监听地址时，通常可以保持：
-
-```text
+enabled = true
 comfyui_base_url = http://127.0.0.1:8188
+workflow = anima_t2i
+unet_name = 你的 Anima 模型文件名
+clip_name = 你的文本编码器文件名
+vae_name = 你的 VAE 文件名
 ```
 
-### AstrBot 在服务器，ComfyUI 在另一台机器
-
-这种情况下，`127.0.0.1` 会指向服务器自身，不能代表家里电脑或其它 ComfyUI 主机。请将 `comfyui_base_url` 改成服务器能访问到的 ComfyUI 地址，例如局域网地址或 Tailscale 地址：
-
-```text
-comfyui_base_url = http://100.x.x.x:8188
-```
-
-同时需要确认 ComfyUI 允许外部访问。常见做法是在启动 ComfyUI 时开启监听，例如：
-
-```text
---listen 0.0.0.0
-```
-
-并确保防火墙、路由或 Tailscale ACL 没有阻断 8188 端口。
-
-### AstrBot 在本机，NapCat 在服务器
-
-这种部署也可以使用。插件生成图片后，会由 AstrBot 平台适配器发送图片组件，不要求服务器 NapCat 读取本机磁盘路径。
-
-如果发送失败，请优先检查 AstrBot 平台适配器和 OneBot 通道，而不是把本机 `D:\...` 路径配置给 NapCat。
-
-### 关于自动启动 ComfyUI
-
-`auto_start` 只会在 AstrBot 所在机器上执行 `startup_command`。如果 AstrBot 在服务器、ComfyUI 在家里电脑，自动启动不会直接启动家里电脑上的 ComfyUI。
-
-跨机器自动启动需要你自行配置远程命令，例如通过 SSH、Tailscale SSH 或其它运维脚本启动远端 ComfyUI。
-
-## 千代预设
-
-`preset_profile` 可以选择：
-
-```text
-none
-chiyo
-```
-
-默认是 `none`，表示插件不自动套用任何私人角色或画风。
-
-无论是否选择 `chiyo`，插件都会默认使用一份内置的“千代预设主提示词”作为 prompt 优化模板。它就是配置页里的 `prompt_builder_template`，也是用户最应该自定义的提示词入口。
-
-这份主提示词会在用户只写一两个短句时主动补全角色方案，例如主体外观、服装结构、材质、配色、姿态、表情和可见细节；镜头、背景、光影和氛围只在用户提到相关要求时生成。当用户写得很具体时，则优先精确遵守用户要求。
-
-选择 `chiyo` 后会在主提示词之外额外应用：
-
-- Anima 常用基础参数。
-- 默认质量词：`masterpiece, best quality, nsfw,`
-- 默认画风名称：千代画风。
-- 默认画师串：`@yukisiannn, @kani biimu, @ixy, @shnva, @shiromochi sakura, @stmast,`
-- 默认 prompt 优化规则：质量词、画师词、具体内容分段拼接。
-
-如果你不想自己写角色 tag，可以试试预设的“狐莉”角色。狐莉不会自动套用；只有当你在指令中明确提到“狐莉”时，插件才会使用这组角色 tags：
-
-```text
-1 girl, solo, fox girl, (fox ears, inner ear hair), (white hair, medium hair, hair ornament, hair between eyes), (heterochromia, ice blue eye and amber eye), fang, black choker,
-```
-
-启用千代预设后，你仍然可以在配置里覆盖默认画风、质量词、画师串或主提示词模板。临时不想用画师串时，也可以在指令里写“不使用默认画风”或 “no artist tags”。
-
-## 自定义固定角色和画风
-
-如果你不使用千代预设，也可以自己配置：
-
-```text
-default_style_enabled = true
-default_style_name = 你的画风名
-default_artist_tags = @artist_a, @artist_b, ...
-sensual_mode_enabled = true
-```
-
-在 `fixed_characters` 中添加角色：
-
-```json
-{
-  "角色A": "1girl, solo, ...",
-  "角色B": "1boy, solo, ..."
-}
-```
-
-之后聊天里提到角色名时，插件会优先使用对应的固定角色 tags。
-没有明确提到固定角色名时，插件不会自动套用任何角色 tags。
-
-## 擦边表现力模式
-
-`sensual_mode_enabled` 默认开启。用户在提示中写到“涩气、擦边、透明、魅惑、性感、蕾丝、吊带、紧身、露肩、suggestive”等词时，插件会要求 prompt 优化模型保留这种非 R18 边界感，并自行选择合适的 Danbooru tags。
-
-这个模式不会硬编码固定涩气 tags，也不会在用户没有相关要求时主动添加擦边内容。
+`127.0.0.1` 指 AstrBot 所在机器。如果 AstrBot 和 ComfyUI 不在同一台设备上，请填写 AstrBot 能访问到的局域网或 Tailscale 地址。
 
 ## 常用指令
 
 ```text
-/anm
-/anm 白色礼服，立绘，简单背景
-/anm 原样 masterpiece, best quality, 1girl, solo
+/anm 一个女孩，白色裙子，立绘，简单背景
+/anm 原样 masterpiece, best quality, 1girl, solo, white dress, simple background
 /anm 解析法术
 /anm 反推这张图的提示词
+/anm 状态
+/anm 调试状态
 ```
 
-`/anm` 也可以替换为：
+`/anm` 也可以写成 `/anima` 或 `/comfyui`。
 
-```text
-/anima
-/comfyui
-```
+## 配置建议
 
-## 功能说明
+首次使用时，优先只看这些配置组：
 
-自然语言生图：
+- `[00 基础]`
+- `[01 ComfyUI]`
+- `[02 出图]`
+- `[03 提示词]`
 
-```text
-/anm 给狐莉穿上蓝白色魔法学院制服，立绘风格
-```
+能稳定出图后，再根据需要调整角色、画风、联网搜索、自动启动和调试项。
 
-插件会先让聊天模型生成 Danbooru tags，再按配置拼接质量词、角色词和画风词，最后发送给 ComfyUI。
+如果你想快速体验一套可用配置，可以把 `preset_profile` 设为 `chiyo`。它会启用千代预设，并提供“狐莉”作为可选固定角色。狐莉不会自动套用，只有当指令里明确提到“狐莉”时才会使用。
 
-原样 tags：
+## 详细说明
 
-```text
-/anm 原样 masterpiece, best quality, 1girl, solo, white background
-```
-
-这种模式不会调用 prompt 优化模型，适合已经熟悉 Danbooru tags 的用户。
-
-解析法术：
-
-```text
-/anm 解析法术
-```
-
-请引用或发送一张本地模型生成的 PNG。插件会尝试读取图片里保存的生成信息。
-
-反推图片：
-
-```text
-/anm 反推这张图的提示词
-```
-
-请引用或发送图片。插件会调用 AstrBot 当前配置的视觉模型来描述图片元素，并整理成提示词参考。
+- [安装与快速开始](docs/quickstart.md)
+- [配置说明](docs/configuration.md)
+- [部署拓扑](docs/deployment.md)
+- [提示词与角色画风](docs/prompting.md)
+- [故障排查](docs/troubleshooting.md)
 
 ## 常见问题
 
 ### 发送 `/anm` 没反应
 
-先确认聊天平台适配器是否在线，再确认 AstrBot 日志中是否收到消息。如果消息没有进入 AstrBot，通常不是插件问题，而是聊天平台桥接层掉线。
+先确认 AstrBot 是否收到了消息。如果日志里没有新消息，通常是聊天平台适配器或 NapCat/OneBot 连接问题，不是插件问题。
 
 ### 提示 ComfyUI 离线
 
-确认 ComfyUI 正在运行，并且 `comfyui_base_url` 与实际地址一致。默认地址是 `http://127.0.0.1:8188`。
+确认 `comfyui_base_url` 填的是 AstrBot 能访问到的 ComfyUI 地址。AstrBot 在服务器时，`127.0.0.1` 指服务器自身。
 
 ### 图片没有发回聊天
 
-检查：
-
-- `send_result_to_chat` 是否为 true。
-- 聊天平台是否允许发送本地图片。
-- ComfyUI 是否真的产出了图片文件。
-
-### 联网搜索没有生效
-
-联网搜索只会在插件判断需要参考外部资料时启用，并且需要 AstrBot 全局 Tavily key。搜索失败会自动降级为普通 prompt 优化，不会中断生图。
+确认 `send_result_to_chat` 为 true，并检查聊天平台是否允许发送图片。生成文件存在但发送失败时，通常需要看 AstrBot 平台适配器日志。
 
 ### 新角色画不像
 
-本地模型不一定认识较新的角色或冷门角色。可以尝试：
+本地模型不一定认识新角色或冷门角色。可以开启联网搜索，补充更具体的外观、服装、配色和标志物，或在 `fixed_characters` 中手动添加角色 tags。
 
-- 开启联网搜索。
-- 在提示里写更具体的外观、服装、配色和标志物。
-- 在 `fixed_characters` 中手动添加角色 tags。
+## 依赖
 
-### 如何完全自己写 tags
-
-使用“原样”模式：
+插件 helper 依赖：
 
 ```text
-/anm 原样 你的完整 tags
+requests
+pillow
 ```
 
+AstrBot 插件管理器通常会处理依赖安装；如果你的环境没有自动安装，请手动安装 `requirements.txt` 中的依赖。

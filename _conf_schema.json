@@ -1,51 +1,51 @@
 {
   "enabled": {
-    "description": "[00 总开关] 启用 Anima 绘图大师",
+    "description": "[00 ??] ????",
     "type": "bool",
     "default": true
   },
   "preset_profile": {
-    "description": "[00 总开关] 一键预设配置",
+    "description": "[00 ??] ????",
     "type": "string",
     "default": "none",
-    "hint": "可选：none / chiyo。插件默认已经使用内置的“千代预设主提示词”作为 prompt 优化模板；选择 chiyo 会在此基础上追加千代画风、Anima 推荐参数和狐莉可选固定角色。狐莉只有明确提到时才会使用。"
+    "hint": "???none / chiyo????????? none????????????????????? chiyo?"
   },
   "comfyui_base_url": {
-    "description": "[01 ComfyUI 连接] 本地 ComfyUI 地址",
+    "description": "[01 ComfyUI] ComfyUI ??",
     "type": "string",
     "default": "http://127.0.0.1:8188",
-    "hint": "首次配置必看。填写 AstrBot 所在机器可以访问到的 ComfyUI 地址。127.0.0.1 指 AstrBot 所在机器，不一定是你的电脑或 NapCat 所在机器；跨机器部署时请填写局域网或 Tailscale 地址。"
+    "hint": "?? AstrBot ????? ComfyUI ???127.0.0.1 ? AstrBot ????????????????? Tailscale ???"
   },
   "workflow": {
-    "description": "[01 ComfyUI 连接] ComfyUI 工作流预设",
+    "description": "[01 ComfyUI] ?????",
     "type": "string",
     "default": "anima_t2i",
-    "hint": "首次配置必看。公开版内置工作流预设当前为 anima_t2i；如果以后扩展自定义工作流，应填写插件支持的预设名。"
+    "hint": "??????? anima_t2i????????????"
   },
   "timeout": {
-    "description": "[01 ComfyUI 连接] 生成超时时间（秒）",
+    "description": "[01 ComfyUI] ???????",
     "type": "int",
     "default": 900
   },
   "poll_interval": {
-    "description": "[01 ComfyUI 连接] 查询生成历史的间隔（秒）",
+    "description": "[01 ComfyUI] ?????????",
     "type": "int",
     "default": 2
   },
   "width": {
-    "description": "[02 生成参数] 默认图片宽度",
+    "description": "[02 ??] ????",
     "type": "int",
     "default": 832,
-    "hint": "首次配置建议确认。width 和 height 组成的尺寸应在 allowed_sizes 中；否则会自动改用最接近的允许尺寸。"
+    "hint": "??? height ?? allowed_sizes ???????????????????????"
   },
   "height": {
-    "description": "[02 生成参数] 默认图片高度",
+    "description": "[02 ??] ????",
     "type": "int",
     "default": 1216,
-    "hint": "首次配置建议确认。常见竖图可用 832x1216 或 1024x1536，前提是 allowed_sizes 中包含该尺寸。"
+    "hint": "?????? 832x1216 ? 1024x1536???? allowed_sizes ???????"
   },
   "allowed_sizes": {
-    "description": "[02 生成参数] 允许的输出尺寸预设",
+    "description": "[02 ??] ????",
     "type": "list",
     "default": [
       "832x1216",
@@ -57,176 +57,176 @@
       "1344x768",
       "1024x1536"
     ],
-    "hint": "推荐使用英文半角 x 书写：宽x高，例如 1024x1536。程序也会兼容 1024×1536、1024*1536 等常见写法；如果 width/height 不在此列表中，会自动改用最接近的允许尺寸。",
+    "hint": "??????????? 1024x1536?width/height ???????????????????",
     "items": {
       "type": "string"
     }
   },
   "steps": {
-    "description": "[02 生成参数] 默认采样步数",
+    "description": "[02 ??] ????",
     "type": "int",
     "default": 30
   },
   "cfg": {
-    "description": "[02 生成参数] 默认 CFG 强度",
+    "description": "[02 ??] CFG ??",
     "type": "float",
     "default": 5
   },
   "sampler_name": {
-    "description": "[02 生成参数] ComfyUI 采样器",
+    "description": "[02 ??] ???",
     "type": "string",
     "default": "er_sde"
   },
   "scheduler": {
-    "description": "[02 生成参数] ComfyUI 调度器",
+    "description": "[02 ??] ???",
     "type": "string",
     "default": "beta57"
   },
   "unet_name": {
-    "description": "[02 生成参数] UNET / 扩散模型文件名",
+    "description": "[02 ??] Anima ?????",
     "type": "string",
     "default": "anima_baseV10.safetensors",
-    "hint": "首次配置必看。必须和 ComfyUI 的 UNETLoader 下拉框中文件名完全一致，只填文件名，不填本机路径。"
+    "hint": "?? ComfyUI ????????????????????"
   },
   "clip_name": {
-    "description": "[02 生成参数] 文本编码器文件名",
+    "description": "[02 ??] ????????",
     "type": "string",
     "default": "qwen_3_06b_base.safetensors",
-    "hint": "首次配置必看。必须和 ComfyUI 的 CLIPLoader 下拉框中文件名完全一致，只填文件名，不填本机路径。"
+    "hint": "?? ComfyUI ????????????????????"
   },
   "vae_name": {
-    "description": "[02 生成参数] VAE 文件名",
+    "description": "[02 ??] VAE ???",
     "type": "string",
     "default": "qwen_image_vae.safetensors",
-    "hint": "首次配置必看。必须和 ComfyUI 的 VAELoader 下拉框中文件名完全一致，只填文件名，不填本机路径。"
+    "hint": "?? ComfyUI ????????????????????"
   },
   "quality_prefix": {
-    "description": "[02 生成参数] 默认质量词前缀",
+    "description": "[02 ??] ???",
     "type": "string",
     "default": "masterpiece, best quality,"
   },
   "negative_prompt": {
-    "description": "[02 生成参数] 默认负面提示词",
+    "description": "[02 ??] ?????",
     "type": "string",
     "default": "worst quality, low quality, artist name"
   },
   "prompt_optimize_enabled": {
-    "description": "[03 提示词优化] 文生图时启用 Anima 提示词优化",
+    "description": "[03 ???] ????????",
     "type": "bool",
     "default": true
   },
   "prompt_builder_provider_id": {
-    "description": "[03 提示词优化] 提示词优化使用的聊天模型 Provider ID",
+    "description": "[03 ???] ??????",
     "type": "string",
     "default": "",
-    "hint": "留空时使用当前会话的主聊天模型。"
+    "hint": "??????????????????????"
   },
   "prompt_builder_max_tokens": {
-    "description": "[03 提示词优化] 提示词优化模型最大输出 token",
+    "description": "[03 ???] ??????",
     "type": "int",
     "default": 700
   },
   "prompt_builder_max_content_tags": {
-    "description": "[03 提示词优化] 具体内容 tags 的最大数量",
+    "description": "[03 ???] ?? tags ????",
     "type": "int",
     "default": 120
   },
   "prompt_builder_web_search_enabled": {
-    "description": "[03 提示词优化] 提示词优化时允许联网搜索参考信息",
+    "description": "[04 ??? Tag] ??????",
     "type": "bool",
     "default": true,
-    "hint": "需要 AstrBot 全局配置 Tavily key。搜索失败时会自动降级，不会中断生图。"
+    "hint": "?? AstrBot ?? Tavily key??????????????????"
   },
   "prompt_builder_search_max_results": {
-    "description": "[03 提示词优化] 提示词联网搜索结果数",
+    "description": "[04 ??? Tag] ?????",
     "type": "int",
     "default": 5
   },
   "prompt_builder_search_depth": {
-    "description": "[03 提示词优化] 提示词联网搜索深度",
+    "description": "[04 ??? Tag] ????",
     "type": "string",
     "default": "advanced",
-    "hint": "可选：basic / advanced。"
+    "hint": "???basic / advanced?"
   },
   "prompt_builder_search_query_template": {
-    "description": "[03 提示词优化] 提示词联网搜索查询模板",
+    "description": "[04 ??? Tag] ?????",
     "type": "string",
     "default": "{prompt} 角色 外观 立绘 服装 配色 武器 官方图 official art character design outfit appearance wiki fandom",
-    "hint": "{prompt} 会替换为用户的生图要求。"
+    "hint": "????{prompt} ????????????"
   },
   "prompt_builder_deep_thinking_enabled": {
-    "description": "[03 提示词优化] 提示词优化时尝试启用深度思考参数",
+    "description": "[03 ???] ????????",
     "type": "bool",
     "default": true,
-    "hint": "会尝试传入 thinking/reasoning_effort；当前模型接口不支持时会自动重试普通调用。"
+    "hint": "??????????????????"
   },
   "prompt_builder_reasoning_effort": {
-    "description": "[03 提示词优化] 提示词优化思考强度",
+    "description": "[03 ???] ????",
     "type": "string",
     "default": "max",
-    "hint": "常用：high / max。"
+    "hint": "???high / max?"
   },
   "danbooru_core_tag_lookup_enabled": {
-    "description": "[04 Tag 查询] 提示词优化后校正 Danbooru 角色核心 tag",
+    "description": "[04 ??? Tag] ?????? tag",
     "type": "bool",
     "default": true,
-    "hint": "只查询少量疑似角色名，不会查询所有服装、姿势 tag。"
+    "hint": "?????????????????????? tag?"
   },
   "danbooru_tag_base_urls": {
-    "description": "[04 Tag 查询] Danbooru/Safebooru tag 查询地址",
+    "description": "[04 ??? Tag] Donmai tag API ??",
     "type": "string",
     "default": "https://safebooru.donmai.us,https://danbooru.donmai.us",
-    "hint": "逗号分隔。仅用于少量核心 tag 查询。"
+    "hint": "???????????????"
   },
   "danbooru_tag_user_agent": {
-    "description": "[04 Tag 查询] Danbooru/Safebooru tag 查询 User-Agent",
+    "description": "[04 ??? Tag] Donmai ????",
     "type": "string",
     "default": "AstrBotAnimaMaster/0.14",
-    "hint": "用于 Donmai 只读 tag API。"
+    "hint": "??????????????"
   },
   "danbooru_tag_lookup_timeout": {
-    "description": "[04 Tag 查询] 单次核心 tag 查询超时时间（秒）",
+    "description": "[04 ??? Tag] ?????????",
     "type": "float",
     "default": 6
   },
   "danbooru_tag_max_candidates": {
-    "description": "[04 Tag 查询] 每次最多检查的疑似核心 tag 数量",
+    "description": "[04 ??? Tag] ???????",
     "type": "int",
     "default": 6
   },
   "fixed_characters": {
-    "description": "[05 角色与画风] 固定角色预设",
+    "description": "[05 ?????] ????",
     "type": "list",
     "default": [],
-    "hint": "每行一个角色，格式：角色名=danbooru tags。用户在指令中提到角色名时会自动使用。",
+    "hint": "?????????????=danbooru tags??????????????????",
     "items": {
       "type": "string"
     }
   },
   "default_style_enabled": {
-    "description": "[05 角色与画风] 默认启用画风 / 画师 tags",
+    "description": "[05 ?????] ?????? tags",
     "type": "bool",
     "default": false
   },
   "default_style_name": {
-    "description": "[05 角色与画风] 默认画风名称",
+    "description": "[05 ?????] ????",
     "type": "string",
     "default": "",
-    "hint": "千代预设中的默认画风名称为“千代画风”。"
+    "hint": "????????????????????????"
   },
   "default_artist_tags": {
-    "description": "[05 角色与画风] 默认画风或画师 tags",
+    "description": "[05 ?????] ????? tags",
     "type": "string",
     "default": ""
   },
   "sensual_mode_enabled": {
-    "description": "[05 角色与画风] 启用非 R18 擦边表现力模式",
+    "description": "[05 ?????] ???????",
     "type": "bool",
     "default": true,
-    "hint": "命中涩气、擦边、透明、魅惑等关键词时，让 LLM 自行生成更有表现力的 Danbooru tags；不会硬编码固定涩气 tag。"
+    "hint": "??????????????????????????? tags???????? tags?"
   },
   "sensual_mode_markers": {
-    "description": "[05 角色与画风] 触发表现力模式的关键词列表",
+    "description": "[05 ?????] ??????",
     "type": "list",
     "default": [
       "色气",
@@ -268,88 +268,88 @@
     }
   },
   "img2img_enabled": {
-    "description": "[06 开发中旁路] 启用图生图 / 改图入口（开发中）",
+    "description": "[06 ???] ??? / ????",
     "type": "bool",
     "default": false,
-    "hint": "该功能仍在开发中，默认关闭，不建议作为稳定功能使用。关闭后，改图、图生图、重绘、风格化和 comfyui_edit 工具都会返回关闭提示。"
+    "hint": "???????????????????????"
   },
   "prompt_optimize_img2img_enabled": {
-    "description": "[06 开发中旁路] 图生图 / 改图时启用 prompt 优化",
+    "description": "[06 ???] ?????????",
     "type": "bool",
     "default": true,
-    "hint": "当前只适合整图 img2img。局部重绘应只描述局部对象。"
+    "hint": "????????????????????????"
   },
   "edit_denoise": {
-    "description": "[06 开发中旁路] 图生图 / 改图默认重绘强度",
+    "description": "[06 ???] ???????",
     "type": "float",
     "default": 0.55
   },
   "max_image_side": {
-    "description": "[06 开发中旁路] ComfyUI 图生图输入图最长边限制",
+    "description": "[06 ???] ????????",
     "type": "int",
     "default": 1024
   },
   "upscale_factor": {
-    "description": "[06 开发中旁路] 默认放大倍率（聊天入口当前关闭）",
+    "description": "[06 ???] ??????",
     "type": "float",
     "default": 2.0
   },
   "remove_bg_model": {
-    "description": "[06 开发中旁路] 去背景模型（聊天入口当前关闭）",
+    "description": "[06 ???] ?????",
     "type": "string",
     "default": "BiRefNet_lite"
   },
   "send_result_to_chat": {
-    "description": "[07 发送与权限] 将生成图片发回当前聊天",
+    "description": "[07 ?????] ???????",
     "type": "bool",
     "default": true
   },
   "max_send_images": {
-    "description": "[07 发送与权限] 最多发送到聊天的输出图片数",
+    "description": "[07 ?????] ???????",
     "type": "int",
     "default": 1
   },
   "admin_only": {
-    "description": "[07 发送与权限] 仅管理员可触发 ComfyUI 绘图",
+    "description": "[07 ?????] ??????",
     "type": "bool",
     "default": false
   },
   "allowed_sender_ids": {
-    "description": "[07 发送与权限] 允许使用的发送者 ID 列表",
+    "description": "[07 ?????] ????? ID",
     "type": "list",
     "default": [],
-    "hint": "留空表示不额外限制。",
+    "hint": "??????????",
     "items": {
       "type": "string"
     }
   },
   "auto_start": {
-    "description": "[08 自动启动] 生成请求到来但 ComfyUI 离线时自动启动本地 ComfyUI",
+    "description": "[08 ????] ComfyUI ???????",
     "type": "bool",
     "default": false
   },
   "startup_command": {
-    "description": "[08 自动启动] 启动本地 ComfyUI 的命令",
+    "description": "[08 ????] ????",
     "type": "string",
     "default": ""
   },
   "startup_workdir": {
-    "description": "[08 自动启动] 启动命令的工作目录",
+    "description": "[08 ????] ????",
     "type": "string",
     "default": ""
   },
   "startup_visible_window": {
-    "description": "[08 自动启动] Windows 下自动启动 ComfyUI 时打开可见终端窗口",
+    "description": "[08 ????] Windows ???????",
     "type": "bool",
     "default": true
   },
   "auto_start_admin_only": {
-    "description": "[08 自动启动] 仅管理员或白名单发送者可触发 ComfyUI 自动启动",
+    "description": "[08 ????] ???????????",
     "type": "bool",
     "default": true
   },
   "auto_start_allowed_sender_ids": {
-    "description": "[08 自动启动] 允许触发 ComfyUI 自动启动的发送者 ID",
+    "description": "[08 ????] ???????",
     "type": "list",
     "default": [],
     "items": {
@@ -357,35 +357,35 @@
     }
   },
   "startup_wait_seconds": {
-    "description": "[08 自动启动] 自动启动后等待 ComfyUI 就绪的最长秒数",
+    "description": "[08 ????] ?????????",
     "type": "int",
     "default": 120
   },
   "startup_poll_interval": {
-    "description": "[08 自动启动] 等待启动时的就绪检查间隔（秒）",
+    "description": "[08 ????] ?????????",
     "type": "int",
     "default": 3
   },
   "prompt_builder_template": {
-    "description": "[09 高级模板] 主提示词模板（默认：千代预设主提示词）",
+    "description": "[09 ??] ??????",
     "type": "string",
-    "default": "你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。\n\n请先在内部判断用户输入类型：\n1. 如果用户输入很短、只是一两个短句，请主动进行审美补全，重点补出主体外观、服装结构、材质、配色、装饰物、动作和表情，让角色本身完整而精致。\n2. 如果用户输入很具体，请优先精确遵守用户要求，不要擅自改主题、角色身份、服装方向或构图重点。\n3. 如果用户输入已经像完整 Danbooru tags，请尽量保持原意，只做必要的补全和规范化。\n\n画面设计原则：\n- 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。\n- 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。\n- 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。\n- 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。\n- 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。\n- 默认审美为可爱、明亮、精致、干净，适合二次元角色展示；用户要求涩气、阴暗、华丽或其它风格时，以用户要求为准。\n- 部分中文概念直译可能不是有效 tag，请转译为可见的 Danbooru 视觉元素。例如：苗族少女可以转成 ornate silver headdress、silver jewelry、embroidered dress。\n\n角色和参考规则：\n{character_rule}\n如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。\n即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n输出要求：\n- 只输出英文 Danbooru tags，用英文逗号分隔。\n- 不要输出解释、标题、Markdown、编号或中文。\n- 不要输出质量词，例如 masterpiece、best quality、worst quality、low quality、score_7。\n- 不要输出画师词，例如 @artist。\n- 不要重复固定角色已经提供的固有发色、瞳色、种族和固定配饰。\n\n用户主题：\n{theme}",
-    "hint": "高级项，首次配置可以不改。这是唯一默认应用的千代 prompt 预设；用户想改变提示词风格时，应直接自定义这份主提示词。支持占位符：{theme} 用户主题，{character_rule} 固定角色规则，{search_block} 联网摘要，{reference_rule} 引用图/法术规则，{img2img_rule} 图生图规则，{sensual_rule} 涩气表现力规则。留空则使用插件内置默认模板。旧模板中的 {style_block} 会被兼容为空。"
+    "default": "",
+    "hint": "???????????????????????????? tags???????? {theme}?{character_rule}?{search_block}?{reference_rule}?{img2img_rule}?{sensual_rule}?"
   },
   "debug_prompt_enabled": {
-    "description": "[09 调试与取证] 记录完整提示词优化输入/输出",
+    "description": "[10 ??] ???????",
     "type": "bool",
     "default": false,
-    "hint": "默认关闭。开启后会在日志和 last_task.json 中记录完整 LLM 输入、LLM 输出和最终 prompt，便于排查生图偏题。"
+    "hint": "??????????????????????????"
   },
   "debug_image_reference_enabled": {
-    "description": "[09 调试与取证] 记录引用图解析细节",
+    "description": "[10 ??] ???????",
     "type": "bool",
     "default": false,
     "hint": "默认关闭。开启后会记录引用图是否取到、法术解析或视觉反推摘要。"
   },
   "debug_send_payload_enabled": {
-    "description": "[09 调试与取证] 记录 ComfyUI 工具返回和发送摘要",
+    "description": "[10 ??] ?? ComfyUI ??",
     "type": "bool",
     "default": false,
     "hint": "默认关闭。开启后会在 last_task.json 中额外保存 ComfyUI 工具返回摘要，便于排查未发图或发送失败。"
