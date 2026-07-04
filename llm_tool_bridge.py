@@ -47,7 +47,6 @@ class LLMToolBridge:
             return f"ComfyUI status failed: {payload.get('error')}"
         return (
             "ComfyUI status: "
-            f"enabled={payload.get('enabled')}, "
             f"base_url={payload.get('base_url')}, "
             f"workflow={payload.get('workflow')}, "
             f"allowed_sizes={payload.get('allowed_sizes')}, "

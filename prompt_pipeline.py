@@ -128,7 +128,7 @@ class PromptPipeline:
             "max_tokens": self._int("prompt_builder_max_tokens", 700),
         }
         if use_deep_thinking:
-            kwargs["reasoning_effort"] = self._str("prompt_builder_reasoning_effort", "max") or "max"
+            kwargs["reasoning_effort"] = self._str("prompt_builder_reasoning_effort", "high") or "high"
             kwargs["thinking"] = {"type": "enabled"}
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()

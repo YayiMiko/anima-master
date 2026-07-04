@@ -72,7 +72,6 @@ class ComfyUIRuntime:
     def is_ready(self, payload: dict[str, Any]) -> bool:
         return bool(
             payload.get("ok")
-            and payload.get("enabled", True)
             and payload.get("unet_available")
             and payload.get("clip_available")
             and payload.get("vae_available")
@@ -122,7 +121,7 @@ class ComfyUIRuntime:
         return payload
 
     async def run_tool(self, args: list[str]) -> dict[str, Any]:
-        timeout = max(self._int("timeout", 900), 30) + 60
+        timeout = max(self._int("timeout", 300), 30) + 60
         return await self.run_python_tool(self.tool, args, timeout)
 
     async def run_prompt_tool(self, args: list[str]) -> dict[str, Any]:

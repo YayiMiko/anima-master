@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
-DEFAULT_NEGATIVE_PROMPT = "worst quality, low quality, artist name"
+DEFAULT_NEGATIVE_PROMPT = "worst quality, low quality, score_1, score_2, score_3, artist name"
 
 
 def anima_t2i_workflow(
@@ -63,7 +63,7 @@ def anima_t2i_workflow(
                 "steps": steps,
                 "cfg": cfg,
                 "sampler_name": config.get("sampler_name", "er_sde"),
-                "scheduler": config.get("scheduler", "simple"),
+                "scheduler": config.get("scheduler", "normal"),
                 "denoise": 1,
             },
         },

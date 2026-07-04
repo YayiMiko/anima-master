@@ -2,17 +2,17 @@
 
 配置页按使用频率分组。首次使用时，只需要先看前四组。
 
-## 基础
+## 预设
 
-- `enabled`：是否启用插件。
-- `preset_profile`：一键预设。可选 `none` 或 `chiyo`。
+- `reset_to_defaults`：一键恢复默认配置。打开并保存后，仅在下一次插件加载时执行一次，完成后会自动关闭。
+- `chiyo_preset_enabled`：一键启用千代预设。
 
-`chiyo` 会启用一套可直接体验的默认配置，包括千代画风、Anima 常用参数和狐莉固定角色。狐莉不是默认角色，只有指令里明确提到“狐莉”时才会使用。
+关闭时使用当前配置。开启后会把千代画师组写入画师 tags，并把狐莉加入固定角色。狐莉不是默认角色，只有指令里明确提到“狐莉”时才会使用。
 
 ## ComfyUI
 
 - `comfyui_base_url`：AstrBot 能访问到的 ComfyUI 地址。
-- `workflow`：工作流预设，目前公开版内置 `anima_t2i`。
+- `workflow`：工作流预设，默认使用 `anima_t2i`。
 - `timeout`：等待生成完成的最长时间。
 - `poll_interval`：查询 ComfyUI 生成状态的间隔。
 
@@ -53,11 +53,9 @@
 ## 角色与画风
 
 - `fixed_characters`：固定角色预设。
-- `default_style_enabled`：默认拼接画风或画师 tags。
-- `default_style_name`：画风名称。
 - `default_artist_tags`：画师 tags。
-- `sensual_mode_enabled`：边界表现力模式。
-- `sensual_mode_markers`：触发表现力模式的关键词。
+- `sensual_mode_enabled`：涩气表现力优化。
+- `sensual_mode_markers`：触发涩气表现力优化的关键词。
 
 固定角色格式：
 
@@ -65,7 +63,7 @@
 角色名=danbooru tags
 ```
 
-## 开发中旁路
+## 实验功能
 
 图生图、放大和去背景仍在开发中。配置项保留给后续版本使用，不建议作为稳定功能依赖。
 
@@ -76,11 +74,11 @@
 - `admin_only`：是否仅管理员可用。
 - `allowed_sender_ids`：允许使用的用户 ID 列表。
 
-## 自动启动
+## 按需拉起
 
-`auto_start` 会在 AstrBot 所在机器上执行 `startup_command`。
+`auto_start` 不是开机自启。它只会在 ComfyUI 离线且收到绘图请求时，在 AstrBot 所在机器上执行 `startup_command`。
 
-如果 ComfyUI 在另一台机器，自动启动不会直接启动远端 ComfyUI。你需要自行配置 SSH、Tailscale SSH 或其它远程启动脚本。
+如果 ComfyUI 在另一台机器，按需拉起不会直接启动远端 ComfyUI。你需要自行配置 SSH、Tailscale SSH 或其它远程启动脚本。
 
 ## 调试
 

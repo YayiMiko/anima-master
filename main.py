@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 from typing import Any
 
 from astrbot.api import AstrBotConfig, logger
@@ -9,11 +10,13 @@ from astrbot.core.star.filter.command import GreedyStr
 
 try:
     from .command_router import parse_hard_route
-    from .prompt_presets import apply_config_preset
+    from .config_defaults import maybe_reset_to_defaults
+    from .prompt_presets import apply_config_preset, maybe_materialize_chiyo_preset
     from .service_container import build_services
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from command_router import parse_hard_route
-    from prompt_presets import apply_config_preset
+    from config_defaults import maybe_reset_to_defaults
+    from prompt_presets import apply_config_preset, maybe_materialize_chiyo_preset
     from service_container import build_services
 
 
@@ -22,7 +25,14 @@ class ComfyUIAgentPlugin(Star):
 
     def __init__(self, context: Context, config: AstrBotConfig | None = None):
         super().__init__(context, config)
-        self.config = apply_config_preset(dict(config or {}))
+        raw_or_reset = maybe_reset_to_defaults(
+            config or {},
+            Path(__file__).with_name("_conf_schema.json"),
+        )
+        raw_config = maybe_materialize_chiyo_preset(
+            config if config is not None else raw_or_reset,
+        )
+        self.config = apply_config_preset(raw_config)
         self._danbooru_tag_cache: dict[str, list[Any]] = {}
         self._last_prompt_summary: dict[str, Any] = {}
         self._services = build_services(
@@ -58,9 +68,8 @@ class ComfyUIAgentPlugin(Star):
             edit_tool_changed = self.context.deactivate_llm_tool("comfyui_edit")
         remove_bg_tool_changed = self.context.deactivate_llm_tool("comfyui_remove_bg")
         logger.info(
-            "[comfyui_agent] enabled=%s preset=%s img2img_enabled=%s edit_tool_changed=%s remove_bg_tool_changed=%s base_url=%s workflow=%s",
-            self._bool("enabled", True),
-            self._str("preset_profile", "none") or "none",
+            "[comfyui_agent] chiyo_preset_enabled=%s img2img_enabled=%s edit_tool_changed=%s remove_bg_tool_changed=%s base_url=%s workflow=%s",
+            self._bool("chiyo_preset_enabled", False),
             img2img_enabled,
             edit_tool_changed,
             remove_bg_tool_changed,
@@ -88,8 +97,6 @@ class ComfyUIAgentPlugin(Star):
         return str(value if value is not None else default)
 
     def _is_allowed(self, event: AstrMessageEvent) -> bool:
-        if not self._bool("enabled", True):
-            return False
         if self._bool("admin_only", False) and not event.is_admin():
             return False
         allowed = self.config.get("allowed_sender_ids", [])

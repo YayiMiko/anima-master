@@ -3,16 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 
-DEFAULT_QUALITY_TAGS = "masterpiece, best quality,"
-OLD_SCORE_QUALITY_TAGS = "masterpiece, best quality, score_7,"
+DEFAULT_QUALITY_TAGS = "masterpiece, best quality, score_7, safe,"
+DEFAULT_NEGATIVE_PROMPT = "worst quality, low quality, score_1, score_2, score_3, artist name"
 DEFAULT_CHARACTER_TAGS = ""
 FIXED_CHARACTER_TAGS: dict[str, str] = {}
 DEFAULT_ARTIST_TAGS = ""
 CHIYO_PRESET_ALIASES = {"chiyo", "chiyo_preset", "千代", "千代预设", "千代配置"}
 CHIYO_STYLE_NAME = "千代画风"
-CHIYO_QUALITY_TAGS = "masterpiece, best quality, nsfw,"
-CHIYO_NEGATIVE_PROMPT = "worst quality, low quality, artist name"
-OLD_SCORE_NEGATIVE_PROMPT = "worst quality, low quality, score_1, score_2, score_3, artist name"
 CHIYO_CHARACTER_NAME = "狐莉"
 CHIYO_CHARACTER_TAGS = (
     "1 girl, solo, fox girl, (fox ears, inner ear hair), "
@@ -108,36 +105,74 @@ NO_CHARACTER_MARKERS = (
 def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
     """Return a config copy with an optional user-facing preset applied."""
     result = dict(config or {})
-    preset = str(result.get("preset_profile") or "").strip()
-    if preset.lower() not in CHIYO_PRESET_ALIASES and preset not in CHIYO_PRESET_ALIASES:
+    if _is_chiyo_enabled(result):
+        chiyo_enabled = True
+    else:
+        chiyo_enabled = False
+    if not chiyo_enabled:
         return result
 
+    result["chiyo_preset_enabled"] = True
     result["preset_profile"] = "chiyo"
     result["default_style_enabled"] = True
-    result["prompt_optimize_enabled"] = True
-    result["danbooru_core_tag_lookup_enabled"] = bool(
-        result.get("danbooru_core_tag_lookup_enabled", True)
-    )
 
     if not str(result.get("default_style_name") or "").strip():
         result["default_style_name"] = CHIYO_STYLE_NAME
-    if (
-        not str(result.get("quality_prefix") or "").strip()
-        or result.get("quality_prefix") == DEFAULT_QUALITY_TAGS
-        or result.get("quality_prefix") == OLD_SCORE_QUALITY_TAGS
-    ):
-        result["quality_prefix"] = CHIYO_QUALITY_TAGS
-    if (
-        not str(result.get("negative_prompt") or "").strip()
-        or result.get("negative_prompt") == OLD_SCORE_NEGATIVE_PROMPT
-    ):
-        result["negative_prompt"] = CHIYO_NEGATIVE_PROMPT
-    if not str(result.get("default_artist_tags") or "").strip():
-        result["default_artist_tags"] = CHIYO_ARTIST_TAGS
+    result["default_artist_tags"] = merge_tag_text(result.get("default_artist_tags"), CHIYO_ARTIST_TAGS)
     fixed_characters = fixed_character_tags(result)
     fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
     result["fixed_characters"] = fixed_characters
     return result
+
+
+def maybe_materialize_chiyo_preset(config: Any) -> dict[str, Any]:
+    """Persist visible Chiyo preset fields back into plugin config when enabled."""
+    current = dict(config or {})
+    if not _is_chiyo_enabled(current):
+        return current
+
+    updated = dict(current)
+    updated["default_artist_tags"] = merge_tag_text(
+        updated.get("default_artist_tags"),
+        CHIYO_ARTIST_TAGS,
+    )
+    fixed_characters = fixed_character_tags(updated)
+    fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
+    updated["fixed_characters"] = [
+        f"{name}={tags}" for name, tags in fixed_characters.items()
+    ]
+
+    if hasattr(config, "save_config") and (
+        updated.get("default_artist_tags") != current.get("default_artist_tags")
+        or updated.get("fixed_characters") != current.get("fixed_characters")
+    ):
+        config.save_config(replace_config=updated)
+        return dict(config)
+    return updated
+
+
+def merge_tag_text(existing: Any, addition: str) -> str:
+    """Merge comma-separated tags while preserving user tags first."""
+    tags: list[str] = []
+    seen: set[str] = set()
+    for source in (existing, addition):
+        for tag in str(source or "").split(","):
+            text = tag.strip()
+            if not text:
+                continue
+            key = text.lower()
+            if key in seen:
+                continue
+            tags.append(text)
+            seen.add(key)
+    return ", ".join(tags) + ("," if tags else "")
+
+
+def _is_chiyo_enabled(config: dict[str, Any]) -> bool:
+    if "chiyo_preset_enabled" in config:
+        return bool(config.get("chiyo_preset_enabled"))
+    preset = str(config.get("preset_profile") or "").strip()
+    return preset.lower() in CHIYO_PRESET_ALIASES or preset in CHIYO_PRESET_ALIASES
 
 
 def fixed_character_tags(config: dict[str, Any]) -> dict[str, str]:

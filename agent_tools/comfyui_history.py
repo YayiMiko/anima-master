@@ -34,7 +34,7 @@ class ComfyUIHistoryRunner:
         prompt_id = str(submit.get("prompt_id") or "")
         if not prompt_id:
             raise RuntimeError(f"缺少 prompt_id：{submit}")
-        timeout = max(1, int(self.config.get("timeout", 900)))
+        timeout = max(1, int(self.config.get("timeout", 300)))
         poll_interval = max(1, int(self.config.get("poll_interval", 2)))
         deadline = time.time() + timeout
         while time.time() < deadline:

@@ -72,7 +72,6 @@ class CommandActionHandler:
             return f"ComfyUI 状态检查失败：{payload.get('error')}"
         lines = [
             "ComfyUI 助手状态：",
-            f"- 启用：{payload.get('enabled')}",
             f"- 地址：{payload.get('base_url')}",
             f"- 工作流：{payload.get('workflow')}",
             f"- 尺寸预设：{', '.join(payload.get('allowed_sizes') or [])}",
@@ -97,7 +96,7 @@ class CommandActionHandler:
         if not prompt:
             return "请在后面写改图提示词。"
         image_input = await self._event_image_input(event)
-        if self._bool("prompt_optimize_img2img_enabled", True):
+        if self._bool("prompt_optimize_img2img_enabled", False):
             prompt = await self._build_prompt(event, prompt, mode="img2img")
         payload = await self._run_tool(["edit", "--prompt", prompt, "--input", image_input or "latest"])
         return await self._send_payload(event, payload)

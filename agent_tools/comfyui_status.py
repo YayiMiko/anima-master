@@ -9,7 +9,6 @@ def build_status_payload(config: dict[str, Any], allowed_sizes: list[str]) -> di
     """Return the JSON payload for the ComfyUI helper status command."""
     payload: dict[str, Any] = {
         "ok": True,
-        "enabled": bool(config.get("enabled", True)),
         "base_url": config.get("comfyui_base_url"),
         "workflow": config.get("workflow"),
         "allowed_sizes": allowed_sizes,

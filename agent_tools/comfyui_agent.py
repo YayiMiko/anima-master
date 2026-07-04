@@ -33,13 +33,12 @@ IMAGE_RESOLVER = ComfyUIImageResolver(WORKSPACE)
 
 
 DEFAULT_CONFIG = {
-    "enabled": True,
     "comfyui_base_url": "http://127.0.0.1:8188",
     "workflow": "anima_t2i",
-    "timeout": 900,
+    "timeout": 300,
     "poll_interval": 2,
-    "width": 832,
-    "height": 1216,
+    "width": 1024,
+    "height": 1536,
     "allowed_sizes": [
         "832x1216",
         "896x1152",
@@ -53,11 +52,11 @@ DEFAULT_CONFIG = {
     "steps": 30,
     "cfg": 5.0,
     "sampler_name": "er_sde",
-    "scheduler": "beta57",
+    "scheduler": "normal",
     "unet_name": "anima_baseV10.safetensors",
     "clip_name": "qwen_3_06b_base.safetensors",
     "vae_name": "qwen_image_vae.safetensors",
-    "negative_prompt": "worst quality, low quality, artist name",
+    "negative_prompt": "worst quality, low quality, score_1, score_2, score_3, artist name",
     "edit_denoise": 0.55,
     "max_image_side": 1024,
     "upscale_factor": 2.0,
@@ -148,9 +147,6 @@ def recent(args) -> None:
 
 def generate(args) -> None:
     config = load_config()
-    if not config.get("enabled", True):
-        result({"ok": False, "error": "comfyui_agent_disabled", "message": "ComfyUI 助手已关闭"})
-        return
     prompt = str(args.prompt or "").strip()
     if not prompt:
         result({"ok": False, "error": "missing_prompt", "message": "缺少提示词"})
@@ -161,9 +157,6 @@ def generate(args) -> None:
 
 def edit(args) -> None:
     config = load_config()
-    if not config.get("enabled", True):
-        result({"ok": False, "error": "comfyui_agent_disabled", "message": "ComfyUI 助手已关闭"})
-        return
     prompt = str(args.prompt or "").strip()
     if not prompt:
         result({"ok": False, "error": "missing_prompt", "message": "缺少提示词"})
@@ -174,18 +167,12 @@ def edit(args) -> None:
 
 def upscale(args) -> None:
     config = load_config()
-    if not config.get("enabled", True):
-        result({"ok": False, "error": "comfyui_agent_disabled", "message": "ComfyUI 助手已关闭"})
-        return
 
     result(run_cli_action(lambda: upscale_payload(config, IMAGE_OUTPUTS, resolve_image, args)))
 
 
 def remove_bg(args) -> None:
     config = load_config()
-    if not config.get("enabled", True):
-        result({"ok": False, "error": "comfyui_agent_disabled", "message": "ComfyUI 助手已关闭"})
-        return
 
     result(run_cli_action(lambda: remove_bg_payload(config, IMAGE_OUTPUTS, resolve_image, args)))
 
