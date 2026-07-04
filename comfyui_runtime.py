@@ -232,6 +232,14 @@ class ComfyUIRuntime:
             return "ComfyUI 工作流执行失败"
         if detail == "no image found in history":
             return "ComfyUI 完成了任务但没有产出图片"
+        if detail == "comfyui_offline":
+            return "ComfyUI 未启动或无法连接。请先启动 ComfyUI，或在插件配置里开启“由 AstrBot 启动 ComfyUI”并填写启动命令"
+        if detail == "startup_command_not_configured":
+            return "ComfyUI 未启动，且“由 AstrBot 启动 ComfyUI”没有填写启动命令。请先手动启动 ComfyUI，或关闭该开关"
+        if detail == "auto_start_not_permitted":
+            return "ComfyUI 未启动，且当前用户没有权限让 AstrBot 启动 ComfyUI"
+        if detail.startswith("auto_start_timeout_after_"):
+            return "已尝试启动 ComfyUI，但等待就绪超时"
         if detail == "no recent image found in workspace inputs":
             return "没有找到最近收到的图片"
         if detail == "reference_image_not_found":

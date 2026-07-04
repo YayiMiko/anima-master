@@ -18,7 +18,6 @@
 在 AstrBot WebUI 的插件配置页里，先确认：
 
 ```text
-enabled = true
 comfyui_base_url = http://127.0.0.1:8188
 workflow = anima_t2i
 unet_name = 你的 Anima 模型文件名
@@ -27,6 +26,8 @@ vae_name = 你的 VAE 文件名
 ```
 
 模型文件名必须和 ComfyUI 下拉框中的文件名一致，只填文件名，不填本机路径。
+
+这些项目分别在配置页的“ComfyUI 连接”和“出图参数”里。多数用户可以先用绘世启动器、ComfyUI portable 或自己的脚本手动启动 ComfyUI。只有开启“由 AstrBot 启动 ComfyUI”时，才需要额外填写 `startup_command`。
 
 ## 第一次测试
 

@@ -3,7 +3,7 @@
     {
       "key": "anima_master_basic",
       "description": "基础设置",
-      "hint": "先从这里开始；只有少数常用开关。",
+      "hint": "用于恢复默认配置，或快速应用千代预设。",
       "items": [
         "reset_to_defaults",
         "chiyo_preset_enabled"
@@ -12,7 +12,7 @@
     {
       "key": "anima_master_comfyui_connection",
       "description": "ComfyUI 连接",
-      "hint": "用于连接 ComfyUI，以及在需要时按需拉起 ComfyUI。",
+      "hint": "用于连接 ComfyUI。通常请先用绘世启动器、ComfyUI portable 或自己的方式启动 ComfyUI；只有开启“由 AstrBot 启动 ComfyUI”后，启动命令才需要填写。",
       "items": [
         "comfyui_base_url",
         "workflow",
@@ -31,7 +31,7 @@
     {
       "key": "anima_master_rendering",
       "description": "出图参数",
-      "hint": "控制默认尺寸、采样和模型文件名。不了解时保留默认值即可。",
+      "hint": "控制默认尺寸、采样、模型文件名、质量词和负面提示词。UNET、CLIP、VAE 文件名必须与 ComfyUI 中的文件名一致。",
       "items": [
         "width",
         "height",

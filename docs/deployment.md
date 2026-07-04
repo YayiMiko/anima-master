@@ -42,10 +42,10 @@ ComfyUI 需要允许外部访问。常见启动参数：
 
 不要把本机 `D:\...` 路径配置给服务器 NapCat。
 
-## 按需拉起 ComfyUI
+## 由 AstrBot 启动 ComfyUI
 
 `auto_start` 只会在 AstrBot 所在机器执行命令。
 
 它不是开机自启，只会在 ComfyUI 离线且收到绘图请求时触发。
 
-如果 AstrBot 和 ComfyUI 不在同一台机器，跨机器按需拉起需要自行配置远程命令。
+如果 AstrBot 和 ComfyUI 不在同一台机器，跨机器启动需要自行配置远程命令。

@@ -1,6 +1,6 @@
 # 配置说明
 
-配置页按使用频率分组。首次使用时，只需要先看前四组。较少使用的项目会收进“更多配置”。
+配置页按使用频率分组。首次使用时，先看“ComfyUI 连接”和“出图参数”。较少使用的项目会收进“更多配置”。
 
 如果你想手动做高度自定义，请对照这些文件：
 
@@ -9,6 +9,22 @@
 
 真正生效的运行文件是 `data/config/astrbot_plugin_anima_master_config.json`。它是标准 JSON，不能直接写注释。
 
+## 最低启动清单
+
+能发起生图前，至少确认这些配置：
+
+```text
+comfyui_base_url = AstrBot 能访问到的 ComfyUI 地址
+workflow = 插件支持的工作流预设
+unet_name = ComfyUI 中的模型文件名
+clip_name = ComfyUI 中的文本编码器文件名
+vae_name = ComfyUI 中的 VAE 文件名
+```
+
+多数用户可以先用绘世启动器、ComfyUI portable 或自己的脚本手动启动 ComfyUI。如果开启 `auto_start`，还必须填写 `startup_command`。不开 `auto_start` 时，不需要填写启动命令。
+
+这些项目主要分布在“ComfyUI 连接”和“出图参数”两个配置组里。
+
 ## 预设
 
 - `reset_to_defaults`：一键恢复默认配置。打开并保存后，仅在下一次插件加载时执行一次，完成后会自动关闭。
@@ -16,7 +32,7 @@
 
 关闭时使用当前配置。开启后会把千代画师组写入画师 tags，并把狐莉加入固定角色。狐莉不是默认角色，只有指令里明确提到“狐莉”时才会使用。
 
-## ComfyUI
+## ComfyUI 连接
 
 - `comfyui_base_url`：AstrBot 能访问到的 ComfyUI 地址。
 - `workflow`：工作流预设，默认使用 `anima_t2i`。
@@ -81,11 +97,15 @@
 - `admin_only`：是否仅管理员可用。
 - `allowed_sender_ids`：允许使用的用户 ID 列表。
 
-## 按需拉起
+## 由 AstrBot 启动 ComfyUI
 
 `auto_start` 不是开机自启。它只会在 ComfyUI 离线且收到绘图请求时，在 AstrBot 所在机器上执行 `startup_command`。
 
-如果 ComfyUI 在另一台机器，按需拉起不会直接启动远端 ComfyUI。你需要自行配置 SSH、Tailscale SSH 或其它远程启动脚本。
+不开 `auto_start` 时，不需要填写 `startup_command`，但需要你先手动启动 ComfyUI。开启 `auto_start` 后，`startup_command` 就是必填项。
+
+`startup_command` 必须是能直接启动 ComfyUI 服务的命令。ComfyUI portable 常见是 `run_nvidia_gpu.bat` 一类脚本；绘世启动器如果只是打开启动器界面，不等于 ComfyUI 服务已经启动。
+
+如果 ComfyUI 在另一台机器，AstrBot 不会直接启动远端 ComfyUI。你需要自行配置 SSH、Tailscale SSH 或其它远程启动脚本。
 
 ## 调试
 

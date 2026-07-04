@@ -16,6 +16,7 @@ try:
     )
     from .prompt_research import PromptResearcher
     from .prompt_templates import build_llm_prompt
+    from .tag_cleaner import split_tags
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_resolver import DanbooruResolver
     from prompt_builder import (
@@ -29,6 +30,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
     )
     from prompt_research import PromptResearcher
     from prompt_templates import build_llm_prompt
+    from tag_cleaner import split_tags
 
 
 @dataclass(frozen=True)
@@ -261,8 +263,45 @@ class PromptPipeline:
             config=prompt_config,
             required_core_tags=required_core_tags,
         )
+        content_tag_count = len(split_tags(built.content_tags))
+        short_content_retry = False
+        if not built.raw_mode and content_tag_count < 60:
+            retry_prompt = (
+                llm_prompt
+                + "\n-----------\n"
+                + "上一次输出的具体内容 tags 太短。请重新输出更完整的英文 Danbooru tags："
+                + "目标 70-120 个具体内容 tags，重点扩写服装结构、材质、纹样、饰品、姿态、表情、手部动作和可见细节。"
+                + "不要输出质量词、画师词、解释或 Markdown。"
+            )
+            try:
+                retry_content = await self._generate_prompt_tags_with_llm(
+                    provider_id=provider_id,
+                    llm_prompt=retry_prompt,
+                    use_deep_thinking=False,
+                    fixed_character=use_fixed_character,
+                    character_name=fixed_character_name,
+                )
+                retry_content = await self._danbooru_resolver.resolve(
+                    llm_content=retry_content,
+                    user_prompt=prompt,
+                    fixed_character=use_fixed_character,
+                )
+                retry_built = build_final_prompt(
+                    user_prompt=prompt,
+                    llm_content=retry_content,
+                    config=prompt_config,
+                    required_core_tags=required_core_tags,
+                )
+                retry_tag_count = len(split_tags(retry_built.content_tags))
+                if retry_tag_count > content_tag_count:
+                    llm_content = retry_content
+                    built = retry_built
+                    content_tag_count = retry_tag_count
+                    short_content_retry = True
+            except Exception as retry_exc:
+                self.logger.warning("[comfyui_agent] prompt builder short-content retry failed: %s", retry_exc)
         self.logger.info(
-            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s required_core_tags=%s content_chars=%s final_chars=%s final_head=%s",
+            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s required_core_tags=%s content_tags=%s content_chars=%s final_chars=%s final_head=%s",
             built.raw_mode,
             bool(search_context),
             research_plan.use_deep_thinking,
@@ -271,6 +310,7 @@ class PromptPipeline:
             built.used_fixed_character,
             built.used_default_style,
             ",".join(built.required_core_tags) or "none",
+            content_tag_count,
             len(built.content_tags),
             len(built.final_prompt),
             built.final_prompt[:300],
@@ -287,6 +327,8 @@ class PromptPipeline:
                 "sensual_mode": built.used_sensual_mode,
                 "default_style": built.used_default_style,
                 "required_core_tags": list(built.required_core_tags),
+                "llm_content_tag_count": content_tag_count,
+                "short_content_retry": short_content_retry,
                 "llm_content_chars": len(built.content_tags),
                 "final_prompt_chars": len(built.final_prompt),
                 "final_prompt_head": self._shorten(built.final_prompt, 600),

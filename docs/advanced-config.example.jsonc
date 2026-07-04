@@ -60,7 +60,7 @@
   "prompt_builder_provider_id": "",
 
   // 提示词优化模型的输出控制。
-  "prompt_builder_max_tokens": 700,
+  "prompt_builder_max_tokens": 1000,
   "prompt_builder_max_content_tags": 120,
 
   // 联网搜索：只会在用户明确触发相关关键词时进入。
@@ -141,7 +141,7 @@
   "admin_only": false,
   "allowed_sender_ids": [],
 
-  // 按需拉起：不是开机自启，而是“收到绘图请求时，如果 ComfyUI 离线，再尝试启动”。
+  // 由 AstrBot 启动 ComfyUI：不是开机自启，而是“收到绘图请求时，如果 ComfyUI 离线，再尝试启动”。
   // 仅对 AstrBot 所在机器生效。
   "auto_start": false,
   "startup_command": "",
@@ -153,7 +153,7 @@
   "startup_poll_interval": 3,
 
   // 主提示词模板。留空会使用插件内置模板。
-  "prompt_builder_template": "你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。\n\n请先在内部判断用户输入类型：\n1. 如果用户输入很短、只是一两个短句，请主动进行审美补全，重点补出主体外观、服装结构、材质、配色、装饰物、动作和表情，让角色本身完整而精致。\n2. 如果用户输入很具体，请优先精确遵守用户要求，不要擅自改主题、角色身份、服装方向或构图重点。\n3. 如果用户输入已经像完整 Danbooru tags，请尽量保持原意，只做必要的补全和规范化。\n\n画面设计原则：\n- 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。\n- 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。\n- 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。\n- 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。\n- 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。\n- 默认审美为可爱、明亮、精致、干净，适合二次元角色展示；用户要求涩气、阴暗、华丽或其它风格时，以用户要求为准。\n- 部分中文概念直译可能不是有效 tag，请转译为可见的 Danbooru 视觉元素。例如：苗族少女可以转成 ornate silver headdress、silver jewelry、embroidered dress。\n\n角色和参考规则：\n{character_rule}\n如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。\n即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n输出要求：\n- 只输出英文 Danbooru tags，用英文逗号分隔。\n- 不要输出解释、标题、Markdown、编号或中文。\n- 不要输出质量词，例如 masterpiece、best quality、worst quality、low quality、score_7。\n- 不要输出画师词，例如 @artist。\n- 不要重复固定角色已经提供的固有发色、瞳色、种族和固定配饰。\n\n用户主题：\n{theme}",
+  "prompt_builder_template": "你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。\n\n请先在内部判断用户输入类型：\n1. 如果用户输入很短、只是一两个短句，请主动进行审美补全，重点补出主体外观、服装结构、材质、配色、装饰物、动作和表情，让角色本身完整而精致。\n2. 如果用户输入很具体，请优先精确遵守用户要求，不要擅自改主题、角色身份、服装方向或构图重点。\n3. 如果用户输入已经像完整 Danbooru tags，请尽量保持原意，只做必要的补全和规范化。\n\n画面设计原则：\n- 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。\n- 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。\n- 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。\n- 具体内容段默认应当足够厚实，常规输出 70-120 个内容 tags；如果前缀已经包含质量词、固定角色和画师词，具体内容段的长度建议接近前缀长度的 2 倍左右。\n- 请把主题拆成多层可见细节：主体类型、体型/年龄感、发型变化、服装主件、内外层、领口、袖型、腰部结构、裙摆/裤装、鞋袜、材质、纹样、金属件、饰品、手部动作、肢体姿态、表情、视线、道具和少量画面稳定 tags。\n- 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。\n- 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。\n- 默认审美为可爱、明亮、精致、干净，适合二次元角色展示；用户要求涩气、阴暗、华丽或其它风格时，以用户要求为准。\n- 部分中文概念直译可能不是有效 tag，请转译为可见的 Danbooru 视觉元素。例如：苗族少女可以转成 ornate silver headdress、silver jewelry、embroidered dress。\n\n角色和参考规则：\n{character_rule}\n如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。\n即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n输出要求：\n- 只输出英文 Danbooru tags，用英文逗号分隔。\n- 不要输出解释、标题、Markdown、编号或中文。\n- 不要输出质量词，例如 masterpiece、best quality、worst quality、low quality、score_7。\n- 不要输出画师词，例如 @artist。\n- 不要重复固定角色已经提供的固有发色、瞳色、种族和固定配饰。\n- 不要为了凑长度重复同义 tags；长度应来自更多具体、可见、可生成的细节。\n\n用户主题：\n{theme}"
 
   // 调试项默认关闭。只在排查问题时再开。
   "debug_prompt_enabled": false,

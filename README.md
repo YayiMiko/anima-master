@@ -27,17 +27,17 @@ Anima 绘图大师是一个 AstrBot 插件，用来把聊天里的自然语言�
 - Danbooru / Safebooru 核心角色 tag 校正。
 - 图片法术解析。
 - 视觉模型反推图片提示词。
-- 可在收到绘图请求时按需拉起 ComfyUI。
+- 可在 ComfyUI 离线时尝试由 AstrBot 启动 ComfyUI。
 
 图生图、放大和去背景仍处于开发中，当前不作为稳定主功能。
 
 ## 快速开始
 
 1. 确认 AstrBot 和 ComfyUI 都能正常运行。
-2. 在插件配置页填写 ComfyUI 地址、工作流和模型文件名。
+2. 在插件配置页确认 ComfyUI 连接和出图参数。
 3. 在聊天中发送 `/anm 一个女孩，白色裙子，立绘，简单背景`。
 
-最少需要确认这些配置：
+最低启动清单：
 
 ```text
 comfyui_base_url = http://127.0.0.1:8188
@@ -48,6 +48,8 @@ vae_name = 你的 VAE 文件名
 ```
 
 `127.0.0.1` 指 AstrBot 所在机器。如果 AstrBot 和 ComfyUI 不在同一台设备上，请填写 AstrBot 能访问到的局域网或 Tailscale 地址。
+
+多数用户可以先用绘世启动器、ComfyUI portable 或自己的脚本手动启动 ComfyUI。只有开启“由 AstrBot 启动 ComfyUI”时，才必须填写 `startup_command`；不开这个功能时，不需要启动命令。
 
 ## 常用指令
 
@@ -66,11 +68,11 @@ vae_name = 你的 VAE 文件名
 
 首次使用时，优先只看这些配置组：
 
-- `[01 ComfyUI]`
-- `[02 出图]`
-- `[03 提示词]`
+- `ComfyUI 连接`
+- `出图参数`
+- `提示词优化`
 
-能稳定出图后，再根据需要调整角色、画风、联网搜索、按需拉起和排查项。
+能稳定出图后，再根据需要调整角色、画风、联网搜索、由 AstrBot 启动 ComfyUI 和排查项。
 
 插件配置页会默认把较少使用的项目收进“更多配置”。如果你想做高度自定义，可以对照：
 
@@ -96,6 +98,8 @@ vae_name = 你的 VAE 文件名
 ### 提示 ComfyUI 离线
 
 确认 `comfyui_base_url` 填的是 AstrBot 能访问到的 ComfyUI 地址。AstrBot 在服务器时，`127.0.0.1` 指服务器自身。
+
+如果希望插件在 ComfyUI 离线时尝试启动它，请打开“由 AstrBot 启动 ComfyUI”，并填写一个能直接启动 ComfyUI 服务的 `startup_command`。如果你使用的是绘世启动器，且命令只能打开启动器界面，仍需要在启动器里手动启动 ComfyUI。
 
 ### 图片没有发回聊天
 

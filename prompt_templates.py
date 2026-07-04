@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 
 DEFAULT_LLM_PROMPT_TEMPLATE = """你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。
 
@@ -12,6 +14,8 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是 Anima 模型的 Danbooru tags 设计助�
 - 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。
 - 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。
 - 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。
+- 具体内容段默认应当足够厚实，常规输出 70-120 个内容 tags；如果前缀已经包含质量词、固定角色和画师词，具体内容段的长度建议接近前缀长度的 2 倍左右。
+- 请把主题拆成多层可见细节：主体类型、体型/年龄感、发型变化、服装主件、内外层、领口、袖型、腰部结构、裙摆/裤装、鞋袜、材质、纹样、金属件、饰品、手部动作、肢体姿态、表情、视线、道具和少量画面稳定 tags。
 - 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。
 - 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。
 - 默认审美为可爱、明亮、精致、干净，适合二次元角色展示；用户要求涩气、阴暗、华丽或其它风格时，以用户要求为准。
@@ -32,9 +36,15 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是 Anima 模型的 Danbooru tags 设计助�
 - 不要输出质量词，例如 masterpiece、best quality、worst quality、low quality、score_7。
 - 不要输出画师词，例如 @artist。
 - 不要重复固定角色已经提供的固有发色、瞳色、种族和固定配饰。
+- 不要为了凑长度重复同义 tags；长度应来自更多具体、可见、可生成的细节。
 
 用户主题：
 {theme}"""
+
+
+LEGACY_BUILTIN_TEMPLATE_HASHES = {
+    "95d7bfecaa58255d97685577e7ad2ddeac595b6237d3dd623407f077646bd2cc",
+}
 
 
 def build_llm_prompt(
@@ -97,7 +107,12 @@ def build_llm_prompt(
 这是非 R18 的擦边表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、暧昧姿势等视觉方向。
 不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。
 """
-    template = str(prompt_builder_template or "").strip() or DEFAULT_LLM_PROMPT_TEMPLATE
+    configured_template = str(prompt_builder_template or "").strip()
+    template = (
+        DEFAULT_LLM_PROMPT_TEMPLATE
+        if not configured_template or _is_legacy_builtin_template(configured_template)
+        else configured_template
+    )
     values = {
         "theme": theme,
         "character_rule": character_rule,
@@ -111,3 +126,8 @@ def build_llm_prompt(
         return template.format(**values)
     except Exception:
         return DEFAULT_LLM_PROMPT_TEMPLATE.format(**values)
+
+
+def _is_legacy_builtin_template(template: str) -> bool:
+    digest = hashlib.sha256(str(template or "").strip().encode("utf-8")).hexdigest()
+    return digest in LEGACY_BUILTIN_TEMPLATE_HASHES
