@@ -31,6 +31,7 @@ class ComfyUIAgentPlugin(Star):
         )
         raw_config = maybe_materialize_chiyo_preset(
             config if config is not None else raw_or_reset,
+            base_config=raw_or_reset,
         )
         self.config = apply_config_preset(raw_config)
         self._danbooru_tag_cache: dict[str, list[Any]] = {}

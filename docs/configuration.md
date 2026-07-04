@@ -1,6 +1,13 @@
 # 配置说明
 
-配置页按使用频率分组。首次使用时，只需要先看前四组。
+配置页按使用频率分组。首次使用时，只需要先看前四组。较少使用的项目会收进“更多配置”。
+
+如果你想手动做高度自定义，请对照这些文件：
+
+- `docs/advanced-config.example.jsonc`
+- `data/config/astrbot_plugin_anima_master_config.example.jsonc`
+
+真正生效的运行文件是 `data/config/astrbot_plugin_anima_master_config.json`。它是标准 JSON，不能直接写注释。
 
 ## 预设
 
@@ -89,3 +96,16 @@
 - `debug_send_payload_enabled`
 
 开启后可能在日志和 `last_task.json` 中记录较长提示词，请注意隐私。
+
+## 推荐做法
+
+普通使用：
+
+1. 先在 WebUI 里只改常用项。
+2. 需要更细的控制时，再展开“更多配置”。
+
+深度自定义：
+
+1. 先打开带注释模板。
+2. 对照修改真实运行文件 `data/config/astrbot_plugin_anima_master_config.json`。
+3. 保存后重载插件。

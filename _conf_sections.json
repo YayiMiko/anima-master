@@ -1,0 +1,126 @@
+{
+  "sections": [
+    {
+      "key": "anima_master_basic",
+      "description": "基础设置",
+      "hint": "先从这里开始；只有少数常用开关。",
+      "items": [
+        "reset_to_defaults",
+        "chiyo_preset_enabled"
+      ]
+    },
+    {
+      "key": "anima_master_comfyui_connection",
+      "description": "ComfyUI 连接",
+      "hint": "用于连接 ComfyUI，以及在需要时按需拉起 ComfyUI。",
+      "items": [
+        "comfyui_base_url",
+        "workflow",
+        "timeout",
+        "poll_interval",
+        "auto_start",
+        "startup_command",
+        "startup_workdir",
+        "startup_visible_window",
+        "auto_start_admin_only",
+        "auto_start_allowed_sender_ids",
+        "startup_wait_seconds",
+        "startup_poll_interval"
+      ]
+    },
+    {
+      "key": "anima_master_rendering",
+      "description": "出图参数",
+      "hint": "控制默认尺寸、采样和模型文件名。不了解时保留默认值即可。",
+      "items": [
+        "width",
+        "height",
+        "allowed_sizes",
+        "steps",
+        "cfg",
+        "sampler_name",
+        "scheduler",
+        "unet_name",
+        "clip_name",
+        "vae_name",
+        "quality_prefix",
+        "negative_prompt"
+      ]
+    },
+    {
+      "key": "anima_master_prompting",
+      "description": "提示词优化",
+      "hint": "控制自然语言转 Danbooru tags 的方式，以及是否启用联网搜索与深度思考。",
+      "items": [
+        "prompt_optimize_enabled",
+        "prompt_builder_provider_id",
+        "prompt_builder_max_tokens",
+        "prompt_builder_max_content_tags",
+        "prompt_builder_web_search_enabled",
+        "prompt_builder_search_max_results",
+        "prompt_builder_search_depth",
+        "prompt_builder_search_query_template",
+        "prompt_builder_deep_thinking_enabled",
+        "prompt_builder_reasoning_effort",
+        "prompt_builder_template"
+      ]
+    },
+    {
+      "key": "anima_master_tag_lookup",
+      "description": "Tag 查询",
+      "hint": "用于校正少量角色核心 tag；只在需要时联网查询。",
+      "items": [
+        "danbooru_core_tag_lookup_enabled",
+        "danbooru_tag_base_urls",
+        "danbooru_tag_user_agent",
+        "danbooru_tag_lookup_timeout",
+        "danbooru_tag_max_candidates"
+      ]
+    },
+    {
+      "key": "anima_master_style",
+      "description": "角色与画风",
+      "hint": "用于固定角色、默认画师 tags，以及涩气表现力相关设置。",
+      "items": [
+        "fixed_characters",
+        "default_artist_tags",
+        "sensual_mode_enabled",
+        "sensual_mode_markers"
+      ]
+    },
+    {
+      "key": "anima_master_experimental",
+      "description": "实验功能",
+      "hint": "仍在开发中的功能，默认建议关闭。",
+      "items": [
+        "img2img_enabled",
+        "prompt_optimize_img2img_enabled",
+        "edit_denoise",
+        "max_image_side",
+        "upscale_factor",
+        "remove_bg_model"
+      ]
+    },
+    {
+      "key": "anima_master_delivery",
+      "description": "发送与权限",
+      "hint": "控制是否回传图片，以及谁可以使用。",
+      "items": [
+        "send_result_to_chat",
+        "max_send_images",
+        "admin_only",
+        "allowed_sender_ids"
+      ]
+    },
+    {
+      "key": "anima_master_debug",
+      "description": "排查问题",
+      "hint": "只在排查问题时临时开启，平时建议保持关闭。",
+      "items": [
+        "debug_prompt_enabled",
+        "debug_image_reference_enabled",
+        "debug_send_payload_enabled"
+      ]
+    }
+  ]
+}

@@ -8,8 +8,8 @@ DEFAULT_NEGATIVE_PROMPT = "worst quality, low quality, score_1, score_2, score_3
 DEFAULT_CHARACTER_TAGS = ""
 FIXED_CHARACTER_TAGS: dict[str, str] = {}
 DEFAULT_ARTIST_TAGS = ""
+LEGACY_HIDDEN_STYLE_KEYS = ("default_style_enabled", "default_style_name")
 CHIYO_PRESET_ALIASES = {"chiyo", "chiyo_preset", "千代", "千代预设", "千代配置"}
-CHIYO_STYLE_NAME = "千代画风"
 CHIYO_CHARACTER_NAME = "狐莉"
 CHIYO_CHARACTER_TAGS = (
     "1 girl, solo, fox girl, (fox ears, inner ear hair), "
@@ -105,19 +105,13 @@ NO_CHARACTER_MARKERS = (
 def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
     """Return a config copy with an optional user-facing preset applied."""
     result = dict(config or {})
-    if _is_chiyo_enabled(result):
-        chiyo_enabled = True
-    else:
-        chiyo_enabled = False
-    if not chiyo_enabled:
+    for key in LEGACY_HIDDEN_STYLE_KEYS:
+        result.pop(key, None)
+    if not _is_chiyo_enabled(result):
         return result
 
     result["chiyo_preset_enabled"] = True
     result["preset_profile"] = "chiyo"
-    result["default_style_enabled"] = True
-
-    if not str(result.get("default_style_name") or "").strip():
-        result["default_style_name"] = CHIYO_STYLE_NAME
     result["default_artist_tags"] = merge_tag_text(result.get("default_artist_tags"), CHIYO_ARTIST_TAGS)
     fixed_characters = fixed_character_tags(result)
     fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
@@ -125,29 +119,39 @@ def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def maybe_materialize_chiyo_preset(config: Any) -> dict[str, Any]:
-    """Persist visible Chiyo preset fields back into plugin config when enabled."""
-    current = dict(config or {})
-    if not _is_chiyo_enabled(current):
-        return current
+def maybe_materialize_chiyo_preset(
+    config: Any,
+    *,
+    base_config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Persist visible Chiyo preset fields back into plugin config when enabled.
 
+    Args:
+        config: Original AstrBot config object or plain dict.
+        base_config: Effective config snapshot that should drive this load cycle.
+
+    Returns:
+        The normalized visible config used for the current plugin load.
+    """
+    current = dict(base_config if base_config is not None else config or {})
+    persisted = dict(config or {}) if hasattr(config, "save_config") else current
     updated = dict(current)
-    updated["default_artist_tags"] = merge_tag_text(
-        updated.get("default_artist_tags"),
-        CHIYO_ARTIST_TAGS,
-    )
-    fixed_characters = fixed_character_tags(updated)
-    fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
-    updated["fixed_characters"] = [
-        f"{name}={tags}" for name, tags in fixed_characters.items()
-    ]
+    for key in LEGACY_HIDDEN_STYLE_KEYS:
+        updated.pop(key, None)
 
-    if hasattr(config, "save_config") and (
-        updated.get("default_artist_tags") != current.get("default_artist_tags")
-        or updated.get("fixed_characters") != current.get("fixed_characters")
-    ):
+    if _is_chiyo_enabled(current):
+        updated["default_artist_tags"] = merge_tag_text(
+            updated.get("default_artist_tags"),
+            CHIYO_ARTIST_TAGS,
+        )
+        fixed_characters = fixed_character_tags(updated)
+        fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
+        updated["fixed_characters"] = [
+            f"{name}={tags}" for name, tags in fixed_characters.items()
+        ]
+
+    if hasattr(config, "save_config") and updated != persisted:
         config.save_config(replace_config=updated)
-        return dict(config)
     return updated
 
 

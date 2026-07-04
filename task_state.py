@@ -83,11 +83,13 @@ class TaskRecorder:
         characters = sorted(fixed_character_tags(prompt_config).keys())
         last_task = self.read()
         prompt_template = _str(config, "prompt_builder_template", "").strip()
+        artist_tags = _str(prompt_config, "default_artist_tags", "").strip()
         lines = [
             "Anima 调试状态：",
             f"- 提示词优化：{_bool(config, 'prompt_optimize_enabled', True)}",
             f"- 自定义 Prompt 模板：{bool(prompt_template)}",
-            f"- 默认画风：{_bool(config, 'default_style_enabled', False)} / {_str(config, 'default_style_name', '') or '未命名'}",
+            f"- 千代预设：{_bool(config, 'chiyo_preset_enabled', False)}",
+            f"- 画师 tags：{'已配置' if artist_tags else '未配置'}",
             f"- 固定角色：{', '.join(characters) if characters else '无'}",
             f"- 联网搜索：{_bool(config, 'prompt_builder_web_search_enabled', True)}",
             f"- 深度思考：{_bool(config, 'prompt_builder_deep_thinking_enabled', True)} / {_str(config, 'prompt_builder_reasoning_effort', 'high')}",

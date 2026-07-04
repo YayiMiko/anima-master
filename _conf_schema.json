@@ -33,7 +33,8 @@
     "description": "[01 ComfyUI] 状态查询间隔（秒）",
     "type": "int",
     "default": 2,
-    "hint": "示例：2"
+    "hint": "示例：2",
+    "collapsed": true
   },
   "width": {
     "description": "[02 出图] 默认宽度",
@@ -128,19 +129,22 @@
     "description": "[03 提示词] 优化模型 Provider ID",
     "type": "string",
     "default": "",
-    "hint": "留空使用当前会话主模型。示例：留空"
+    "hint": "留空使用当前会话主模型。示例：留空",
+    "collapsed": true
   },
   "prompt_builder_max_tokens": {
     "description": "[03 提示词] 优化模型输出上限",
     "type": "int",
     "default": 700,
-    "hint": "示例：700"
+    "hint": "示例：700",
+    "collapsed": true
   },
   "prompt_builder_max_content_tags": {
     "description": "[03 提示词] 内容 tags 数量上限",
     "type": "int",
     "default": 120,
-    "hint": "示例：120"
+    "hint": "示例：120",
+    "collapsed": true
   },
   "prompt_builder_web_search_enabled": {
     "description": "[03 提示词] 允许联网搜索",
@@ -152,19 +156,22 @@
     "description": "[03 提示词] 搜索结果数量",
     "type": "int",
     "default": 5,
-    "hint": "示例：5"
+    "hint": "示例：5",
+    "collapsed": true
   },
   "prompt_builder_search_depth": {
     "description": "[03 提示词] 搜索深度",
     "type": "string",
     "default": "advanced",
-    "hint": "可选：basic / advanced。 示例：advanced"
+    "hint": "可选：basic / advanced。 示例：advanced",
+    "collapsed": true
   },
   "prompt_builder_search_query_template": {
     "description": "[03 提示词] 搜索词模板",
     "type": "string",
     "default": "{prompt} 角色 外观 立绘 服装 配色 武器 官方图 official art character design outfit appearance wiki fandom",
-    "hint": "{prompt} 会替换为用户的生图要求。示例：{prompt} character design outfit official art"
+    "hint": "{prompt} 会替换为用户的生图要求。示例：{prompt} character design outfit official art",
+    "collapsed": true
   },
   "prompt_builder_deep_thinking_enabled": {
     "description": "[03 提示词] 允许深度思考",
@@ -176,7 +183,8 @@
     "description": "[03 提示词] 思考强度",
     "type": "string",
     "default": "high",
-    "hint": "常用：high / max。 示例：high"
+    "hint": "常用：high / max。 示例：high",
+    "collapsed": true
   },
   "danbooru_core_tag_lookup_enabled": {
     "description": "[04 Tag 查询] 校正角色核心 tag",
@@ -188,25 +196,29 @@
     "description": "[04 Tag 查询] 查询地址",
     "type": "string",
     "default": "https://safebooru.donmai.us,https://danbooru.donmai.us",
-    "hint": "逗号分隔，仅用于核心角色 tag 查询。示例：https://safebooru.donmai.us,https://danbooru.donmai.us"
+    "hint": "逗号分隔，仅用于核心角色 tag 查询。示例：https://safebooru.donmai.us,https://danbooru.donmai.us",
+    "collapsed": true
   },
   "danbooru_tag_user_agent": {
     "description": "[04 Tag 查询] User-Agent",
     "type": "string",
     "default": "AstrBotAnimaMaster/0.14",
-    "hint": "访问 Donmai 只读 API 时使用。示例：AstrBotAnimaMaster/0.14"
+    "hint": "访问 Donmai 只读 API 时使用。示例：AstrBotAnimaMaster/0.14",
+    "collapsed": true
   },
   "danbooru_tag_lookup_timeout": {
     "description": "[04 Tag 查询] 查询超时（秒）",
     "type": "float",
     "default": 6,
-    "hint": "示例：6"
+    "hint": "示例：6",
+    "collapsed": true
   },
   "danbooru_tag_max_candidates": {
     "description": "[04 Tag 查询] 候选 tag 上限",
     "type": "int",
     "default": 6,
-    "hint": "示例：6"
+    "hint": "示例：6",
+    "collapsed": true
   },
   "fixed_characters": {
     "description": "[05 角色与画风] 固定角色",
@@ -270,43 +282,59 @@
     "items": {
       "type": "string"
     },
-    "hint": "示例：涩气, 透明, lace, teasing"
+    "hint": "示例：涩气, 透明, lace, teasing",
+    "collapsed": true
   },
   "img2img_enabled": {
     "description": "[06 实验功能] 启用图生图 / 改图",
     "type": "bool",
     "default": false,
-    "hint": "实验功能，默认关闭。关闭后相关指令会返回关闭提示。"
+    "hint": "实验功能，默认关闭。关闭后相关指令会返回关闭提示。",
+    "collapsed": true
   },
   "prompt_optimize_img2img_enabled": {
     "description": "[06 实验功能] 改图时优化提示词",
     "type": "bool",
     "default": false,
-    "hint": "当前只适合整图改图；局部重绘请谨慎使用。"
+    "hint": "当前只适合整图改图；局部重绘请谨慎使用。",
+    "collapsed": true,
+    "condition": {
+      "img2img_enabled": true
+    }
   },
   "edit_denoise": {
     "description": "[06 实验功能] 改图重绘强度",
     "type": "float",
     "default": 0.55,
-    "hint": "示例：0.55"
+    "hint": "示例：0.55",
+    "collapsed": true,
+    "condition": {
+      "img2img_enabled": true
+    }
   },
   "max_image_side": {
     "description": "[06 实验功能] 输入图最长边",
     "type": "int",
     "default": 1024,
-    "hint": "示例：1024"
+    "hint": "示例：1024",
+    "collapsed": true,
+    "condition": {
+      "img2img_enabled": true
+    }
   },
   "upscale_factor": {
     "description": "[06 实验功能] 默认放大倍率",
     "type": "float",
     "default": 2.0,
-    "hint": "示例：2.0"
+    "hint": "示例：2.0",
+    "collapsed": true
   },
   "remove_bg_model": {
     "description": "[06 实验功能] 去背景模型",
     "type": "string",
     "default": "BiRefNet_lite",
-    "hint": "示例：BiRefNet_lite"
+    "hint": "示例：BiRefNet_lite",
+    "collapsed": true
   },
   "send_result_to_chat": {
     "description": "[07 发送与权限] 发送图片到聊天",
@@ -317,18 +345,24 @@
     "description": "[07 发送与权限] 最多发送图片数",
     "type": "int",
     "default": 1,
-    "hint": "示例：1"
+    "hint": "示例：1",
+    "collapsed": true,
+    "condition": {
+      "send_result_to_chat": true
+    }
   },
   "admin_only": {
     "description": "[07 发送与权限] 仅管理员可用",
     "type": "bool",
-    "default": false
+    "default": false,
+    "collapsed": true
   },
   "allowed_sender_ids": {
     "description": "[07 发送与权限] 用户白名单",
     "type": "list",
     "default": [],
     "hint": "留空表示不限制。示例：123456789",
+    "collapsed": true,
     "items": {
       "type": "string"
     }
@@ -343,28 +377,48 @@
     "description": "[08 按需拉起] 启动命令",
     "type": "string",
     "default": "",
-    "hint": "示例：D:\\ComfyUI\\run_nvidia_gpu.bat"
+    "hint": "示例：D:\\ComfyUI\\run_nvidia_gpu.bat",
+    "collapsed": true,
+    "condition": {
+      "auto_start": true
+    }
   },
   "startup_workdir": {
     "description": "[08 按需拉起] 工作目录",
     "type": "string",
     "default": "",
-    "hint": "示例：D:\\ComfyUI"
+    "hint": "示例：D:\\ComfyUI",
+    "collapsed": true,
+    "condition": {
+      "auto_start": true
+    }
   },
   "startup_visible_window": {
     "description": "[08 按需拉起] 显示启动窗口",
     "type": "bool",
-    "default": true
+    "default": true,
+    "collapsed": true,
+    "condition": {
+      "auto_start": true
+    }
   },
   "auto_start_admin_only": {
     "description": "[08 按需拉起] 限制拉起权限",
     "type": "bool",
-    "default": true
+    "default": true,
+    "collapsed": true,
+    "condition": {
+      "auto_start": true
+    }
   },
   "auto_start_allowed_sender_ids": {
     "description": "[08 按需拉起] 拉起白名单",
     "type": "list",
     "default": [],
+    "collapsed": true,
+    "condition": {
+      "auto_start": true
+    },
     "items": {
       "type": "string"
     },
@@ -374,36 +428,48 @@
     "description": "[08 按需拉起] 等待就绪时间（秒）",
     "type": "int",
     "default": 120,
-    "hint": "示例：120"
+    "hint": "示例：120",
+    "collapsed": true,
+    "condition": {
+      "auto_start": true
+    }
   },
   "startup_poll_interval": {
     "description": "[08 按需拉起] 就绪检查间隔（秒）",
     "type": "int",
     "default": 3,
-    "hint": "示例：3"
+    "hint": "示例：3",
+    "collapsed": true,
+    "condition": {
+      "auto_start": true
+    }
   },
   "prompt_builder_template": {
     "description": "[09 高级] 主提示词模板",
     "type": "string",
     "default": "你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。\n\n请先在内部判断用户输入类型：\n1. 如果用户输入很短、只是一两个短句，请主动进行审美补全，重点补出主体外观、服装结构、材质、配色、装饰物、动作和表情，让角色本身完整而精致。\n2. 如果用户输入很具体，请优先精确遵守用户要求，不要擅自改主题、角色身份、服装方向或构图重点。\n3. 如果用户输入已经像完整 Danbooru tags，请尽量保持原意，只做必要的补全和规范化。\n\n画面设计原则：\n- 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。\n- 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。\n- 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。\n- 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。\n- 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。\n- 默认审美为可爱、明亮、精致、干净，适合二次元角色展示；用户要求涩气、阴暗、华丽或其它风格时，以用户要求为准。\n- 部分中文概念直译可能不是有效 tag，请转译为可见的 Danbooru 视觉元素。例如：苗族少女可以转成 ornate silver headdress、silver jewelry、embroidered dress。\n\n角色和参考规则：\n{character_rule}\n如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。\n即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n输出要求：\n- 只输出英文 Danbooru tags，用英文逗号分隔。\n- 不要输出解释、标题、Markdown、编号或中文。\n- 不要输出质量词，例如 masterpiece、best quality、worst quality、low quality、score_7。\n- 不要输出画师词，例如 @artist。\n- 不要重复固定角色已经提供的固有发色、瞳色、种族和固定配饰。\n\n用户主题：\n{theme}",
-    "hint": "默认显示当前千代模板。想改变自然语言生图提示词时再改；详见 docs/prompting.md。"
+    "hint": "默认显示当前千代模板。想改变自然语言生图提示词时再改；详见 docs/prompting.md。",
+    "collapsed": true
   },
   "debug_prompt_enabled": {
     "description": "[10 排查问题] 记录完整提示词",
     "type": "bool",
     "default": false,
-    "hint": "仅排查偏题时开启；会记录完整输入和输出。"
+    "hint": "仅排查偏题时开启；会记录完整输入和输出。",
+    "collapsed": true
   },
   "debug_image_reference_enabled": {
     "description": "[10 排查问题] 记录引用图细节",
     "type": "bool",
     "default": false,
-    "hint": "仅排查引用图问题时开启。"
+    "hint": "仅排查引用图问题时开启。",
+    "collapsed": true
   },
   "debug_send_payload_enabled": {
     "description": "[10 排查问题] 记录发送与工具结果",
     "type": "bool",
     "default": false,
-    "hint": "仅排查未发图或发送失败时开启。"
+    "hint": "仅排查未发图或发送失败时开启。",
+    "collapsed": true
   }
 }

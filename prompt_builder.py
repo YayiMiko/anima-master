@@ -63,10 +63,8 @@ def build_final_prompt(
 
     fixed_character = selected_fixed_character(user_prompt, config)
     use_character = fixed_character is not None
-    use_style = wants_default_style(
-        user_prompt,
-        bool(config.get("default_style_enabled", False)),
-    )
+    artist = str(config.get("default_artist_tags") or DEFAULT_ARTIST_TAGS)
+    use_style = wants_default_style(user_prompt, bool(artist.strip()))
     use_sensual = wants_sensual_mode(user_prompt, config)
     quality = str(config.get("quality_prefix") or DEFAULT_QUALITY_TAGS)
     character_name = ""
@@ -77,7 +75,6 @@ def build_final_prompt(
     if use_character and not character.strip():
         use_character = False
         character_name = ""
-    artist = str(config.get("default_artist_tags") or DEFAULT_ARTIST_TAGS)
     if use_style and not artist.strip():
         use_style = False
     prompt_lower = str(user_prompt or "").lower()

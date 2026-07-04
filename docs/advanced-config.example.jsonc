@@ -1,0 +1,162 @@
+{
+  // 这是 Anima 绘图大师的“带注释高级配置模板”。
+  // 真正生效的运行文件是：
+  // data/config/astrbot_plugin_anima_master_config.json
+  // 运行文件是标准 JSON，不能直接写注释；如需手动深度自定义，请对照本模板修改。
+
+  // 打开并保存后，下次插件加载时恢复 schema 默认值；执行一次后会自动回到 false。
+  "reset_to_defaults": false,
+
+  // 启用后，会把千代画师组写入 default_artist_tags，并把“狐莉”加入 fixed_characters。
+  "chiyo_preset_enabled": false,
+
+  // AstrBot 能访问到的 ComfyUI 地址。
+  "comfyui_base_url": "http://127.0.0.1:8188",
+
+  // 当前内置工作流名称。不了解时保持默认。
+  "workflow": "anima_t2i",
+
+  // 单次生成总超时（秒）。ComfyUI 排队久时可适当调大。
+  "timeout": 300,
+
+  // 轮询 ComfyUI 状态的间隔（秒）。
+  "poll_interval": 2,
+
+  // 默认出图尺寸。
+  "width": 1024,
+  "height": 1536,
+
+  // 允许的尺寸列表。默认宽高不在列表中时，会自动贴近到最接近的允许尺寸。
+  "allowed_sizes": [
+    "832x1216",
+    "896x1152",
+    "1024x1024",
+    "1152x896",
+    "1216x832",
+    "768x1344",
+    "1344x768",
+    "1024x1536"
+  ],
+
+  // 采样参数。
+  "steps": 30,
+  "cfg": 5.0,
+  "sampler_name": "er_sde",
+  "scheduler": "normal",
+
+  // 模型文件名。只填 ComfyUI 下拉框里显示的文件名，不填完整路径。
+  "unet_name": "anima_baseV10.safetensors",
+  "clip_name": "qwen_3_06b_base.safetensors",
+  "vae_name": "qwen_image_vae.safetensors",
+
+  // 固定拼接到正面提示词前后的默认词。
+  "quality_prefix": "masterpiece, best quality, score_7, safe,",
+  "negative_prompt": "worst quality, low quality, score_1, score_2, score_3, artist name",
+
+  // 是否让聊天模型把中文需求整理成 Danbooru tags。
+  "prompt_optimize_enabled": true,
+
+  // 留空时使用当前聊天会话的主模型；填入后，专门用这个 Provider 来做提示词优化。
+  "prompt_builder_provider_id": "",
+
+  // 提示词优化模型的输出控制。
+  "prompt_builder_max_tokens": 700,
+  "prompt_builder_max_content_tags": 120,
+
+  // 联网搜索：只会在用户明确触发相关关键词时进入。
+  "prompt_builder_web_search_enabled": true,
+  "prompt_builder_search_max_results": 5,
+  "prompt_builder_search_depth": "advanced",
+  "prompt_builder_search_query_template": "{prompt} 角色 外观 立绘 服装 配色 武器 官方图 official art character design outfit appearance wiki fandom",
+
+  // 深度思考：只会在用户明确触发相关关键词时进入；如果模型不支持，会自动降级。
+  "prompt_builder_deep_thinking_enabled": true,
+  "prompt_builder_reasoning_effort": "high",
+
+  // 是否对疑似角色名做少量 Danbooru / Safebooru 核心 tag 校正。
+  "danbooru_core_tag_lookup_enabled": true,
+  "danbooru_tag_base_urls": "https://safebooru.donmai.us,https://danbooru.donmai.us",
+  "danbooru_tag_user_agent": "AstrBotAnimaMaster/0.14",
+  "danbooru_tag_lookup_timeout": 6.0,
+  "danbooru_tag_max_candidates": 6,
+
+  // 固定角色：格式为 “角色名=danbooru tags”。
+  // 只有用户在聊天里明确提到角色名时才会使用。
+  "fixed_characters": [],
+
+  // 默认画师 / 画风 tags。用户说“不用我的风格 / 不要画师词”时会绕开。
+  "default_artist_tags": "",
+
+  // 开启后，命中相关关键词时会让 LLM 自行写得更有边界表现力。
+  "sensual_mode_enabled": true,
+  "sensual_mode_markers": [
+    "色气",
+    "涩气",
+    "擦边",
+    "边界感",
+    "性感",
+    "诱惑",
+    "魅惑",
+    "妖艳",
+    "撩人",
+    "暧昧",
+    "挑逗",
+    "诱人",
+    "透明",
+    "透视",
+    "黑纱",
+    "薄纱",
+    "蕾丝",
+    "吊带",
+    "紧身",
+    "露肩",
+    "绝对领域",
+    "小恶魔",
+    "suggestive",
+    "seductive",
+    "sexy",
+    "sensual",
+    "alluring",
+    "see-through",
+    "sheer",
+    "transparent",
+    "lace",
+    "garter",
+    "teasing"
+  ],
+
+  // 图生图仍属实验功能。当前更适合整图改图，不建议把它当稳定主线。
+  "img2img_enabled": false,
+  "prompt_optimize_img2img_enabled": false,
+  "edit_denoise": 0.55,
+  "max_image_side": 1024,
+
+  // 这些项当前主线不常用，但仍可手调。
+  "upscale_factor": 2.0,
+  "remove_bg_model": "BiRefNet_lite",
+
+  // 发送与权限。
+  "send_result_to_chat": true,
+  "max_send_images": 1,
+  "admin_only": false,
+  "allowed_sender_ids": [],
+
+  // 按需拉起：不是开机自启，而是“收到绘图请求时，如果 ComfyUI 离线，再尝试启动”。
+  // 仅对 AstrBot 所在机器生效。
+  "auto_start": false,
+  "startup_command": "",
+  "startup_workdir": "",
+  "startup_visible_window": true,
+  "auto_start_admin_only": true,
+  "auto_start_allowed_sender_ids": [],
+  "startup_wait_seconds": 120,
+  "startup_poll_interval": 3,
+
+  // 主提示词模板。留空会使用插件内置模板。
+  "prompt_builder_template": "你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。\n\n请先在内部判断用户输入类型：\n1. 如果用户输入很短、只是一两个短句，请主动进行审美补全，重点补出主体外观、服装结构、材质、配色、装饰物、动作和表情，让角色本身完整而精致。\n2. 如果用户输入很具体，请优先精确遵守用户要求，不要擅自改主题、角色身份、服装方向或构图重点。\n3. 如果用户输入已经像完整 Danbooru tags，请尽量保持原意，只做必要的补全和规范化。\n\n画面设计原则：\n- 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。\n- 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。\n- 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。\n- 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。\n- 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。\n- 默认审美为可爱、明亮、精致、干净，适合二次元角色展示；用户要求涩气、阴暗、华丽或其它风格时，以用户要求为准。\n- 部分中文概念直译可能不是有效 tag，请转译为可见的 Danbooru 视觉元素。例如：苗族少女可以转成 ornate silver headdress、silver jewelry、embroidered dress。\n\n角色和参考规则：\n{character_rule}\n如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。\n即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n输出要求：\n- 只输出英文 Danbooru tags，用英文逗号分隔。\n- 不要输出解释、标题、Markdown、编号或中文。\n- 不要输出质量词，例如 masterpiece、best quality、worst quality、low quality、score_7。\n- 不要输出画师词，例如 @artist。\n- 不要重复固定角色已经提供的固有发色、瞳色、种族和固定配饰。\n\n用户主题：\n{theme}",
+
+  // 调试项默认关闭。只在排查问题时再开。
+  "debug_prompt_enabled": false,
+  "debug_image_reference_enabled": false,
+  "debug_send_payload_enabled": false
+}

@@ -72,6 +72,11 @@ vae_name = 你的 VAE 文件名
 
 能稳定出图后，再根据需要调整角色、画风、联网搜索、按需拉起和排查项。
 
+插件配置页会默认把较少使用的项目收进“更多配置”。如果你想做高度自定义，可以对照：
+
+- `docs/advanced-config.example.jsonc`
+- `data/config/astrbot_plugin_anima_master_config.example.jsonc`（本机注释模板）
+
 如果你想快速体验千代画风，可以打开“一键启用千代预设”。它会把千代画师组写入画师 tags，并把“狐莉”加入固定角色。狐莉不会自动套用，只有当指令里明确提到“狐莉”时才会使用。
 
 ## 详细说明
