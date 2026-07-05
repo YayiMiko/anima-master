@@ -9,11 +9,13 @@ from astrbot.api.star import Context, Star
 from astrbot.core.star.filter.command import GreedyStr
 
 try:
+    from . import anima_verify
     from .command_router import parse_hard_route
     from .config_defaults import maybe_reset_to_defaults
     from .prompt_presets import apply_config_preset, maybe_materialize_chiyo_preset
     from .service_container import build_services
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
+    import anima_verify
     from command_router import parse_hard_route
     from config_defaults import maybe_reset_to_defaults
     from prompt_presets import apply_config_preset, maybe_materialize_chiyo_preset
@@ -134,6 +136,44 @@ class ComfyUIAgentPlugin(Star):
     async def _send_payload(self, event: AstrMessageEvent, payload: dict[str, Any]) -> str:
         return await self._runtime.send_payload(event, payload)
 
+    async def _verify_provider_id(self, event: AstrMessageEvent) -> str:
+        """Resolve the provider used for image self-verification.
+
+        Prefers the plugin's ``verify_provider_id`` config, then falls back to
+        the session's image-caption / default chat provider (same resolution
+        used by reference-image reverse tagging).
+        """
+        configured = self._str("verify_provider_id", "").strip()
+        if configured:
+            return configured
+        try:
+            cfg = self.context.get_config(umo=event.unified_msg_origin)
+            provider_settings = cfg.get("provider_settings", {})
+            return str(
+                provider_settings.get("default_image_caption_provider_id")
+                or provider_settings.get("default_provider_id")
+                or ""
+            ).strip()
+        except Exception:  # noqa: BLE001
+            return ""
+
+    def _make_verify_llm_call(self, provider_id: str):
+        """Build the ``(prompt, image_urls) -> str`` caller for verification."""
+
+        async def llm_call(prompt: str, image_urls=None) -> str:
+            if not provider_id:
+                raise RuntimeError("no_verify_provider_available")
+            resp = await self.context.llm_generate(
+                chat_provider_id=provider_id,
+                prompt=prompt,
+                system_prompt=anima_verify.ANIMA_VERIFY_SYSTEM,
+                image_urls=image_urls or None,
+                max_tokens=self._int("prompt_builder_max_tokens", 700),
+            )
+            return str(getattr(resp, "completion_text", "") or "")
+
+        return llm_call
+
     async def _generate_payload(
         self,
         event: AstrMessageEvent,
@@ -173,6 +213,21 @@ class ComfyUIAgentPlugin(Star):
             cfg=cfg,
             negative_prompt=negative_prompt,
         )
+
+        # Self-verification: look at the generated image and, if it does not
+        # match the request, adjust the prompt and retry once before sending.
+        verdict = await self._verify_and_maybe_retry(
+            event,
+            payload,
+            user_request=prompt,
+            width=width,
+            height=height,
+            steps=steps,
+            cfg=cfg,
+            negative_prompt=negative_prompt,
+        )
+        payload = verdict["payload"]
+
         message = await self._send_payload(event, payload)
         # Surface silent prompt-optimiser failures to the user so they know
         # the image was drawn from the raw request, not the crafted tags.
@@ -180,7 +235,93 @@ class ComfyUIAgentPlugin(Star):
             await event.send(event.plain_result(
                 "（提示词优化这次没走通，是拿你的原文直接画的，可能不太准。要重画就再说一次。）"
             ))
+        # If verification still failed after the retry, tell the user what
+        # looked off and let them decide whether to redraw.
+        final = verdict.get("verdict")
+        if payload.get("ok") and final is not None and not final.passed and not final.skipped:
+            issues = "；".join(final.issues[:3]) if final.issues else "和描述有出入"
+            await event.send(event.plain_result(
+                f"（这张我看着还差点意思：{issues}。要再调整重画就说一声。）"
+            ))
         return message
+
+    async def _verify_and_maybe_retry(
+        self,
+        event: AstrMessageEvent,
+        payload: dict[str, Any],
+        *,
+        user_request: str,
+        width: int | None,
+        height: int | None,
+        steps: int | None,
+        cfg: float | None,
+        negative_prompt: str | None,
+    ) -> dict[str, Any]:
+        """Verify the generated image; retry once with a fix hint if needed.
+
+        Returns a dict ``{"payload": <best payload>, "verdict": <Verdict|None>}``.
+        Verification is skipped (verdict None) when disabled, when generation
+        failed, or when the backend produced no output image.
+        """
+        result: dict[str, Any] = {"payload": payload, "verdict": None}
+        if not self._bool("enable_verify", True):
+            return result
+        if not payload.get("ok"):
+            return result
+        outputs = [str(p) for p in (payload.get("outputs") or []) if str(p).strip()]
+        if not outputs:
+            return result
+
+        provider_id = await self._verify_provider_id(event)
+        if not provider_id:
+            logger.info("[comfyui_agent] verify skipped: no provider available")
+            return result
+        llm_call = self._make_verify_llm_call(provider_id)
+        pass_score = self._int("verify_pass_score", 7)
+        max_retry = max(0, self._int("max_verify_retry", 1))
+
+        verdict = await anima_verify.verify_image(
+            llm_call, outputs[-1], user_request, pass_score=pass_score
+        )
+        result["verdict"] = verdict
+        logger.info(
+            "[comfyui_agent] verify: passed=%s score=%s skipped=%s",
+            verdict.passed, verdict.score, verdict.skipped,
+        )
+
+        retries = 0
+        while not verdict.passed and not verdict.skipped and retries < max_retry:
+            retries += 1
+            hint = verdict.fix_hint or ("；".join(verdict.issues) if verdict.issues else "")
+            logger.info("[comfyui_agent] verify retry %s with hint: %s", retries, hint)
+            retry_prompt = user_request
+            if hint:
+                retry_prompt = f"{user_request}\n【上次问题，请修正】{hint}"
+            retry_payload = await self._generate_payload(
+                event,
+                retry_prompt,
+                width=width,
+                height=height,
+                steps=steps,
+                cfg=cfg,
+                negative_prompt=negative_prompt,
+            )
+            if not retry_payload.get("ok"):
+                # Retry generation failed outright — keep the first good image.
+                break
+            retry_outputs = [str(p) for p in (retry_payload.get("outputs") or []) if str(p).strip()]
+            if not retry_outputs:
+                break
+            result["payload"] = retry_payload
+            verdict = await anima_verify.verify_image(
+                llm_call, retry_outputs[-1], user_request, pass_score=pass_score
+            )
+            result["verdict"] = verdict
+            logger.info(
+                "[comfyui_agent] verify(after retry %s): passed=%s score=%s",
+                retries, verdict.passed, verdict.score,
+            )
+        return result
 
     async def _edit(self, event: AstrMessageEvent, prompt: str) -> str:
         return await self._action_handler.edit(event, prompt)

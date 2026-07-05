@@ -129,6 +129,17 @@
       ]
     },
     {
+      "key": "anima_master_verify",
+      "description": "生成后自我验证",
+      "hint": "开启后用多模态模型检查成品图是否符合请求，不达标会自动带修正提示重画一次再发送。需要支持读图的模型；会增加一次看图调用。",
+      "items": [
+        "enable_verify",
+        "verify_provider_id",
+        "verify_pass_score",
+        "max_verify_retry"
+      ]
+    },
+    {
       "key": "anima_master_debug",
       "description": "排查问题",
       "hint": "只在排查问题时临时开启，平时建议保持关闭。",

@@ -547,5 +547,35 @@
     "default": false,
     "hint": "仅排查未发图或发送失败时临时开启；平时建议关闭。",
     "collapsed": true
+  },
+  "enable_verify": {
+    "description": "生成后自我验证",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后用多模态模型检查成品图是否符合请求；不达标会自动调整提示词重画一次。会额外增加一次看图模型调用，注意与 provider_settings.tool_call_timeout 对齐。"
+  },
+  "verify_provider_id": {
+    "description": "验证用多模态模型",
+    "type": "string",
+    "default": "",
+    "hint": "留空则用当前会话的图像描述模型或默认对话模型。必须是支持读图的多模态模型，否则会自动跳过验证并照常发图。",
+    "collapsed": true,
+    "condition": {"enable_verify": true}
+  },
+  "verify_pass_score": {
+    "description": "验证通过分数线",
+    "type": "int",
+    "default": 7,
+    "hint": "0-10。生成图被打分低于此值判为不达标。分数越高越严格。",
+    "collapsed": true,
+    "condition": {"enable_verify": true}
+  },
+  "max_verify_retry": {
+    "description": "验证失败重画次数",
+    "type": "int",
+    "default": 1,
+    "hint": "验证不达标时自动带修正提示重画的最多次数。0 表示只验证不重画。",
+    "collapsed": true,
+    "condition": {"enable_verify": true}
   }
 }
