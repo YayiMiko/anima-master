@@ -121,6 +121,7 @@ def build_services(
     *,
     context: Any,
     config: dict[str, Any],
+    config_store: Any = None,
     logger: Any,
     danbooru_tag_cache: dict[str, list[Any]],
     get_bool: Callable[[str, bool], bool],
@@ -142,6 +143,7 @@ def build_services(
     Args:
         context: AstrBot plugin context.
         config: Plugin configuration dict.
+        config_store: Original mutable plugin config object, when available.
         logger: Logger compatible with AstrBot logger methods.
         danbooru_tag_cache: Shared Danbooru lookup cache.
         get_bool: Config boolean accessor.
@@ -242,6 +244,7 @@ def build_services(
     )
     action_handler = CommandActionHandler(
         config=config,
+        config_store=config_store,
         task_recorder=task_recorder,
         reference_context=reference_context,
         is_allowed=is_allowed,

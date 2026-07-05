@@ -1,4 +1,4 @@
-# Anima 绘图大师
+﻿# Anima 绘图大师
 
 Anima 绘图大师是一个 AstrBot 插件，用来把聊天里的自然语言变成适合本地 ComfyUI / Anima 工作流的 Danbooru tags，并把生成结果发回聊天。
 
@@ -55,7 +55,7 @@ vae_name = 你的 VAE 文件名
 
 ```text
 /anm 一个女孩，白色裙子，立绘，简单背景
-/anm 原样 masterpiece, best quality, 1girl, solo, white dress, simple background
+/anm 无优化 masterpiece, best quality, 1girl, solo, white dress, simple background
 /anm 解析法术
 /anm 反推这张图的提示词
 /anm 状态
@@ -79,7 +79,7 @@ vae_name = 你的 VAE 文件名
 - `docs/advanced-config.example.jsonc`
 - `data/config/astrbot_plugin_anima_master_config.example.jsonc`（本机注释模板）
 
-如果你想快速体验千代画风，可以打开“一键启用千代预设”。它会把千代画师组写入画师 tags，并把“狐莉”加入固定角色。狐莉不会自动套用，只有当指令里明确提到“狐莉”时才会使用。
+如果你想快速体验千代风格，可以打开“一键启用千代预设”。它会加入并自动补回“千代风格”画师组，并把“狐莉”加入角色列表。狐莉不会自动套用，只有当指令里明确提到“狐莉”时才会使用。若想永久删除千代风格，请先关闭千代预设。
 
 ## 详细说明
 

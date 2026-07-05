@@ -7,6 +7,7 @@ try:
         DEFAULT_CHARACTER_TAGS,
         DEFAULT_QUALITY_TAGS,
         apply_config_preset,
+        active_artist_tags,
         selected_fixed_character,
         strip_raw_prefix,
         wants_default_style,
@@ -19,6 +20,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
         DEFAULT_CHARACTER_TAGS,
         DEFAULT_QUALITY_TAGS,
         apply_config_preset,
+        active_artist_tags,
         selected_fixed_character,
         strip_raw_prefix,
         wants_default_style,
@@ -63,7 +65,7 @@ def build_final_prompt(
 
     fixed_character = selected_fixed_character(user_prompt, config)
     use_character = fixed_character is not None
-    artist = str(config.get("default_artist_tags") or DEFAULT_ARTIST_TAGS)
+    artist = active_artist_tags(config)
     use_style = wants_default_style(user_prompt, bool(artist.strip()))
     use_sensual = wants_sensual_mode(user_prompt, config)
     quality = str(config.get("quality_prefix") or DEFAULT_QUALITY_TAGS)

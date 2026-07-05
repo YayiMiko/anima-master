@@ -128,12 +128,19 @@ class PromptResearcher:
             return template.replace("{prompt}", prompt).strip()
         return f"{prompt} {template}".strip()
 
-    async def search_context(self, event: Any, prompt: str) -> str:
+    async def search_context(
+        self,
+        event: Any,
+        prompt: str,
+        *,
+        search_query_prompt: str | None = None,
+    ) -> str:
         """Fetch web search context for a prompt.
 
         Args:
             event: AstrBot message event for per-chat config lookup.
-            prompt: User prompt.
+            prompt: User prompt used for logs and summary text.
+            search_query_prompt: Optional prompt override used only for the search query.
 
         Returns:
             Search context text, or an empty string when unavailable.
@@ -152,7 +159,7 @@ class PromptResearcher:
                 return ""
             max_results = max(1, min(self._int("prompt_builder_search_max_results", 5), 8))
             payload = {
-                "query": self.search_query(prompt),
+                "query": self.search_query(search_query_prompt or prompt),
                 "max_results": max_results,
                 "include_favicon": False,
                 "search_depth": self._str("prompt_builder_search_depth", "advanced") or "advanced",

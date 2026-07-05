@@ -39,6 +39,7 @@ class ComfyUIAgentPlugin(Star):
         self._services = build_services(
             context=self.context,
             config=self.config,
+            config_store=config,
             logger=logger,
             danbooru_tag_cache=self._danbooru_tag_cache,
             get_bool=self._bool,
@@ -219,11 +220,6 @@ class ComfyUIAgentPlugin(Star):
         if message:
             await event.send(event.plain_result(message))
 
-    @comfyui_group.command("help", alias={"帮助", "指令表", "指令", "菜单"})
-    async def cmd_help(self, event: AstrMessageEvent):
-        event.stop_event()
-        yield event.plain_result(await self._handle_action(event, "help", ""))
-
     @comfyui_group.command("status", alias={"状态"})
     async def cmd_status(self, event: AstrMessageEvent):
         event.stop_event()
@@ -265,6 +261,46 @@ class ComfyUIAgentPlugin(Star):
     async def cmd_reverse(self, event: AstrMessageEvent):
         event.stop_event()
         yield event.plain_result(await self._handle_action(event, "reverse", ""))
+
+    @comfyui_group.command(
+        "artist",
+        alias={
+            "创建画师组",
+        },
+    )
+    async def cmd_set_artist_tags(self, event: AstrMessageEvent, prompt: GreedyStr):
+        event.stop_event()
+        yield event.plain_result(await self._handle_action(event, "create_artist_preset", str(prompt or "").strip()))
+
+    @comfyui_group.command("append_artist", alias={"追加画师组"})
+    async def cmd_append_artist_tags(self, event: AstrMessageEvent, prompt: GreedyStr):
+        event.stop_event()
+        yield event.plain_result(await self._handle_action(event, "append_artist_tags", str(prompt or "").strip()))
+
+    @comfyui_group.command("use_artist", alias={"切换画师组"})
+    async def cmd_use_artist_preset(self, event: AstrMessageEvent, prompt: GreedyStr):
+        event.stop_event()
+        yield event.plain_result(await self._handle_action(event, "use_artist_preset", str(prompt or "").strip()))
+
+    @comfyui_group.command("list_artist", alias={"查看画师组"})
+    async def cmd_list_artist_presets(self, event: AstrMessageEvent):
+        event.stop_event()
+        yield event.plain_result(await self._handle_action(event, "list_artist_presets", ""))
+
+    @comfyui_group.command("delete_artist", alias={"删除画师组"})
+    async def cmd_delete_artist_preset(self, event: AstrMessageEvent, prompt: GreedyStr):
+        event.stop_event()
+        yield event.plain_result(await self._handle_action(event, "delete_artist_preset", str(prompt or "").strip()))
+
+    @comfyui_group.command(
+        "character",
+        alias={
+            "添加角色",
+        },
+    )
+    async def cmd_add_fixed_character(self, event: AstrMessageEvent, prompt: GreedyStr):
+        event.stop_event()
+        yield event.plain_result(await self._handle_action(event, "add_fixed_character", str(prompt or "").strip()))
 
     @filter.llm_tool(name="comfyui_status")
     async def comfyui_status(self, event: AstrMessageEvent) -> str:

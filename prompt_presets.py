@@ -12,7 +12,7 @@ LEGACY_HIDDEN_STYLE_KEYS = ("default_style_enabled", "default_style_name")
 CHIYO_PRESET_ALIASES = {"chiyo", "chiyo_preset", "千代", "千代预设", "千代配置"}
 CHIYO_CHARACTER_NAME = "狐莉"
 CHIYO_CHARACTER_TAGS = (
-    "1 girl, solo, fox girl, (fox ears, inner ear hair), "
+    "1girl, solo, fox girl, (fox ears, inner ear hair), "
     "(white hair, medium hair, hair ornament, hair between eyes), "
     "(heterochromia, ice blue eye and amber eye), fang, black choker,"
 )
@@ -20,6 +20,8 @@ CHIYO_ARTIST_TAGS = (
     "@yukisiannn, @kani biimu, @ixy, @shnva, "
     "@shiromochi sakura, @stmast,"
 )
+CHIYO_ARTIST_PRESET_NAME = "\u5343\u4ee3\u98ce\u683c"
+CHIYO_ARTIST_LEGACY_PRESET_NAMES = ("\u5343\u4ee3\u753b\u98ce",)
 SENSUAL_MARKERS = (
     "ɬ",
     "色气",
@@ -73,6 +75,11 @@ RAW_PREFIXES = (
     "直接 tags",
     "直接 tag",
     "不优化",
+    "无优化",
+    "无优化tags",
+    "无优化tag",
+    "无优化 tags",
+    "无优化 tag",
     "不要优化",
     "跳过优化",
     "跳过提示词优化",
@@ -113,6 +120,14 @@ def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
     result["chiyo_preset_enabled"] = True
     result["preset_profile"] = "chiyo"
     result["default_artist_tags"] = merge_tag_text(result.get("default_artist_tags"), CHIYO_ARTIST_TAGS)
+    presets = _normalize_chiyo_artist_presets(artist_presets(result))
+    presets.setdefault(CHIYO_ARTIST_PRESET_NAME, CHIYO_ARTIST_TAGS)
+    result["artist_presets"] = presets
+    active_artist = str(result.get("active_artist_preset") or "").strip()
+    if active_artist in CHIYO_ARTIST_LEGACY_PRESET_NAMES:
+        result["active_artist_preset"] = CHIYO_ARTIST_PRESET_NAME
+    elif not active_artist:
+        result["active_artist_preset"] = CHIYO_ARTIST_PRESET_NAME
     fixed_characters = fixed_character_tags(result)
     fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
     result["fixed_characters"] = fixed_characters
@@ -144,6 +159,16 @@ def maybe_materialize_chiyo_preset(
             updated.get("default_artist_tags"),
             CHIYO_ARTIST_TAGS,
         )
+        presets = _normalize_chiyo_artist_presets(artist_presets(updated))
+        presets.setdefault(CHIYO_ARTIST_PRESET_NAME, CHIYO_ARTIST_TAGS)
+        updated["artist_presets"] = [
+            f"{name}={tags}" for name, tags in presets.items()
+        ]
+        active_artist = str(updated.get("active_artist_preset") or "").strip()
+        if active_artist in CHIYO_ARTIST_LEGACY_PRESET_NAMES:
+            updated["active_artist_preset"] = CHIYO_ARTIST_PRESET_NAME
+        elif not active_artist:
+            updated["active_artist_preset"] = CHIYO_ARTIST_PRESET_NAME
         fixed_characters = fixed_character_tags(updated)
         fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
         updated["fixed_characters"] = [
@@ -177,6 +202,62 @@ def _is_chiyo_enabled(config: dict[str, Any]) -> bool:
         return bool(config.get("chiyo_preset_enabled"))
     preset = str(config.get("preset_profile") or "").strip()
     return preset.lower() in CHIYO_PRESET_ALIASES or preset in CHIYO_PRESET_ALIASES
+
+
+def _normalize_chiyo_artist_presets(presets: dict[str, str]) -> dict[str, str]:
+    """Merge legacy Chiyo artist preset names into the current name."""
+    result = dict(presets or {})
+    current = result.get(CHIYO_ARTIST_PRESET_NAME, "").strip()
+    for legacy_name in CHIYO_ARTIST_LEGACY_PRESET_NAMES:
+        legacy = result.pop(legacy_name, "").strip()
+        if legacy and not current:
+            current = legacy
+    if current:
+        result[CHIYO_ARTIST_PRESET_NAME] = current
+    return result
+
+
+def artist_presets(config: dict[str, Any]) -> dict[str, str]:
+    """Return configured artist tag presets keyed by preset name."""
+    presets: dict[str, str] = {}
+    configured = config.get("artist_presets")
+    if isinstance(configured, dict):
+        for name, tags in configured.items():
+            name_text = str(name or "").strip()
+            tags_text = str(tags or "").strip()
+            if name_text and tags_text:
+                presets[name_text] = tags_text
+    elif isinstance(configured, list):
+        for item in configured:
+            text = str(item or "").strip()
+            if not text:
+                continue
+            separator = "=" if "=" in text else ":"
+            if separator not in text:
+                continue
+            name, tags = text.split(separator, 1)
+            name_text = name.strip()
+            tags_text = tags.strip()
+            if name_text and tags_text:
+                presets[name_text] = tags_text
+    return presets
+
+
+def active_artist_preset_name(config: dict[str, Any]) -> str:
+    """Return the configured active artist preset name, if valid."""
+    name = str(config.get("active_artist_preset") or "").strip()
+    if name and name in artist_presets(config):
+        return name
+    return ""
+
+
+def active_artist_tags(config: dict[str, Any]) -> str:
+    """Return artist tags currently used for prompt composition."""
+    presets = artist_presets(config)
+    name = str(config.get("active_artist_preset") or "").strip()
+    if name and name in presets:
+        return presets[name]
+    return str(config.get("default_artist_tags") or DEFAULT_ARTIST_TAGS)
 
 
 def fixed_character_tags(config: dict[str, Any]) -> dict[str, str]:

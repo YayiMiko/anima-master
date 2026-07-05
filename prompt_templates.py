@@ -26,6 +26,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是 Anima 模型的 Danbooru tags 设计助�
 如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。
 即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。
 {search_block}
+{outfit_transfer_rule}
 {reference_rule}
 {img2img_rule}
 {sensual_rule}
@@ -55,6 +56,7 @@ def build_llm_prompt(
     sensual_mode: bool = False,
     mode: str = "txt2img",
     prompt_builder_template: str = "",
+    outfit_transfer_rule: str = "",
 ) -> str:
     """Build the prompt sent to the chat LLM for Danbooru tag generation."""
     theme = str(theme or "").strip()
@@ -117,6 +119,7 @@ def build_llm_prompt(
         "theme": theme,
         "character_rule": character_rule,
         "search_block": search_block,
+        "outfit_transfer_rule": str(outfit_transfer_rule or "").strip(),
         "reference_rule": reference_rule,
         "img2img_rule": img2img_rule,
         "style_block": "",

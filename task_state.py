@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .prompt_presets import apply_config_preset, fixed_character_tags
+    from .prompt_presets import active_artist_preset_name, active_artist_tags, apply_config_preset, artist_presets, fixed_character_tags
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
-    from prompt_presets import apply_config_preset, fixed_character_tags
+    from prompt_presets import active_artist_preset_name, active_artist_tags, apply_config_preset, artist_presets, fixed_character_tags
 
 
 def _bool(config: dict[str, Any], key: str, default: bool) -> bool:
@@ -81,16 +81,20 @@ class TaskRecorder:
         """
         prompt_config = apply_config_preset(dict(config or {}))
         characters = sorted(fixed_character_tags(prompt_config).keys())
+        presets = sorted(artist_presets(prompt_config).keys())
+        active_artist = active_artist_preset_name(prompt_config)
         last_task = self.read()
         prompt_template = _str(config, "prompt_builder_template", "").strip()
-        artist_tags = _str(prompt_config, "default_artist_tags", "").strip()
+        artist_tags = active_artist_tags(prompt_config).strip()
         lines = [
             "Anima 调试状态：",
             f"- 提示词优化：{_bool(config, 'prompt_optimize_enabled', True)}",
             f"- 自定义 Prompt 模板：{bool(prompt_template)}",
             f"- 千代预设：{_bool(config, 'chiyo_preset_enabled', False)}",
             f"- 画师 tags：{'已配置' if artist_tags else '未配置'}",
-            f"- 固定角色：{', '.join(characters) if characters else '无'}",
+            f"- 当前画师组：{active_artist or '默认画师 tags'}",
+            f"- 已保存的画师组：{', '.join(presets) if presets else '无'}",
+            f"- 角色：{', '.join(characters) if characters else '无'}",
             f"- 联网搜索：{_bool(config, 'prompt_builder_web_search_enabled', True)}",
             f"- 深度思考：{_bool(config, 'prompt_builder_deep_thinking_enabled', True)} / {_str(config, 'prompt_builder_reasoning_effort', 'high')}",
             f"- Danbooru 核心 tag 查询：{_bool(config, 'danbooru_core_tag_lookup_enabled', True)}",
@@ -115,7 +119,7 @@ class TaskRecorder:
                     f"- 动作：{last_task.get('action') or '未知'} / 成功：{last_task.get('ok')}",
                     f"- 错误：{last_task.get('error') or '无'}",
                     f"- 引用图：requested={last_task.get('reference_image_requested')} applied={last_task.get('reference_context_applied')}",
-                    f"- 固定角色：{prompt_summary.get('fixed_character_name') or '无'}",
+                    f"- 角色：{prompt_summary.get('fixed_character_name') or '无'}",
                     f"- 搜索/思考：{prompt_summary.get('web_search')} / {prompt_summary.get('deep_thinking')}",
                     f"- 最终 prompt 长度：{prompt_summary.get('final_prompt_chars') or 0}",
                     f"- 输出：{len(last_task.get('outputs') or [])} 张",

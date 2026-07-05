@@ -1,4 +1,4 @@
-# 提示词与角色画风
+﻿# 提示词与角色画风
 
 ## 自然语言模式
 
@@ -15,7 +15,7 @@
 如果你已经写好了完整 tags，可以使用：
 
 ```text
-/anm 原样 masterpiece, best quality, 1girl, solo, white dress, simple background
+/anm 无优化 masterpiece, best quality, 1girl, solo, white dress, simple background
 ```
 
 这种模式不会调用提示词优化模型。

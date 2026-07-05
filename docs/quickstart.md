@@ -1,4 +1,4 @@
-# 安装与快速开始
+﻿# 安装与快速开始
 
 ## 前置要求
 
@@ -40,7 +40,7 @@ vae_name = 你的 VAE 文件名
 如果你已经写好了完整 tags，可以发送：
 
 ```text
-/anm 原样 masterpiece, best quality, 1girl, solo, white dress, simple background
+/anm 无优化 masterpiece, best quality, 1girl, solo, white dress, simple background
 ```
 
 ## 尺寸配置

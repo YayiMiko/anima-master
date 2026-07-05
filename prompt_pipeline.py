@@ -5,6 +5,14 @@ from typing import Any, Callable
 
 try:
     from .danbooru_resolver import DanbooruResolver
+    from .outfit_transfer import (
+        build_outfit_summary_prompt,
+        build_outfit_transfer_block,
+        detect_outfit_transfer,
+        extract_reference_tag_text,
+        filter_outfit_tags,
+        preferred_search_prompt,
+    )
     from .prompt_builder import (
         build_final_prompt,
     )
@@ -19,6 +27,14 @@ try:
     from .tag_cleaner import split_tags
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_resolver import DanbooruResolver
+    from outfit_transfer import (
+        build_outfit_summary_prompt,
+        build_outfit_transfer_block,
+        detect_outfit_transfer,
+        extract_reference_tag_text,
+        filter_outfit_tags,
+        preferred_search_prompt,
+    )
     from prompt_builder import (
         build_final_prompt,
     )
@@ -135,6 +151,30 @@ class PromptPipeline:
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()
 
+    async def _generate_outfit_summary_with_llm(
+        self,
+        *,
+        provider_id: str,
+        summary_prompt: str,
+        use_deep_thinking: bool,
+    ) -> str:
+        kwargs: dict[str, Any] = {
+            "chat_provider_id": provider_id,
+            "prompt": summary_prompt,
+            "system_prompt": (
+                "你是二次元服装解析助手。"
+                "请在内部充分推理来源服装结构，但不要输出思考过程。"
+                "只输出英文 danbooru tags，用英文逗号分隔。"
+                "不要解释，不要 Markdown，不要输出质量词、画师词或角色身份词。"
+            ),
+            "max_tokens": min(self._int("prompt_builder_max_tokens", 700), 500),
+        }
+        if use_deep_thinking:
+            kwargs["reasoning_effort"] = self._str("prompt_builder_reasoning_effort", "high") or "high"
+            kwargs["thinking"] = {"type": "enabled"}
+        response = await self.context.llm_generate(**kwargs)
+        return str(getattr(response, "completion_text", "") or "").strip()
+
     async def build(self, event: Any, user_prompt: str, mode: str = "txt2img") -> PromptPipelineResult:
         """Build the final prompt and summary for one generation request.
 
@@ -191,6 +231,7 @@ class PromptPipeline:
         fixed_character_name = fixed_character[0] if fixed_character else ""
         use_fixed_character = fixed_character is not None
         use_sensual_mode = wants_sensual_mode(prompt, prompt_config)
+        outfit_plan = detect_outfit_transfer(prompt, fixed_character_name)
         required_core_tags = (
             self._danbooru_resolver.required_core_tags_for_prompt(prompt) if not use_fixed_character else ()
         )
@@ -209,7 +250,42 @@ class PromptPipeline:
             research_plan.search_reason or "none",
             research_plan.thinking_reason or "none",
         )
-        search_context = await self._researcher.search_context(event, prompt) if research_plan.use_web_search else ""
+        search_query_prompt = preferred_search_prompt(outfit_plan, prompt)
+        search_context = (
+            await self._researcher.search_context(
+                event,
+                prompt,
+                search_query_prompt=search_query_prompt,
+            )
+            if research_plan.use_web_search
+            else ""
+        )
+        outfit_summary = ""
+        outfit_summary_source = ""
+        reference_tag_text = extract_reference_tag_text(prompt) if outfit_plan.enabled else ""
+        if reference_tag_text:
+            outfit_summary = filter_outfit_tags(reference_tag_text, max_tags=42)
+            if outfit_summary:
+                outfit_summary_source = "reference_filter"
+        if outfit_plan.enabled and not outfit_summary and search_context:
+            summary_prompt = build_outfit_summary_prompt(
+                outfit_plan,
+                original_prompt=prompt,
+                source_context=search_context,
+            )
+            try:
+                raw_outfit_summary = await self._generate_outfit_summary_with_llm(
+                    provider_id=provider_id,
+                    summary_prompt=summary_prompt,
+                    use_deep_thinking=research_plan.use_deep_thinking,
+                )
+                outfit_summary = filter_outfit_tags(raw_outfit_summary, max_tags=48)
+                if outfit_summary:
+                    outfit_summary_source = "search_summary"
+                if self._bool("debug_prompt_enabled", False):
+                    self.logger.info("[comfyui_agent] outfit summary LLM output:\n%s", raw_outfit_summary)
+            except Exception as exc:
+                self.logger.warning("[comfyui_agent] outfit summary build failed: %s", exc)
         llm_prompt = build_llm_prompt(
             prompt,
             search_context=search_context,
@@ -218,6 +294,7 @@ class PromptPipeline:
             sensual_mode=use_sensual_mode,
             mode=mode,
             prompt_builder_template=self._str("prompt_builder_template", ""),
+            outfit_transfer_rule=build_outfit_transfer_block(outfit_plan, outfit_summary),
         )
         if self._bool("debug_prompt_enabled", False):
             self.logger.info("[comfyui_agent] prompt builder LLM prompt:\n%s", llm_prompt)
@@ -327,6 +404,11 @@ class PromptPipeline:
                 "sensual_mode": built.used_sensual_mode,
                 "default_style": built.used_default_style,
                 "required_core_tags": list(built.required_core_tags),
+                "outfit_transfer": outfit_plan.enabled,
+                "outfit_transfer_source": outfit_plan.source_subject,
+                "outfit_transfer_target": outfit_plan.target_character,
+                "outfit_summary_source": outfit_summary_source,
+                "outfit_summary_chars": len(outfit_summary),
                 "llm_content_tag_count": content_tag_count,
                 "short_content_retry": short_content_retry,
                 "llm_content_chars": len(built.content_tags),
@@ -342,6 +424,7 @@ class PromptPipeline:
             summary.update(
                 {
                     "llm_prompt": llm_prompt,
+                    "outfit_summary": outfit_summary,
                     "llm_content": llm_content,
                     "final_prompt": built.final_prompt,
                 }

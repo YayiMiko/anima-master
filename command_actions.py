@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Callable
 
 try:
     from .command_router import help_text
+    from .prompt_presets import active_artist_preset_name, artist_presets, fixed_character_tags, merge_tag_text
+    from .tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from command_router import help_text
+    from prompt_presets import active_artist_preset_name, artist_presets, fixed_character_tags, merge_tag_text
+    from tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
 
 
 class CommandActionHandler:
@@ -27,6 +32,7 @@ class CommandActionHandler:
         format_spell_payload: Callable[[dict[str, Any]], str],
         get_bool: Callable[[str, bool], bool],
         shorten: Callable[[str, int], str],
+        config_store: Any = None,
     ):
         """Store dependencies for command-side action handling.
 
@@ -46,6 +52,7 @@ class CommandActionHandler:
             shorten: Text-shortening helper.
         """
         self.config = config
+        self._config_store = config_store
         self._task_recorder = task_recorder
         self._reference_context = reference_context
         self._is_allowed = is_allowed
@@ -58,6 +65,163 @@ class CommandActionHandler:
         self._format_spell_payload = format_spell_payload
         self._bool = get_bool
         self._shorten = shorten
+
+    def _persist_config_key(self, key: str, value: Any) -> None:
+        self.config[key] = value
+        if isinstance(self._config_store, dict):
+            self._config_store[key] = value
+        save_config = getattr(self._config_store, "save_config", None)
+        if callable(save_config):
+            save_config()
+
+    def _normalize_tag_text(self, text: str) -> str:
+        tags = [canonical_tag_text(tag) for tag in split_tags(text)]
+        normalized = join_prompt_parts([", ".join(tags)])
+        return normalized + ("," if normalized else "")
+
+    def _parse_name_tags(self, text: str) -> tuple[str, str] | None:
+        raw = str(text or "").strip()
+        candidates: list[tuple[int, str]] = []
+        for separator in ("=", "：", ":"):
+            index = raw.find(separator)
+            if index >= 0:
+                candidates.append((index, separator))
+        for index, separator in sorted(candidates):
+            name = raw[:index].strip()
+            tags = raw[index + len(separator) :].strip()
+            if not self._is_name_tags_separator(name, tags):
+                continue
+            tags = self._normalize_tag_text(tags)
+            if name and tags:
+                return name, tags
+        return None
+
+    def _is_name_tags_separator(self, name: str, tags: str) -> bool:
+        if not name or not tags:
+            return False
+        if "," in name or "\n" in name:
+            return False
+        if re.search(r"[@()[\]{}]", name):
+            return False
+        lowered = name.strip().lower()
+        if lowered in {"artist", "tag", "tags", "prompt", "positive", "negative"}:
+            return False
+        return True
+
+    def _save_artist_preset(self, name: str, tags: str) -> str:
+        presets = artist_presets(self.config)
+        presets[name] = tags
+        self._persist_artist_presets(presets, active=name)
+        return f"已保存并启用画师组“{name}”：\n" + self._shorten(tags, 800)
+
+    def create_artist_preset(self, prompt: str) -> str:
+        parsed = self._parse_name_tags(prompt)
+        if not parsed:
+            return "请使用“名称=tags”的格式。例：/anm 创建画师组 千代风格=@artist_a, @artist_b,"
+        name, tags = parsed
+        return self._save_artist_preset(name, tags)
+
+    def _persist_artist_presets(self, presets: dict[str, str], active: str | None = None) -> None:
+        lines = [f"{name}={tags}" for name, tags in presets.items()]
+        self._persist_config_key("artist_presets", lines)
+        if active is not None:
+            self._persist_config_key("active_artist_preset", active)
+
+    def set_artist_tags(self, prompt: str) -> str:
+        parsed = self._parse_name_tags(prompt)
+        if parsed:
+            name, tags = parsed
+            return self._save_artist_preset(name, tags)
+
+        tags = self._normalize_tag_text(prompt)
+        if not tags:
+            return "请写画师 tags，或使用“名称=tags”。例：/anm 创建画师组 千代=@artist_a, @artist_b,"
+        self._persist_config_key("default_artist_tags", tags)
+        self._persist_config_key("active_artist_preset", "")
+        return "已设置默认画师 tags，并切回默认画师 tags：\n" + self._shorten(tags, 800)
+
+    def append_artist_tags(self, prompt: str) -> str:
+        parsed = self._parse_name_tags(prompt)
+        if parsed:
+            name, tags = parsed
+            presets = artist_presets(self.config)
+            merged = merge_tag_text(presets.get(name), tags)
+            presets[name] = merged
+            self._persist_artist_presets(presets, active=name)
+            return f"已追加并启用画师组“{name}”：\n" + self._shorten(merged, 800)
+
+        addition = self._normalize_tag_text(prompt)
+        if not addition:
+            return "请写要追加的画师 tags，或使用“名称=tags”。例：/anm 追加画师组 千代=@artist_a,"
+        active = active_artist_preset_name(self.config)
+        if active:
+            presets = artist_presets(self.config)
+            merged = merge_tag_text(presets.get(active), addition)
+            presets[active] = merged
+            self._persist_artist_presets(presets, active=active)
+            return f"已追加当前画师组“{active}”：\n" + self._shorten(merged, 800)
+        merged = merge_tag_text(self.config.get("default_artist_tags"), addition)
+        self._persist_config_key("default_artist_tags", merged)
+        return "已追加默认画师 tags：\n" + self._shorten(merged, 800)
+
+    def use_artist_preset(self, prompt: str) -> str:
+        name = str(prompt or "").strip()
+        if not name:
+            return "请写要启用的画师组名称。例：/anm 切换画师组 千代"
+        if name in {"默认", "默认画师", "默认画师组", "default"}:
+            self._persist_config_key("active_artist_preset", "")
+            return "已切回默认画师 tags。"
+        presets = artist_presets(self.config)
+        if name not in presets:
+            return f"没有找到画师组“{name}”。可用画师组：{', '.join(sorted(presets)) if presets else '无'}"
+        self._persist_config_key("active_artist_preset", name)
+        return f"已启用画师组“{name}”：\n" + self._shorten(presets[name], 800)
+
+    def list_artist_presets(self) -> str:
+        presets = artist_presets(self.config)
+        active = active_artist_preset_name(self.config)
+        default_tags = str(self.config.get("default_artist_tags") or "").strip()
+        lines = ["画师组："]
+        lines.append(f"- 默认画师 tags：{'已配置' if default_tags else '未配置'}{'（当前）' if not active else ''}")
+        if not presets:
+            lines.append("- 已保存的画师组：无")
+        else:
+            for name in sorted(presets):
+                marker = "（当前）" if name == active else ""
+                lines.append(f"- {name}{marker}：{self._shorten(presets[name], 120)}")
+        lines.extend(
+            [
+                "",
+                "用法：",
+                "/anm 创建画师组 名称=@artist_a, @artist_b,",
+                "/anm 切换画师组 名称",
+                "/anm 删除画师组 名称",
+            ]
+        )
+        return "\n".join(lines)
+
+    def delete_artist_preset(self, prompt: str) -> str:
+        name = str(prompt or "").strip()
+        if not name:
+            return "请写要删除的画师组名称。例：/anm 删除画师组 千代"
+        presets = artist_presets(self.config)
+        if name not in presets:
+            return f"没有找到画师组“{name}”。"
+        presets.pop(name, None)
+        active = active_artist_preset_name(self.config)
+        self._persist_artist_presets(presets, active="" if active == name else active)
+        return f"已删除画师组“{name}”。" + (" 当前已切回默认画师 tags。" if active == name else "")
+
+    def add_fixed_character(self, prompt: str) -> str:
+        parsed = self._parse_name_tags(prompt)
+        if not parsed:
+            return "请使用“名称=tags”的格式。例：/anm 添加角色 狐莉=1girl, solo, fox girl,"
+        name, tags = parsed
+        characters = fixed_character_tags(self.config)
+        characters[name] = tags
+        lines = [f"{character_name}={character_tags}" for character_name, character_tags in characters.items()]
+        self._persist_config_key("fixed_characters", lines)
+        return f"已保存角色“{name}”：\n" + self._shorten(tags, 1000)
 
     def status_text(self, payload: dict[str, Any]) -> str:
         """Render a chat-visible ComfyUI status response.
@@ -149,6 +313,20 @@ class CommandActionHandler:
             return self.status_text(await self._run_tool(["status"]))
         if action == "debug_status":
             return self._task_recorder.debug_status_text(self.config)
+        if action == "set_artist_tags":
+            return self.set_artist_tags(prompt)
+        if action == "create_artist_preset":
+            return self.create_artist_preset(prompt)
+        if action == "append_artist_tags":
+            return self.append_artist_tags(prompt)
+        if action == "use_artist_preset":
+            return self.use_artist_preset(prompt)
+        if action == "list_artist_presets":
+            return self.list_artist_presets()
+        if action == "delete_artist_preset":
+            return self.delete_artist_preset(prompt)
+        if action == "add_fixed_character":
+            return self.add_fixed_character(prompt)
         if action == "generate":
             if not prompt:
                 return "请在后面写完整 prompt 或 tags。"

@@ -2,7 +2,7 @@
   "sections": [
     {
       "key": "anima_master_basic",
-      "description": "基础设置",
+      "description": "预设与恢复",
       "hint": "用于恢复默认配置，或快速应用千代预设。",
       "items": [
         "reset_to_defaults",
@@ -12,7 +12,7 @@
     {
       "key": "anima_master_comfyui_connection",
       "description": "ComfyUI 连接",
-      "hint": "用于连接 ComfyUI。通常请先用绘世启动器、ComfyUI portable 或自己的方式启动 ComfyUI；只有开启“由 AstrBot 启动 ComfyUI”后，启动命令才需要填写。",
+      "hint": "用于连接 ComfyUI。通常请先用绘世启动器、ComfyUI portable 或自己的方式启动 ComfyUI；插件工作流类型不是 ComfyUI 本地保存的工作流名称。只有开启“由 AstrBot 启动 ComfyUI”后，启动命令才需要填写。",
       "items": [
         "comfyui_base_url",
         "workflow",
@@ -29,9 +29,19 @@
       ]
     },
     {
+      "key": "anima_master_models",
+      "description": "模型文件",
+      "hint": "首次配置时请对照 ComfyUI 下拉框确认；这里只填文件名，不填路径。如果状态检查显示模型不可用，优先检查这里。",
+      "items": [
+        "unet_name",
+        "clip_name",
+        "vae_name"
+      ]
+    },
+    {
       "key": "anima_master_rendering",
       "description": "出图参数",
-      "hint": "控制默认尺寸、采样、模型文件名、质量词和负面提示词。UNET、CLIP、VAE 文件名必须与 ComfyUI 中的文件名一致。",
+      "hint": "控制默认尺寸、采样步数、CFG、采样器和调度器。",
       "items": [
         "width",
         "height",
@@ -39,18 +49,22 @@
         "steps",
         "cfg",
         "sampler_name",
-        "scheduler",
-        "unet_name",
-        "clip_name",
-        "vae_name",
+        "scheduler"
+      ]
+    },
+    {
+      "key": "anima_master_default_prompt",
+      "description": "默认提示词",
+      "hint": "控制每次生图都会自动加入的正面质量词和负面提示词。",
+      "items": [
         "quality_prefix",
         "negative_prompt"
       ]
     },
     {
       "key": "anima_master_prompting",
-      "description": "提示词优化",
-      "hint": "控制自然语言转 Danbooru tags 的方式，以及是否启用联网搜索与深度思考。",
+      "description": "自然语言优化",
+      "hint": "控制中文描述转 Danbooru tags 的方式，以及是否启用联网搜索与深度思考。",
       "items": [
         "prompt_optimize_enabled",
         "prompt_builder_provider_id",
@@ -67,8 +81,8 @@
     },
     {
       "key": "anima_master_tag_lookup",
-      "description": "Tag 查询",
-      "hint": "用于校正少量角色核心 tag；只在需要时联网查询。",
+      "description": "联网校正角色 Tag",
+      "hint": "用于校正少量角色核心 tag；只在需要时访问 Donmai / Danbooru。",
       "items": [
         "danbooru_core_tag_lookup_enabled",
         "danbooru_tag_base_urls",
@@ -79,10 +93,12 @@
     },
     {
       "key": "anima_master_style",
-      "description": "角色与画风",
-      "hint": "用于固定角色、默认画师 tags，以及涩气表现力相关设置。",
+      "description": "角色与风格",
+      "hint": "用于角色、画师组和风格，以及涩气表现力相关设置。",
       "items": [
         "fixed_characters",
+        "artist_presets",
+        "active_artist_preset",
         "default_artist_tags",
         "sensual_mode_enabled",
         "sensual_mode_markers"
@@ -90,8 +106,8 @@
     },
     {
       "key": "anima_master_experimental",
-      "description": "实验功能",
-      "hint": "仍在开发中的功能，默认建议关闭。",
+      "description": "实验与附加功能",
+      "hint": "包含图生图、放大和去背景等附加能力；不影响基础文生图。",
       "items": [
         "img2img_enabled",
         "prompt_optimize_img2img_enabled",
@@ -104,7 +120,7 @@
     {
       "key": "anima_master_delivery",
       "description": "发送与权限",
-      "hint": "控制是否回传图片，以及谁可以使用。",
+      "hint": "控制图片是否发回聊天，以及哪些用户可以使用插件。",
       "items": [
         "send_result_to_chat",
         "max_send_images",
