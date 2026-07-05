@@ -6,11 +6,10 @@ from typing import Any, Callable
 try:
     from .danbooru_resolver import DanbooruResolver
     from .outfit_transfer import (
+        OutfitTransferContext,
+        build_outfit_transfer_context,
         build_outfit_summary_prompt,
-        build_outfit_transfer_block,
         detect_outfit_transfer,
-        extract_reference_tag_text,
-        filter_outfit_tags,
         preferred_search_prompt,
     )
     from .prompt_builder import (
@@ -25,15 +24,15 @@ try:
     )
     from .prompt_research import PromptResearcher
     from .prompt_templates import build_llm_prompt
+    from .prompt_trace import PromptBuildTrace
     from .tag_cleaner import split_tags
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_resolver import DanbooruResolver
     from outfit_transfer import (
+        OutfitTransferContext,
+        build_outfit_transfer_context,
         build_outfit_summary_prompt,
-        build_outfit_transfer_block,
         detect_outfit_transfer,
-        extract_reference_tag_text,
-        filter_outfit_tags,
         preferred_search_prompt,
     )
     from prompt_builder import (
@@ -48,6 +47,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
     )
     from prompt_research import PromptResearcher
     from prompt_templates import build_llm_prompt
+    from prompt_trace import PromptBuildTrace
     from tag_cleaner import split_tags
 
 
@@ -62,6 +62,20 @@ class PromptPipelineResult:
 
     final_prompt: str
     summary: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class PromptContext:
+    """Resolved prompt-side context before the LLM prompt is built."""
+
+    prompt_config: dict[str, Any]
+    fixed_character_name: str
+    use_fixed_character: bool
+    use_sensual_mode: bool
+    outfit_plan: Any
+    required_core_tags: tuple[str, ...]
+    research_plan: Any
+    search_query_prompt: str
 
 
 class PromptPipeline:
@@ -177,6 +191,236 @@ class PromptPipeline:
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()
 
+    def _try_direct_prompt_path(
+        self,
+        prompt: str,
+        trace: PromptBuildTrace,
+    ) -> str | None:
+        """Return a prompt immediately when optimization should be skipped."""
+        if not self._bool("prompt_optimize_enabled", True):
+            trace.mark_skipped("prompt_optimize_disabled", prompt)
+            return prompt
+        raw_mode, raw_prompt = strip_raw_prefix(prompt)
+        if raw_mode:
+            self.logger.info("[comfyui_agent] prompt builder skipped: raw tags mode")
+            trace.mark_raw("raw_tags_mode", raw_prompt)
+            return raw_prompt
+        if looks_like_danbooru_tags(prompt):
+            self.logger.info("[comfyui_agent] prompt builder skipped: danbooru fast path")
+            trace.mark_raw("danbooru_tags_detected", prompt, danbooru_fast_path=True)
+            return prompt
+        return None
+
+    def _prepare_prompt_context(self, prompt: str) -> PromptContext:
+        """Resolve role/style/research decisions before LLM prompt creation."""
+        prompt_config = apply_config_preset(dict(self.config))
+        fixed_character = selected_fixed_character(prompt, prompt_config)
+        fixed_character_name = fixed_character[0] if fixed_character else ""
+        use_fixed_character = fixed_character is not None
+        use_sensual_mode = wants_sensual_mode(prompt, prompt_config)
+        outfit_plan = detect_outfit_transfer(prompt, fixed_character_name)
+        required_core_tags = (
+            tuple(self._danbooru_resolver.required_core_tags_for_prompt(prompt))
+            if not use_fixed_character
+            else ()
+        )
+        research_plan = self._researcher.plan(prompt)
+        search_query_prompt = preferred_search_prompt(outfit_plan, prompt)
+        self.logger.info(
+            "[comfyui_agent] prompt builder input fixed_character=%s sensual=%s required_core_tags=%s prompt=%s",
+            fixed_character_name or "none",
+            use_sensual_mode,
+            ",".join(required_core_tags) or "none",
+            prompt[:180],
+        )
+        self.logger.info(
+            "[comfyui_agent] prompt strategy web_search=%s deep_thinking=%s search_reason=%s thinking_reason=%s",
+            research_plan.use_web_search,
+            research_plan.use_deep_thinking,
+            research_plan.search_reason or "none",
+            research_plan.thinking_reason or "none",
+        )
+        return PromptContext(
+            prompt_config=prompt_config,
+            fixed_character_name=fixed_character_name,
+            use_fixed_character=use_fixed_character,
+            use_sensual_mode=use_sensual_mode,
+            outfit_plan=outfit_plan,
+            required_core_tags=required_core_tags,
+            research_plan=research_plan,
+            search_query_prompt=search_query_prompt,
+        )
+
+    async def _build_outfit_context(
+        self,
+        event: Any,
+        prompt: str,
+        provider_id: str,
+        context: PromptContext,
+        trace: PromptBuildTrace,
+    ) -> OutfitTransferContext:
+        """Build optional search/reference outfit context for the LLM prompt."""
+        search_context = (
+            await self._researcher.search_context(
+                event,
+                prompt,
+                search_query_prompt=context.search_query_prompt,
+            )
+            if context.research_plan.use_web_search
+            else ""
+        )
+        if context.research_plan.use_web_search:
+            trace.add_event("web_search", "ok" if search_context else "empty")
+        else:
+            trace.add_event("web_search", "skipped", "not_requested")
+        outfit_context = build_outfit_transfer_context(
+            context.outfit_plan,
+            prompt=prompt,
+            search_context=search_context,
+        )
+        if outfit_context.reference_tag_text:
+            if outfit_context.outfit_summary:
+                trace.add_event("outfit_summary", "ok", "reference_filter")
+        elif not context.outfit_plan.enabled:
+            trace.add_event("outfit_summary", "skipped", "not_requested")
+        elif not search_context:
+            trace.add_event("outfit_summary", "skipped", "no_search_context")
+        if context.outfit_plan.enabled and not outfit_context.outfit_summary and search_context:
+            summary_prompt = build_outfit_summary_prompt(
+                context.outfit_plan,
+                original_prompt=prompt,
+                source_context=search_context,
+            )
+            try:
+                raw_outfit_summary = await self._generate_outfit_summary_with_llm(
+                    provider_id=provider_id,
+                    summary_prompt=summary_prompt,
+                    use_deep_thinking=context.research_plan.use_deep_thinking,
+                )
+                next_context = outfit_context.with_filtered_outfit_summary(
+                    raw_outfit_summary,
+                    "search_summary",
+                    max_tags=48,
+                )
+                if next_context.outfit_summary:
+                    outfit_context = next_context
+                    trace.add_event("outfit_summary", "ok", "search_summary")
+                else:
+                    trace.add_event("outfit_summary", "empty", "search_summary")
+                if self._bool("debug_prompt_enabled", False):
+                    self.logger.info(
+                        "[comfyui_agent] outfit summary LLM output:\n%s",
+                        raw_outfit_summary,
+                    )
+            except Exception as exc:
+                self.logger.warning("[comfyui_agent] outfit summary build failed: %s", exc)
+                trace.mark_outfit_summary_failed(type(exc).__name__)
+        return outfit_context
+
+    async def _call_prompt_builder_llm(
+        self,
+        *,
+        provider_id: str,
+        llm_prompt: str,
+        context: PromptContext,
+        trace: PromptBuildTrace,
+    ) -> str:
+        """Call the prompt-builder LLM with deep-thinking fallback."""
+        try:
+            result = await self._generate_prompt_tags_with_llm(
+                provider_id=provider_id,
+                llm_prompt=llm_prompt,
+                use_deep_thinking=context.research_plan.use_deep_thinking,
+                fixed_character=context.use_fixed_character,
+                character_name=context.fixed_character_name,
+            )
+            trace.add_event("prompt_llm", "ok")
+            return result
+        except Exception as exc:
+            if not context.research_plan.use_deep_thinking:
+                self.logger.warning("[comfyui_agent] prompt builder LLM failed: %s", exc)
+                trace.mark_llm_failed(type(exc).__name__)
+                return ""
+            self.logger.warning(
+                "[comfyui_agent] prompt builder deep thinking failed, retrying without it: %s",
+                exc,
+            )
+            trace.add_event("prompt_llm", "deep_thinking_failed", type(exc).__name__)
+            try:
+                result = await self._generate_prompt_tags_with_llm(
+                    provider_id=provider_id,
+                    llm_prompt=llm_prompt,
+                    use_deep_thinking=False,
+                    fixed_character=context.use_fixed_character,
+                    character_name=context.fixed_character_name,
+                )
+                trace.add_event("prompt_llm", "fallback_ok")
+                return result
+            except Exception as retry_exc:
+                self.logger.warning("[comfyui_agent] prompt builder LLM failed: %s", retry_exc)
+                trace.add_event("prompt_llm", "fallback_failed", type(retry_exc).__name__)
+                trace.mark_llm_failed(type(retry_exc).__name__)
+                return ""
+
+    async def _maybe_retry_short_content(
+        self,
+        *,
+        provider_id: str,
+        llm_prompt: str,
+        prompt: str,
+        llm_content: str,
+        built: Any,
+        content_tag_count: int,
+        prompt_context: PromptContext,
+        outfit_context: OutfitTransferContext,
+        trace: PromptBuildTrace,
+    ) -> tuple[str, Any, int, bool]:
+        """Retry prompt generation when ordinary content tags are too short."""
+        if built.raw_mode:
+            trace.add_event("short_content_retry", "skipped", "raw_mode")
+            return llm_content, built, content_tag_count, False
+        if outfit_context.asset_reference_mode:
+            trace.add_event("short_content_retry", "skipped", "asset_reference_mode")
+            return llm_content, built, content_tag_count, False
+        if content_tag_count >= 60:
+            trace.add_event("short_content_retry", "skipped", "not_needed")
+            return llm_content, built, content_tag_count, False
+        retry_prompt = (
+            llm_prompt
+            + "\n-----------\n"
+            + "上一次输出的具体内容 tags 太短。请重新输出更完整的英文 Danbooru tags："
+            + "目标 70-120 个具体内容 tags，重点扩写服装结构、材质、纹样、饰品、姿态、表情、手部动作和可见细节。"
+            + "不要输出质量词、画师词、解释或 Markdown。"
+        )
+        try:
+            retry_content = await self._generate_prompt_tags_with_llm(
+                provider_id=provider_id,
+                llm_prompt=retry_prompt,
+                use_deep_thinking=False,
+                fixed_character=prompt_context.use_fixed_character,
+                character_name=prompt_context.fixed_character_name,
+            )
+            retry_content = await self._danbooru_resolver.resolve(
+                llm_content=retry_content,
+                user_prompt=prompt,
+                fixed_character=prompt_context.use_fixed_character,
+            )
+            retry_built = build_final_prompt(
+                user_prompt=prompt,
+                llm_content=retry_content,
+                config=prompt_context.prompt_config,
+                required_core_tags=prompt_context.required_core_tags,
+            )
+            retry_tag_count = len(split_tags(retry_built.content_tags))
+            if retry_tag_count > content_tag_count:
+                trace.add_event("short_content_retry", "improved")
+                return retry_content, retry_built, retry_tag_count, True
+            trace.add_event("short_content_retry", "no_improvement")
+        except Exception as retry_exc:
+            self.logger.warning("[comfyui_agent] prompt builder short-content retry failed: %s", retry_exc)
+            trace.add_event("short_content_retry", "failed", type(retry_exc).__name__)
+        return llm_content, built, content_tag_count, False
+
     async def build(self, event: Any, user_prompt: str, mode: str = "txt2img") -> PromptPipelineResult:
         """Build the final prompt and summary for one generation request.
 
@@ -189,228 +433,83 @@ class PromptPipeline:
             Final prompt plus a serializable summary dict.
         """
         prompt = str(user_prompt or "").strip()
-        summary: dict[str, Any] = {
-            "prompt_optimize_enabled": self._bool("prompt_optimize_enabled", True),
-            "mode": mode,
-            "original_prompt_head": self._shorten(prompt, 600),
-            # Health flags — flipped to False when a stage silently fails.
-            # Consumed by main.py to warn the user that the prompt was NOT
-            # optimised, so they can distinguish "understood + drew badly"
-            # from "LLM died, drew from raw request".
-            "llm_ok": True,
-            "outfit_summary_ok": True,
-        }
-        if not self._bool("prompt_optimize_enabled", True):
-            summary.update(
-                {
-                    "skipped_reason": "prompt_optimize_disabled",
-                    "final_prompt_head": self._shorten(prompt, 600),
-                    "final_prompt_chars": len(prompt),
-                }
-            )
-            return PromptPipelineResult(prompt, summary)
-        raw_mode, raw_prompt = strip_raw_prefix(prompt)
-        if raw_mode:
-            self.logger.info("[comfyui_agent] prompt builder skipped: raw tags mode")
-            summary.update(
-                {
-                    "raw_mode": True,
-                    "skipped_reason": "raw_tags_mode",
-                    "final_prompt_head": self._shorten(raw_prompt, 600),
-                    "final_prompt_chars": len(raw_prompt),
-                }
-            )
-            return PromptPipelineResult(raw_prompt, summary)
-
-        # Fast path: caller pasted a hand-crafted danbooru tag list — skip the
-        # optimiser, web search, and danbooru resolver entirely.
-        if looks_like_danbooru_tags(prompt):
-            self.logger.info("[comfyui_agent] prompt builder skipped: danbooru fast path")
-            summary.update(
-                {
-                    "raw_mode": True,
-                    "danbooru_fast_path": True,
-                    "skipped_reason": "danbooru_tags_detected",
-                    "final_prompt_head": self._shorten(prompt, 600),
-                    "final_prompt_chars": len(prompt),
-                }
-            )
-            return PromptPipelineResult(prompt, summary)
+        trace = PromptBuildTrace(
+            mode=mode,
+            original_prompt=prompt,
+            prompt_optimize_enabled=self._bool("prompt_optimize_enabled", True),
+            shorten=self._shorten,
+        )
+        direct_prompt = self._try_direct_prompt_path(prompt, trace)
+        if direct_prompt is not None:
+            return PromptPipelineResult(direct_prompt, trace.to_summary())
 
         provider_id = await self._current_chat_provider_id(event)
         if not provider_id:
             self.logger.warning("[comfyui_agent] prompt builder has no provider; using original prompt")
-            summary.update(
-                {
-                    "skipped_reason": "no_chat_provider",
-                    "final_prompt_head": self._shorten(prompt, 600),
-                    "final_prompt_chars": len(prompt),
-                }
-            )
-            return PromptPipelineResult(prompt, summary)
+            trace.mark_skipped("no_chat_provider", prompt, stage="provider", status="missing")
+            return PromptPipelineResult(prompt, trace.to_summary())
+        trace.add_event("provider", "ok")
 
-        prompt_config = apply_config_preset(dict(self.config))
-        fixed_character = selected_fixed_character(prompt, prompt_config)
-        fixed_character_name = fixed_character[0] if fixed_character else ""
-        use_fixed_character = fixed_character is not None
-        use_sensual_mode = wants_sensual_mode(prompt, prompt_config)
-        outfit_plan = detect_outfit_transfer(prompt, fixed_character_name)
-        required_core_tags = (
-            self._danbooru_resolver.required_core_tags_for_prompt(prompt) if not use_fixed_character else ()
+        prompt_context = self._prepare_prompt_context(prompt)
+        outfit_context = await self._build_outfit_context(
+            event,
+            prompt,
+            provider_id,
+            prompt_context,
+            trace,
         )
-        self.logger.info(
-            "[comfyui_agent] prompt builder input fixed_character=%s sensual=%s required_core_tags=%s prompt=%s",
-            fixed_character_name or "none",
-            use_sensual_mode,
-            ",".join(required_core_tags) or "none",
-            prompt[:180],
-        )
-        research_plan = self._researcher.plan(prompt)
-        self.logger.info(
-            "[comfyui_agent] prompt strategy web_search=%s deep_thinking=%s search_reason=%s thinking_reason=%s",
-            research_plan.use_web_search,
-            research_plan.use_deep_thinking,
-            research_plan.search_reason or "none",
-            research_plan.thinking_reason or "none",
-        )
-        search_query_prompt = preferred_search_prompt(outfit_plan, prompt)
-        search_context = (
-            await self._researcher.search_context(
-                event,
-                prompt,
-                search_query_prompt=search_query_prompt,
-            )
-            if research_plan.use_web_search
-            else ""
-        )
-        outfit_summary = ""
-        outfit_summary_source = ""
-        reference_tag_text = extract_reference_tag_text(prompt) if outfit_plan.enabled else ""
-        asset_reference_mode = bool(search_context or outfit_plan.enabled or reference_tag_text)
-        if reference_tag_text:
-            outfit_summary = filter_outfit_tags(reference_tag_text, max_tags=42)
-            if outfit_summary:
-                outfit_summary_source = "reference_filter"
-        if outfit_plan.enabled and not outfit_summary and search_context:
-            summary_prompt = build_outfit_summary_prompt(
-                outfit_plan,
-                original_prompt=prompt,
-                source_context=search_context,
-            )
-            try:
-                raw_outfit_summary = await self._generate_outfit_summary_with_llm(
-                    provider_id=provider_id,
-                    summary_prompt=summary_prompt,
-                    use_deep_thinking=research_plan.use_deep_thinking,
-                )
-                outfit_summary = filter_outfit_tags(raw_outfit_summary, max_tags=48)
-                if outfit_summary:
-                    outfit_summary_source = "search_summary"
-                if self._bool("debug_prompt_enabled", False):
-                    self.logger.info("[comfyui_agent] outfit summary LLM output:\n%s", raw_outfit_summary)
-            except Exception as exc:
-                self.logger.warning("[comfyui_agent] outfit summary build failed: %s", exc)
-                summary["outfit_summary_ok"] = False
         llm_prompt = build_llm_prompt(
             prompt,
-            search_context=search_context,
-            fixed_character=use_fixed_character,
-            character_name=fixed_character_name,
-            required_core_tags=required_core_tags,
-            sensual_mode=use_sensual_mode,
-            asset_reference_mode=asset_reference_mode,
+            search_context=outfit_context.search_context,
+            fixed_character=prompt_context.use_fixed_character,
+            character_name=prompt_context.fixed_character_name,
+            required_core_tags=prompt_context.required_core_tags,
+            sensual_mode=prompt_context.use_sensual_mode,
+            asset_reference_mode=outfit_context.asset_reference_mode,
             mode=mode,
             prompt_builder_template=self._str("prompt_builder_template", ""),
-            outfit_transfer_rule=build_outfit_transfer_block(outfit_plan, outfit_summary),
+            outfit_transfer_rule=outfit_context.transfer_rule_block(),
         )
         if self._bool("debug_prompt_enabled", False):
             self.logger.info("[comfyui_agent] prompt builder LLM prompt:\n%s", llm_prompt)
-        try:
-            llm_content = await self._generate_prompt_tags_with_llm(
-                provider_id=provider_id,
-                llm_prompt=llm_prompt,
-                use_deep_thinking=research_plan.use_deep_thinking,
-                fixed_character=use_fixed_character,
-                character_name=fixed_character_name,
-            )
-        except Exception as exc:
-            if not research_plan.use_deep_thinking:
-                self.logger.warning("[comfyui_agent] prompt builder LLM failed: %s", exc)
-                llm_content = ""
-                summary["llm_ok"] = False
-            else:
-                self.logger.warning(
-                    "[comfyui_agent] prompt builder deep thinking failed, retrying without it: %s",
-                    exc,
-                )
-                try:
-                    llm_content = await self._generate_prompt_tags_with_llm(
-                        provider_id=provider_id,
-                        llm_prompt=llm_prompt,
-                        use_deep_thinking=False,
-                        fixed_character=use_fixed_character,
-                        character_name=fixed_character_name,
-                    )
-                except Exception as retry_exc:
-                    self.logger.warning("[comfyui_agent] prompt builder LLM failed: %s", retry_exc)
-                    llm_content = ""
-                    summary["llm_ok"] = False
-
+        llm_content = await self._call_prompt_builder_llm(
+            provider_id=provider_id,
+            llm_prompt=llm_prompt,
+            context=prompt_context,
+            trace=trace,
+        )
         if self._bool("debug_prompt_enabled", False):
             self.logger.info("[comfyui_agent] prompt builder LLM output:\n%s", llm_content)
         llm_content = await self._danbooru_resolver.resolve(
             llm_content=llm_content,
             user_prompt=prompt,
-            fixed_character=use_fixed_character,
+            fixed_character=prompt_context.use_fixed_character,
         )
         built = build_final_prompt(
             user_prompt=prompt,
             llm_content=llm_content,
-            config=prompt_config,
-            required_core_tags=required_core_tags,
+            config=prompt_context.prompt_config,
+            required_core_tags=prompt_context.required_core_tags,
         )
         content_tag_count = len(split_tags(built.content_tags))
-        short_content_retry = False
-        if not built.raw_mode and not asset_reference_mode and content_tag_count < 60:
-            retry_prompt = (
-                llm_prompt
-                + "\n-----------\n"
-                + "上一次输出的具体内容 tags 太短。请重新输出更完整的英文 Danbooru tags："
-                + "目标 70-120 个具体内容 tags，重点扩写服装结构、材质、纹样、饰品、姿态、表情、手部动作和可见细节。"
-                + "不要输出质量词、画师词、解释或 Markdown。"
+        llm_content, built, content_tag_count, short_content_retry = (
+            await self._maybe_retry_short_content(
+                provider_id=provider_id,
+                llm_prompt=llm_prompt,
+                prompt=prompt,
+                llm_content=llm_content,
+                built=built,
+                content_tag_count=content_tag_count,
+                prompt_context=prompt_context,
+                outfit_context=outfit_context,
+                trace=trace,
             )
-            try:
-                retry_content = await self._generate_prompt_tags_with_llm(
-                    provider_id=provider_id,
-                    llm_prompt=retry_prompt,
-                    use_deep_thinking=False,
-                    fixed_character=use_fixed_character,
-                    character_name=fixed_character_name,
-                )
-                retry_content = await self._danbooru_resolver.resolve(
-                    llm_content=retry_content,
-                    user_prompt=prompt,
-                    fixed_character=use_fixed_character,
-                )
-                retry_built = build_final_prompt(
-                    user_prompt=prompt,
-                    llm_content=retry_content,
-                    config=prompt_config,
-                    required_core_tags=required_core_tags,
-                )
-                retry_tag_count = len(split_tags(retry_built.content_tags))
-                if retry_tag_count > content_tag_count:
-                    llm_content = retry_content
-                    built = retry_built
-                    content_tag_count = retry_tag_count
-                    short_content_retry = True
-            except Exception as retry_exc:
-                self.logger.warning("[comfyui_agent] prompt builder short-content retry failed: %s", retry_exc)
+        )
         self.logger.info(
             "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s required_core_tags=%s content_tags=%s content_chars=%s final_chars=%s final_head=%s",
             built.raw_mode,
-            bool(search_context),
-            research_plan.use_deep_thinking,
+            bool(outfit_context.search_context),
+            prompt_context.research_plan.use_deep_thinking,
             built.character_name or "none",
             built.used_sensual_mode,
             built.used_fixed_character,
@@ -421,42 +520,29 @@ class PromptPipeline:
             len(built.final_prompt),
             built.final_prompt[:300],
         )
-        summary.update(
-            {
-                "raw_mode": built.raw_mode,
-                "web_search": bool(search_context),
-                "deep_thinking": research_plan.use_deep_thinking,
-                "search_reason": research_plan.search_reason or "",
-                "thinking_reason": research_plan.thinking_reason or "",
-                "fixed_character": built.used_fixed_character,
-                "fixed_character_name": built.character_name,
-                "sensual_mode": built.used_sensual_mode,
-                "default_style": built.used_default_style,
-                "required_core_tags": list(built.required_core_tags),
-                "outfit_transfer": outfit_plan.enabled,
-                "outfit_transfer_source": outfit_plan.source_subject,
-                "outfit_transfer_target": outfit_plan.target_character,
-                "outfit_summary_source": outfit_summary_source,
-                "outfit_summary_chars": len(outfit_summary),
-                "asset_reference_mode": asset_reference_mode,
-                "llm_content_tag_count": content_tag_count,
-                "short_content_retry": short_content_retry,
-                "llm_content_chars": len(built.content_tags),
-                "final_prompt_chars": len(built.final_prompt),
-                "final_prompt_head": self._shorten(built.final_prompt, 600),
-                "prompt_builder_template_customized": bool(
-                    self._str("prompt_builder_template", "").strip()
-                ),
-            }
+        trace.mark_final(
+            built=built,
+            web_search=bool(outfit_context.search_context),
+            deep_thinking=prompt_context.research_plan.use_deep_thinking,
+            search_reason=prompt_context.research_plan.search_reason or "",
+            thinking_reason=prompt_context.research_plan.thinking_reason or "",
+            outfit_plan=prompt_context.outfit_plan,
+            outfit_summary_source=outfit_context.outfit_summary_source,
+            outfit_summary=outfit_context.outfit_summary,
+            asset_reference_mode=outfit_context.asset_reference_mode,
+            content_tag_count=content_tag_count,
+            short_content_retry=short_content_retry,
+            prompt_builder_template_customized=bool(
+                self._str("prompt_builder_template", "").strip()
+            ),
+            final_prompt_head=self._shorten(built.final_prompt, 600),
         )
         if self._bool("debug_prompt_enabled", False):
             self.logger.info("[comfyui_agent] prompt builder final prompt:\n%s", built.final_prompt)
-            summary.update(
-                {
-                    "llm_prompt": llm_prompt,
-                    "outfit_summary": outfit_summary,
-                    "llm_content": llm_content,
-                    "final_prompt": built.final_prompt,
-                }
+            trace.add_debug_payload(
+                llm_prompt=llm_prompt,
+                outfit_summary=outfit_context.outfit_summary,
+                llm_content=llm_content,
+                final_prompt=built.final_prompt,
             )
-        return PromptPipelineResult(built.final_prompt, summary)
+        return PromptPipelineResult(built.final_prompt, trace.to_summary())

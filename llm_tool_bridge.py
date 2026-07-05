@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+try:
+    from .capability_catalog import capability_ids
+except Exception:  # pragma: no cover - fallback for direct script-style imports.
+    from capability_catalog import capability_ids
+
 
 class LLMToolBridge:
     """Bridge AstrBot LLM tool methods to Anima plugin services."""
@@ -42,7 +47,7 @@ class LLMToolBridge:
         Returns:
             Compact English status text for the model.
         """
-        payload = await self._run_tool(["status"])
+        payload = await self._status_payload()
         if not payload.get("ok"):
             return f"ComfyUI status failed: {payload.get('error')}"
         return (
@@ -57,6 +62,13 @@ class LLMToolBridge:
             f"clip_available={payload.get('clip_available')}, "
             f"vae_available={payload.get('vae_available')}"
         )
+
+    async def _status_payload(self) -> dict[str, Any]:
+        return await self._run_tool(["status"])
+
+    def capability_names(self) -> set[str]:
+        """Return capability ids currently backed by this bridge."""
+        return capability_ids()
 
     async def generate(
         self,
@@ -82,6 +94,27 @@ class LLMToolBridge:
         Returns:
             Generation result summary.
         """
+        return await self._invoke_generate(
+            event,
+            prompt,
+            width=width,
+            height=height,
+            steps=steps,
+            cfg=cfg,
+            negative_prompt=negative_prompt,
+        )
+
+    async def _invoke_generate(
+        self,
+        event: Any,
+        prompt: str,
+        *,
+        width: int | None = None,
+        height: int | None = None,
+        steps: int | None = None,
+        cfg: float | None = None,
+        negative_prompt: str | None = None,
+    ) -> str:
         return await self._generate(
             event,
             prompt,
@@ -102,6 +135,9 @@ class LLMToolBridge:
         Returns:
             Edit result summary.
         """
+        return await self._invoke_edit(event, prompt)
+
+    async def _invoke_edit(self, event: Any, prompt: str) -> str:
         return await self._edit(event, prompt)
 
     async def remove_bg(self, event: Any) -> str:
@@ -113,6 +149,9 @@ class LLMToolBridge:
         Returns:
             Background removal result summary.
         """
+        return await self._invoke_remove_bg(event)
+
+    async def _invoke_remove_bg(self, event: Any) -> str:
         return await self._remove_bg(event)
 
     async def extract_prompt(self, event: Any) -> str:
@@ -124,6 +163,9 @@ class LLMToolBridge:
         Returns:
             Extracted prompt information.
         """
+        return await self._invoke_spell(event)
+
+    async def _invoke_spell(self, event: Any) -> str:
         return await self._spell(event)
 
     async def reverse_prompt(self, event: Any) -> str:
@@ -135,4 +177,11 @@ class LLMToolBridge:
         Returns:
             Reverse prompt tags or an error summary.
         """
+        return await self._invoke_reverse(event)
+
+    async def _invoke_reverse(self, event: Any) -> str:
         return await self._reverse(event)
+
+    async def upscale(self, event: Any) -> str:
+        """Return the chat-side disabled response for upscale capability."""
+        return "放大功能已关闭。"

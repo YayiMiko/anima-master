@@ -3,6 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Callable
 
+try:
+    from .task_summary import build_strategy_summary
+except Exception:  # pragma: no cover - fallback for direct script-style imports.
+    from task_summary import build_strategy_summary
+
 
 class GenerationTaskRunner:
     """Orchestrate one text-to-image generation task."""
@@ -146,7 +151,9 @@ class GenerationTaskRunner:
         task["reference_context_applied"] = reference_requested and prompt != original_prompt
         prompt = self._augment_quoted_spell(event, prompt)
         prompt = await self._build_prompt(event, prompt)
-        task["prompt_summary"] = dict(self._prompt_summary())
+        prompt_summary = dict(self._prompt_summary())
+        task["prompt_summary"] = prompt_summary
+        task["strategy_summary"] = build_strategy_summary(task, prompt_summary)
         args = ["generate", "--prompt", prompt]
         if width:
             args.extend(["--width", str(int(width))])

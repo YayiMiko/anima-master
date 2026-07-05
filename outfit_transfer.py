@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import re
 
 try:
@@ -226,6 +226,45 @@ class OutfitTransferPlan:
     directive_prompt: str = ""
 
 
+@dataclass(frozen=True)
+class OutfitTransferContext:
+    """Resolved outfit-transfer state used by the prompt pipeline."""
+
+    plan: OutfitTransferPlan
+    search_context: str = ""
+    reference_tag_text: str = ""
+    outfit_summary: str = ""
+    outfit_summary_source: str = ""
+    asset_reference_mode: bool = False
+    forbidden_identity_features: tuple[str, ...] = _IDENTITY_HINTS
+
+    @property
+    def enabled(self) -> bool:
+        return self.plan.enabled
+
+    def with_outfit_summary(self, outfit_summary: str, source: str) -> "OutfitTransferContext":
+        """Return a copy with a resolved outfit summary."""
+        return replace(
+            self,
+            outfit_summary=str(outfit_summary or "").strip(),
+            outfit_summary_source=str(source or "").strip(),
+        )
+
+    def with_filtered_outfit_summary(
+        self,
+        text: str,
+        source: str,
+        *,
+        max_tags: int = 48,
+    ) -> "OutfitTransferContext":
+        """Return a copy with outfit-only tags filtered from text."""
+        return self.with_outfit_summary(filter_outfit_tags(text, max_tags=max_tags), source)
+
+    def transfer_rule_block(self) -> str:
+        """Render the LLM rule block for this transfer context."""
+        return build_outfit_transfer_block(self.plan, self.outfit_summary)
+
+
 def detect_outfit_transfer(prompt: str, fixed_character_name: str = "") -> OutfitTransferPlan:
     """Detect the "source outfit -> target character" task pattern."""
     text = str(prompt or "").strip()
@@ -248,6 +287,30 @@ def detect_outfit_transfer(prompt: str, fixed_character_name: str = "") -> Outfi
         source_from_reference=source_from_reference,
         source_from_search=source_from_search,
         directive_prompt=directive,
+    )
+
+
+def build_outfit_transfer_context(
+    plan: OutfitTransferPlan,
+    *,
+    prompt: str,
+    search_context: str = "",
+) -> OutfitTransferContext:
+    """Build the non-LLM outfit transfer context for a prompt."""
+    reference_tag_text = extract_reference_tag_text(prompt) if plan.enabled else ""
+    outfit_summary = ""
+    outfit_summary_source = ""
+    if reference_tag_text:
+        outfit_summary = filter_outfit_tags(reference_tag_text, max_tags=42)
+        if outfit_summary:
+            outfit_summary_source = "reference_filter"
+    return OutfitTransferContext(
+        plan=plan,
+        search_context=str(search_context or ""),
+        reference_tag_text=reference_tag_text,
+        outfit_summary=outfit_summary,
+        outfit_summary_source=outfit_summary_source,
+        asset_reference_mode=bool(search_context or plan.enabled or reference_tag_text),
     )
 
 

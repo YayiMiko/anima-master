@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import re
 from typing import Any, Callable
 
@@ -65,6 +66,24 @@ class CommandActionHandler:
         self._format_spell_payload = format_spell_payload
         self._bool = get_bool
         self._shorten = shorten
+        self._action_dispatch = {
+            "help": self._handle_help,
+            "status": self._handle_status,
+            "debug_status": self._handle_debug_status,
+            "set_artist_tags": self._handle_set_artist_tags,
+            "create_artist_preset": self._handle_create_artist_preset,
+            "append_artist_tags": self._handle_append_artist_tags,
+            "use_artist_preset": self._handle_use_artist_preset,
+            "list_artist_presets": self._handle_list_artist_presets,
+            "delete_artist_preset": self._handle_delete_artist_preset,
+            "add_fixed_character": self._handle_add_fixed_character,
+            "generate": self._handle_generate,
+            "edit": self._handle_edit,
+            "disabled_upscale": self._handle_disabled_upscale,
+            "disabled_remove_bg": self._handle_disabled_remove_bg,
+            "spell": self._handle_spell,
+            "reverse": self._handle_reverse,
+        }
 
     def _persist_config_key(self, key: str, value: Any) -> None:
         self.config[key] = value
@@ -293,6 +312,63 @@ class CommandActionHandler:
     async def remove_bg(self, event: Any) -> str:
         return "去背景功能暂未开放。当前先保留文生图、法术解析和图片反推主线。"
 
+    def _handle_help(self, event: Any, prompt: str) -> str:
+        return help_text(self._bool("img2img_enabled", False))
+
+    async def _handle_status(self, event: Any, prompt: str) -> str:
+        return self.status_text(await self._run_tool(["status"]))
+
+    def _handle_debug_status(self, event: Any, prompt: str) -> str:
+        return self._task_recorder.debug_status_text(self.config)
+
+    def _handle_set_artist_tags(self, event: Any, prompt: str) -> str:
+        return self.set_artist_tags(prompt)
+
+    def _handle_create_artist_preset(self, event: Any, prompt: str) -> str:
+        return self.create_artist_preset(prompt)
+
+    def _handle_append_artist_tags(self, event: Any, prompt: str) -> str:
+        return self.append_artist_tags(prompt)
+
+    def _handle_use_artist_preset(self, event: Any, prompt: str) -> str:
+        return self.use_artist_preset(prompt)
+
+    def _handle_list_artist_presets(self, event: Any, prompt: str) -> str:
+        return self.list_artist_presets()
+
+    def _handle_delete_artist_preset(self, event: Any, prompt: str) -> str:
+        return self.delete_artist_preset(prompt)
+
+    def _handle_add_fixed_character(self, event: Any, prompt: str) -> str:
+        return self.add_fixed_character(prompt)
+
+    async def _handle_generate(self, event: Any, prompt: str) -> str | None:
+        if not prompt:
+            return "请在后面写完整 prompt 或 tags。"
+        await self._generate(event, prompt)
+        return None
+
+    async def _handle_edit(self, event: Any, prompt: str) -> str:
+        if not prompt:
+            return "请在后面写改图 prompt。"
+        return await self.edit(event, prompt)
+
+    def _handle_disabled_upscale(self, event: Any, prompt: str) -> str:
+        return "放大功能已关闭。"
+
+    async def _handle_disabled_remove_bg(self, event: Any, prompt: str) -> str:
+        return await self.remove_bg(event)
+
+    async def _handle_spell(self, event: Any, prompt: str) -> str:
+        return await self.spell(event)
+
+    async def _handle_reverse(self, event: Any, prompt: str) -> str:
+        return await self.reverse(event)
+
+    def action_names(self) -> set[str]:
+        """Return action keys currently handled by this dispatcher."""
+        return set(self._action_dispatch.keys())
+
     async def handle_action(self, event: Any, action: str, prompt: str) -> str | None:
         """Handle one parsed command action.
 
@@ -307,41 +383,10 @@ class CommandActionHandler:
         """
         if not self._is_allowed(event):
             return "ComfyUI 助手已关闭，或当前用户没有使用权限。"
-        if action == "help":
-            return help_text(self._bool("img2img_enabled", False))
-        if action == "status":
-            return self.status_text(await self._run_tool(["status"]))
-        if action == "debug_status":
-            return self._task_recorder.debug_status_text(self.config)
-        if action == "set_artist_tags":
-            return self.set_artist_tags(prompt)
-        if action == "create_artist_preset":
-            return self.create_artist_preset(prompt)
-        if action == "append_artist_tags":
-            return self.append_artist_tags(prompt)
-        if action == "use_artist_preset":
-            return self.use_artist_preset(prompt)
-        if action == "list_artist_presets":
-            return self.list_artist_presets()
-        if action == "delete_artist_preset":
-            return self.delete_artist_preset(prompt)
-        if action == "add_fixed_character":
-            return self.add_fixed_character(prompt)
-        if action == "generate":
-            if not prompt:
-                return "请在后面写完整 prompt 或 tags。"
-            await self._generate(event, prompt)
-            return None
-        if action == "edit":
-            if not prompt:
-                return "请在后面写改图 prompt。"
-            return await self.edit(event, prompt)
-        if action == "disabled_upscale":
-            return "放大功能已关闭。"
-        if action == "disabled_remove_bg":
-            return await self.remove_bg(event)
-        if action == "spell":
-            return await self.spell(event)
-        if action == "reverse":
-            return await self.reverse(event)
-        return "未知 Anima 指令。"
+        handler = self._action_dispatch.get(action)
+        if handler is None:
+            return "未知 Anima 指令。"
+        result = handler(event, prompt)
+        if inspect.isawaitable(result):
+            return await result
+        return result
