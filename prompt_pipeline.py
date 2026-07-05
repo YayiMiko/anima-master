@@ -18,6 +18,7 @@ try:
     )
     from .prompt_presets import (
         apply_config_preset,
+        looks_like_danbooru_tags,
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
@@ -40,6 +41,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
     )
     from prompt_presets import (
         apply_config_preset,
+        looks_like_danbooru_tags,
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
@@ -191,6 +193,12 @@ class PromptPipeline:
             "prompt_optimize_enabled": self._bool("prompt_optimize_enabled", True),
             "mode": mode,
             "original_prompt_head": self._shorten(prompt, 600),
+            # Health flags — flipped to False when a stage silently fails.
+            # Consumed by main.py to warn the user that the prompt was NOT
+            # optimised, so they can distinguish "understood + drew badly"
+            # from "LLM died, drew from raw request".
+            "llm_ok": True,
+            "outfit_summary_ok": True,
         }
         if not self._bool("prompt_optimize_enabled", True):
             summary.update(
@@ -213,6 +221,21 @@ class PromptPipeline:
                 }
             )
             return PromptPipelineResult(raw_prompt, summary)
+
+        # Fast path: caller pasted a hand-crafted danbooru tag list — skip the
+        # optimiser, web search, and danbooru resolver entirely.
+        if looks_like_danbooru_tags(prompt):
+            self.logger.info("[comfyui_agent] prompt builder skipped: danbooru fast path")
+            summary.update(
+                {
+                    "raw_mode": True,
+                    "danbooru_fast_path": True,
+                    "skipped_reason": "danbooru_tags_detected",
+                    "final_prompt_head": self._shorten(prompt, 600),
+                    "final_prompt_chars": len(prompt),
+                }
+            )
+            return PromptPipelineResult(prompt, summary)
 
         provider_id = await self._current_chat_provider_id(event)
         if not provider_id:
@@ -263,6 +286,7 @@ class PromptPipeline:
         outfit_summary = ""
         outfit_summary_source = ""
         reference_tag_text = extract_reference_tag_text(prompt) if outfit_plan.enabled else ""
+        asset_reference_mode = bool(search_context or outfit_plan.enabled or reference_tag_text)
         if reference_tag_text:
             outfit_summary = filter_outfit_tags(reference_tag_text, max_tags=42)
             if outfit_summary:
@@ -286,12 +310,15 @@ class PromptPipeline:
                     self.logger.info("[comfyui_agent] outfit summary LLM output:\n%s", raw_outfit_summary)
             except Exception as exc:
                 self.logger.warning("[comfyui_agent] outfit summary build failed: %s", exc)
+                summary["outfit_summary_ok"] = False
         llm_prompt = build_llm_prompt(
             prompt,
             search_context=search_context,
             fixed_character=use_fixed_character,
             character_name=fixed_character_name,
+            required_core_tags=required_core_tags,
             sensual_mode=use_sensual_mode,
+            asset_reference_mode=asset_reference_mode,
             mode=mode,
             prompt_builder_template=self._str("prompt_builder_template", ""),
             outfit_transfer_rule=build_outfit_transfer_block(outfit_plan, outfit_summary),
@@ -310,6 +337,7 @@ class PromptPipeline:
             if not research_plan.use_deep_thinking:
                 self.logger.warning("[comfyui_agent] prompt builder LLM failed: %s", exc)
                 llm_content = ""
+                summary["llm_ok"] = False
             else:
                 self.logger.warning(
                     "[comfyui_agent] prompt builder deep thinking failed, retrying without it: %s",
@@ -326,6 +354,7 @@ class PromptPipeline:
                 except Exception as retry_exc:
                     self.logger.warning("[comfyui_agent] prompt builder LLM failed: %s", retry_exc)
                     llm_content = ""
+                    summary["llm_ok"] = False
 
         if self._bool("debug_prompt_enabled", False):
             self.logger.info("[comfyui_agent] prompt builder LLM output:\n%s", llm_content)
@@ -342,7 +371,7 @@ class PromptPipeline:
         )
         content_tag_count = len(split_tags(built.content_tags))
         short_content_retry = False
-        if not built.raw_mode and content_tag_count < 60:
+        if not built.raw_mode and not asset_reference_mode and content_tag_count < 60:
             retry_prompt = (
                 llm_prompt
                 + "\n-----------\n"
@@ -409,6 +438,7 @@ class PromptPipeline:
                 "outfit_transfer_target": outfit_plan.target_character,
                 "outfit_summary_source": outfit_summary_source,
                 "outfit_summary_chars": len(outfit_summary),
+                "asset_reference_mode": asset_reference_mode,
                 "llm_content_tag_count": content_tag_count,
                 "short_content_retry": short_content_retry,
                 "llm_content_chars": len(built.content_tags),

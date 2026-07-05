@@ -282,10 +282,10 @@
     }
   },
   "default_artist_tags": {
-    "description": "备用画师 tags",
+    "description": "默认画师组",
     "type": "string",
     "default": "",
-    "hint": "通常不用填；只有未启用画师组时才会读取这里。示例：@artist_a, @artist_b,",
+    "hint": "通常不用填；只有没有启用任何画师组时才会读取这里。示例：@artist_a, @artist_b,",
     "collapsed": true
   },
   "artist_presets": {
@@ -302,7 +302,7 @@
     "description": "启用的画师组",
     "type": "string",
     "default": "",
-    "hint": "必须与已保存的画师组名称完全一致。推荐在聊天里用 /anm 切换画师组 名称；手填时注意不要多空格。优先级高于默认画师 tags。示例：千代风格"
+    "hint": "必须与已保存的画师组名称完全一致。推荐在聊天里用 /anm 切换画师组 名称；手填时注意不要多空格。优先级高于默认画师组。示例：千代风格"
   },
   "sensual_mode_enabled": {
     "description": "涩气表现力优化",
@@ -441,17 +441,17 @@
     }
   },
   "auto_start": {
-    "description": "由 AstrBot 启动 ComfyUI",
+    "description": "由 AstrBot 拉起 ComfyUI",
     "type": "bool",
     "default": false,
-    "hint": "高级选项。默认关闭。关闭时请用绘世启动器、ComfyUI portable 或自己的方式先启动 ComfyUI；开启后必须填写下面的启动命令。不是开机自启。",
+    "hint": "高级选项。默认关闭。关闭时请先用绘世启动器、ComfyUI portable 或自己的方式启动 ComfyUI；开启后必须填写下面的启动命令。它不是开机自启。",
     "collapsed": true
   },
   "startup_command": {
-    "description": "启动命令（开启上项后必填）",
+    "description": "启动 ComfyUI 的命令（开启上项后必填）",
     "type": "string",
     "default": "",
-    "hint": "仅在开启“由 AstrBot 启动 ComfyUI”后必填。这里要填能直接启动 ComfyUI 服务的命令，例如 ComfyUI portable 的 run_nvidia_gpu.bat。绘世启动器如果只是打开启动器界面，仍需要你在启动器里启动 ComfyUI。",
+    "hint": "仅在开启“由 AstrBot 拉起 ComfyUI”后必填。这里要填能直接启动 ComfyUI 服务的命令，例如 ComfyUI portable 的 run_nvidia_gpu.bat。绘世启动器如果只是打开启动器界面，仍需要你在启动器里手动启动 ComfyUI。",
     "condition": {
       "auto_start": true
     }

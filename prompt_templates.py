@@ -14,7 +14,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是 Anima 模型的 Danbooru tags 设计助�
 - 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。
 - 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。
 - 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。
-- 具体内容段默认应当足够厚实，常规输出 70-120 个内容 tags；如果前缀已经包含质量词、固定角色和画师词，具体内容段的长度建议接近前缀长度的 2 倍左右。
+- 普通文生图时，具体内容段默认应当足够厚实，常规输出 70-120 个内容 tags；如果前缀已经包含质量词、固定角色和画师词，具体内容段的长度建议接近前缀长度的 2 倍左右。
 - 请把主题拆成多层可见细节：主体类型、体型/年龄感、发型变化、服装主件、内外层、领口、袖型、腰部结构、裙摆/裤装、鞋袜、材质、纹样、金属件、饰品、手部动作、肢体姿态、表情、视线、道具和少量画面稳定 tags。
 - 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。
 - 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。
@@ -27,6 +27,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是 Anima 模型的 Danbooru tags 设计助�
 即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。
 {search_block}
 {outfit_transfer_rule}
+{asset_reference_rule}
 {reference_rule}
 {img2img_rule}
 {sensual_rule}
@@ -53,7 +54,9 @@ def build_llm_prompt(
     search_context: str = "",
     fixed_character: bool = False,
     character_name: str = "",
+    required_core_tags: tuple[str, ...] = (),
     sensual_mode: bool = False,
+    asset_reference_mode: bool = False,
     mode: str = "txt2img",
     prompt_builder_template: str = "",
     outfit_transfer_rule: str = "",
@@ -61,10 +64,18 @@ def build_llm_prompt(
     """Build the prompt sent to the chat LLM for Danbooru tag generation."""
     theme = str(theme or "").strip()
     search_context = str(search_context or "").strip()
+    core_tags = tuple(str(tag or "").strip() for tag in required_core_tags if str(tag or "").strip())
     if character_name:
         character_rule = (
             f"最终 prompt 前缀中会拼接固定角色“{character_name}”的角色词，"
             "因此具体内容段不要重复列出该角色的固有发色、瞳色、种族和固定配饰。"
+        )
+    elif core_tags:
+        character_rule = (
+            "最终 prompt 前缀中会拼接已校正的核心角色 tag："
+            + ", ".join(core_tags)
+            + "。请把这些核心角色 tag 视为唯一主体身份；具体内容段可以补充该角色的可见外观，"
+            "但不要输出任何其它角色名 tag，不要把角色猜成另一个角色，也不要添加与该角色冲突的固有外观。"
         )
     else:
         character_rule = (
@@ -109,6 +120,20 @@ def build_llm_prompt(
 这是非 R18 的擦边表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、暧昧姿势等视觉方向。
 不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。
 """
+    asset_reference_rule = ""
+    if asset_reference_mode:
+        asset_reference_rule = """
+-----------
+本次涉及引用其它美术资产，例如引用图、联网检索到的角色资料、官方立绘或服装迁移参考。
+请优先忠实整理已有视觉信息，内容 tags 保持自然、够用即可。
+不要为了追求长度硬凑到“前缀两倍”或固定数量，也不要为了扩写而擅自加入无关服装、配饰、世界观元素或额外风格主题。
+如果参考资料已经给出了足够明确的服装、配色、装饰和结构，就以准确还原为优先。
+"""
+    if outfit_transfer_rule:
+        asset_reference_rule += """
+如果本次同时涉及“把某角色的衣服穿到固定角色身上”，请只迁移服装、材质、配色、饰品和可穿用外观元素。
+不要把来源角色的名字、角色标签、发色、瞳色、种族、耳尾角翼、年龄感或体型一起写进最终内容 tags。
+"""
     configured_template = str(prompt_builder_template or "").strip()
     template = (
         DEFAULT_LLM_PROMPT_TEMPLATE
@@ -120,6 +145,7 @@ def build_llm_prompt(
         "character_rule": character_rule,
         "search_block": search_block,
         "outfit_transfer_rule": str(outfit_transfer_rule or "").strip(),
+        "asset_reference_rule": asset_reference_rule,
         "reference_rule": reference_rule,
         "img2img_rule": img2img_rule,
         "style_block": "",

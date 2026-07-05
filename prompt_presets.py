@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -314,6 +315,64 @@ def strip_raw_prefix(prompt: str) -> tuple[bool, str]:
         if lowered.startswith(prefix.lower()):
             return True, text[len(prefix) :].strip(" ，,：:")
     return False, text
+
+
+# Signature danbooru-style tokens whose presence strongly suggests the user has
+# already produced a curated tag list rather than a Chinese chat sentence.
+_DANBOORU_SIGNATURE_TAGS = (
+    "1girl", "2girls", "1boy", "2boys", "solo", "solo focus",
+    "masterpiece", "best quality", "highres", "absurdres", "ultra detailed",
+    "score_9", "score_8_up", "score_7_up", "score_6_up",
+    "safe", "nsfw", "sensitive", "questionable", "explicit",
+    "looking at viewer", "upper body", "cowboy shot", "full body",
+    "detailed background", "simple background", "white background",
+)
+
+
+def looks_like_danbooru_tags(prompt: str) -> bool:
+    """Whether ``prompt`` looks like a hand-crafted danbooru tag list.
+
+    Used as a fast-path: when a user pastes real tags we skip the prompt
+    optimiser, web search, and danbooru core-tag resolver entirely, and hand
+    the string straight to ComfyUI. The check is intentionally conservative
+    — false positives silently disable optimisation, so every gate must fire.
+
+    Gates (all must hold):
+        1. Length >= 60 chars (chat sentences are rarely that long).
+        2. At least 6 comma-separated segments (roughly 6 tags).
+        3. At least 70% of the non-whitespace characters are ASCII
+           (Chinese chat is mostly CJK).
+        4. At least one danbooru "signature" token, ``_``-joined compound
+           tag (``long_hair``), or ``(weight:1.2)`` style bracket appears.
+
+    Args:
+        prompt: Raw user prompt.
+
+    Returns:
+        True when the string looks like a tag dump, False otherwise.
+    """
+    text = str(prompt or "").strip()
+    if len(text) < 60:
+        return False
+    segments = [seg.strip() for seg in text.split(",") if seg.strip()]
+    if len(segments) < 6:
+        return False
+    non_ws = [ch for ch in text if not ch.isspace()]
+    if not non_ws:
+        return False
+    ascii_count = sum(1 for ch in non_ws if ord(ch) < 128)
+    if ascii_count / len(non_ws) < 0.70:
+        return False
+    lowered = text.lower()
+    if any(tag in lowered for tag in _DANBOORU_SIGNATURE_TAGS):
+        return True
+    # Compound underscore tags like `blue_hair` or weight brackets like
+    # `(masterpiece:1.2)` are also strong danbooru indicators.
+    if re.search(r"[a-z]+_[a-z]+", lowered):
+        return True
+    if re.search(r"\([^)]{2,40}:[0-9.]+\)", lowered):
+        return True
+    return False
 
 
 def wants_default_style(prompt: str, default: bool = True) -> bool:

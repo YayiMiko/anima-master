@@ -105,6 +105,7 @@ def build_final_prompt(
         strip_character_tags=use_character,
         protected_core_tags=required_core_tags,
         allow_multi_character=allow_multi_character,
+        strip_unprotected_character_names=bool(required_core_tags) and not allow_multi_character,
     )
     parts = [quality]
     if required_core_tags:

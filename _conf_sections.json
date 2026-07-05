@@ -12,7 +12,7 @@
     {
       "key": "anima_master_comfyui_connection",
       "description": "ComfyUI 连接",
-      "hint": "用于连接 ComfyUI。通常请先用绘世启动器、ComfyUI portable 或自己的方式启动 ComfyUI；插件工作流类型不是 ComfyUI 本地保存的工作流名称。只有开启“由 AstrBot 启动 ComfyUI”后，启动命令才需要填写。",
+      "hint": "用于连接 ComfyUI。多数用户先用绘世启动器、ComfyUI portable 或自己的方式手动启动 ComfyUI 就可以；只有打开“由 AstrBot 拉起 ComfyUI”时，启动命令才需要填写。",
       "items": [
         "comfyui_base_url",
         "workflow",

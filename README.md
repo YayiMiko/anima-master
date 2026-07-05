@@ -22,7 +22,7 @@ Anima 绘图大师是一个 AstrBot 插件，用来把聊天里的自然语言�
 - `/anm` 文生图。
 - 自然语言自动优化为 Danbooru tags。
 - 原样 tags 模式。
-- 固定角色、默认画风、画师 tags。
+- 固定角色、画师组和风格控制。
 - 少量联网搜索，用于补充角色外观和服装参考。
 - Danbooru / Safebooru 核心角色 tag 校正。
 - 图片法术解析。
@@ -49,7 +49,7 @@ vae_name = 你的 VAE 文件名
 
 `127.0.0.1` 指 AstrBot 所在机器。如果 AstrBot 和 ComfyUI 不在同一台设备上，请填写 AstrBot 能访问到的局域网或 Tailscale 地址。
 
-多数用户可以先用绘世启动器、ComfyUI portable 或自己的脚本手动启动 ComfyUI。只有开启“由 AstrBot 启动 ComfyUI”时，才必须填写 `startup_command`；不开这个功能时，不需要启动命令。
+多数用户可以先用绘世启动器、ComfyUI portable 或自己的脚本手动启动 ComfyUI。只有开启“由 AstrBot 拉起 ComfyUI”时，才必须填写 `startup_command`；不开这个功能时，不需要启动命令。
 
 ## 常用指令
 
@@ -70,9 +70,9 @@ vae_name = 你的 VAE 文件名
 
 - `ComfyUI 连接`
 - `出图参数`
-- `提示词优化`
+- `自然语言优化`
 
-能稳定出图后，再根据需要调整角色、画风、联网搜索、由 AstrBot 启动 ComfyUI 和排查项。
+能稳定出图后，再根据需要调整角色、画师组、联网搜索、由 AstrBot 拉起 ComfyUI 和排查项。
 
 插件配置页会默认把较少使用的项目收进“更多配置”。如果你想做高度自定义，可以对照：
 

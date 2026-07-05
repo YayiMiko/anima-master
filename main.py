@@ -173,7 +173,14 @@ class ComfyUIAgentPlugin(Star):
             cfg=cfg,
             negative_prompt=negative_prompt,
         )
-        return await self._send_payload(event, payload)
+        message = await self._send_payload(event, payload)
+        # Surface silent prompt-optimiser failures to the user so they know
+        # the image was drawn from the raw request, not the crafted tags.
+        if payload.get("ok") and not self._last_prompt_summary.get("llm_ok", True):
+            await event.send(event.plain_result(
+                "（提示词优化这次没走通，是拿你的原文直接画的，可能不太准。要重画就再说一次。）"
+            ))
+        return message
 
     async def _edit(self, event: AstrMessageEvent, prompt: str) -> str:
         return await self._action_handler.edit(event, prompt)

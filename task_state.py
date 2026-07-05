@@ -1,4 +1,7 @@
 import json
+import os
+import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -46,10 +49,43 @@ class TaskRecorder:
         """
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(
-                json.dumps(task, ensure_ascii=False, indent=2),
-                encoding="utf-8",
+            payload = json.dumps(task, ensure_ascii=False, indent=2)
+            # Atomic write: dump into a same-directory tempfile, fsync, then
+            # os.replace onto the target. os.replace is atomic on both POSIX
+            # and Windows, so a concurrent writer or crash can never leave
+            # last_task.json half-written.
+            fd, tmp_path = tempfile.mkstemp(
+                prefix=self.path.name + ".",
+                suffix=".tmp",
+                dir=str(self.path.parent),
             )
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    fh.write(payload)
+                    fh.flush()
+                    os.fsync(fh.fileno())
+                # Windows quirk: os.replace fails with PermissionError if the
+                # target is currently opened by another process (e.g. a reader
+                # via read_text()). Retry a few times with a tiny backoff so
+                # occasional read/write collisions don't drop the update.
+                last_exc: Exception | None = None
+                for attempt in range(5):
+                    try:
+                        os.replace(tmp_path, self.path)
+                        last_exc = None
+                        break
+                    except PermissionError as exc:
+                        last_exc = exc
+                        time.sleep(0.02 * (attempt + 1))
+                if last_exc is not None:
+                    raise last_exc
+            except Exception:
+                # Clean up the stray tempfile on any mid-write failure.
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
         except Exception as exc:
             self._logger.warning("[comfyui_agent] failed to write last task summary: %s", exc)
 
