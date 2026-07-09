@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 import re
 
 try:
-    from .danbooru_tags import KNOWN_CORE_ALIASES
     from .tag_cleaner import normalize_tag_key, split_tags
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
-    from danbooru_tags import KNOWN_CORE_ALIASES
     from tag_cleaner import normalize_tag_key, split_tags
 
 
@@ -226,45 +224,6 @@ class OutfitTransferPlan:
     directive_prompt: str = ""
 
 
-@dataclass(frozen=True)
-class OutfitTransferContext:
-    """Resolved outfit-transfer state used by the prompt pipeline."""
-
-    plan: OutfitTransferPlan
-    search_context: str = ""
-    reference_tag_text: str = ""
-    outfit_summary: str = ""
-    outfit_summary_source: str = ""
-    asset_reference_mode: bool = False
-    forbidden_identity_features: tuple[str, ...] = _IDENTITY_HINTS
-
-    @property
-    def enabled(self) -> bool:
-        return self.plan.enabled
-
-    def with_outfit_summary(self, outfit_summary: str, source: str) -> "OutfitTransferContext":
-        """Return a copy with a resolved outfit summary."""
-        return replace(
-            self,
-            outfit_summary=str(outfit_summary or "").strip(),
-            outfit_summary_source=str(source or "").strip(),
-        )
-
-    def with_filtered_outfit_summary(
-        self,
-        text: str,
-        source: str,
-        *,
-        max_tags: int = 48,
-    ) -> "OutfitTransferContext":
-        """Return a copy with outfit-only tags filtered from text."""
-        return self.with_outfit_summary(filter_outfit_tags(text, max_tags=max_tags), source)
-
-    def transfer_rule_block(self) -> str:
-        """Render the LLM rule block for this transfer context."""
-        return build_outfit_transfer_block(self.plan, self.outfit_summary)
-
-
 def detect_outfit_transfer(prompt: str, fixed_character_name: str = "") -> OutfitTransferPlan:
     """Detect the "source outfit -> target character" task pattern."""
     text = str(prompt or "").strip()
@@ -290,30 +249,6 @@ def detect_outfit_transfer(prompt: str, fixed_character_name: str = "") -> Outfi
     )
 
 
-def build_outfit_transfer_context(
-    plan: OutfitTransferPlan,
-    *,
-    prompt: str,
-    search_context: str = "",
-) -> OutfitTransferContext:
-    """Build the non-LLM outfit transfer context for a prompt."""
-    reference_tag_text = extract_reference_tag_text(prompt) if plan.enabled else ""
-    outfit_summary = ""
-    outfit_summary_source = ""
-    if reference_tag_text:
-        outfit_summary = filter_outfit_tags(reference_tag_text, max_tags=42)
-        if outfit_summary:
-            outfit_summary_source = "reference_filter"
-    return OutfitTransferContext(
-        plan=plan,
-        search_context=str(search_context or ""),
-        reference_tag_text=reference_tag_text,
-        outfit_summary=outfit_summary,
-        outfit_summary_source=outfit_summary_source,
-        asset_reference_mode=bool(search_context or plan.enabled or reference_tag_text),
-    )
-
-
 def preferred_search_prompt(plan: OutfitTransferPlan, prompt: str) -> str:
     """Return a search-focused prompt for outfit transfer tasks."""
     if not plan.enabled or not plan.source_from_search:
@@ -322,47 +257,7 @@ def preferred_search_prompt(plan: OutfitTransferPlan, prompt: str) -> str:
     subject = _clean_subject(subject)
     if not subject:
         return str(prompt or "").strip()
-    terms = [subject]
-    terms.extend(_known_subject_aliases(subject))
-    terms.extend(_franchise_terms(prompt))
-    terms.extend(("角色立绘", "服装", "外观", "配色", "饰品", "官方图", "official art", "character design", "outfit"))
-    return " ".join(_unique_terms(terms))
-
-
-def _known_subject_aliases(subject: str) -> list[str]:
-    aliases = KNOWN_CORE_ALIASES.get(subject) or KNOWN_CORE_ALIASES.get(subject.strip())
-    if not aliases:
-        aliases = KNOWN_CORE_ALIASES.get(subject.lower())
-    if not aliases:
-        return []
-    terms: list[str] = []
-    for alias in aliases[:1]:
-        alias = str(alias or "").strip()
-        if not alias:
-            continue
-        terms.append(alias)
-        terms.append(alias.replace("_", " ").replace("(", "").replace(")", ""))
-    return terms
-
-
-def _franchise_terms(prompt: str) -> list[str]:
-    text = str(prompt or "").lower()
-    if any(marker in text for marker in ("碧蓝档案", "蔚蓝档案", "blue archive")):
-        return ["碧蓝档案", "蔚蓝档案", "Blue Archive"]
-    return []
-
-
-def _unique_terms(terms: list[str] | tuple[str, ...]) -> list[str]:
-    seen: set[str] = set()
-    result: list[str] = []
-    for term in terms:
-        term = re.sub(r"\s+", " ", str(term or "").strip())
-        key = term.lower()
-        if not term or key in seen:
-            continue
-        seen.add(key)
-        result.append(term)
-    return result
+    return f"{subject} 角色立绘 服装 外观 配色 饰品 官方图"
 
 
 def extract_reference_tag_text(prompt: str) -> str:
@@ -410,11 +305,9 @@ def build_outfit_summary_prompt(
     directive = plan.directive_prompt or str(original_prompt or "").strip()
     return (
         "你是二次元角色服装解析助手。\n"
-        "你的任务是从资料中提取一套可以迁移给目标角色的服装 tags。\n"
-        "请严格区分“来源角色身份”和“来源服装元素”：你只提取服装元素，不提取角色身份。\n"
-        "只关注服装结构、层次、材质、配色、头饰、胸饰、腰饰、手套、袜鞋、装饰件和可直接穿用的外观元素。\n"
-        "不要输出角色名字、角色标签、发色、瞳色、耳朵、尾巴、角、翅膀、年龄感、体型、表情、动作、背景、质量词或画师词。\n"
-        "如果资料里混有来源角色本人，请仍然只保留衣服、饰品和可迁移外观，不要把来源角色的身份设定一起带出来。\n"
+        "你的任务是从资料中提取一套可迁移给目标角色的服装 tags。\n"
+        "只关注服装结构、层次、材质、配色、头饰、胸饰、腰饰、手套、袜鞋、装饰件。\n"
+        "不要输出角色身份、名字、发色、瞳色、耳朵、尾巴、角、翅膀、年龄感、体型、表情、动作、背景、质量词或画师词。\n"
         "如果资料不足，可以做保守补全，但必须紧贴已有视觉线索，不要自行改主题。\n"
         "输出 24-60 个英文 Danbooru tags，用英文逗号分隔；不要解释，不要 Markdown。\n\n"
         f"来源对象：{source_subject}\n"
@@ -433,10 +326,9 @@ def build_outfit_transfer_block(plan: OutfitTransferPlan, outfit_summary: str) -
         "-----------",
         "本次是“来源角色/来源参考 -> 目标固定角色”的服装迁移任务。",
         f"最终主体必须是固定角色“{plan.target_character or '目标角色'}”。",
-        "来源对象只用于提供服装结构、材质、配色和装饰；不要复制来源对象的角色身份、角色名、发色、瞳色、种族、耳朵、尾巴、角、翅膀、年龄感和体型。",
-        "请把“来源角色身份”和“来源服装元素”分开处理：最终画面保留目标角色自己的身份设定，只把来源服装穿到目标角色身上。",
-        "如果是联网搜索到的角色资料，请优先提取衣服、饰品、配色和可穿用外观，不要把来源角色本人一起复制进来。",
-        "如果资料不足，可以补齐服装细节，但不要擅自换成别的服装主题，更不要回流到来源角色的完整设定。",
+        "来源对象只用于提供服装结构、材质、配色和装饰；不要复制来源对象的角色身份、发色、瞳色、种族、耳朵、尾巴、角、翅膀、年龄感和体型。",
+        "请优先让目标角色穿上来源服装，并保留目标角色自己的身份设定。",
+        "如果资料不足，可以补齐服装细节，但不要擅自换成别的服装主题。",
     ]
     if plan.source_subject:
         lines.append(f"来源对象：{plan.source_subject}")

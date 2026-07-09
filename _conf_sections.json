@@ -12,7 +12,7 @@
     {
       "key": "anima_master_comfyui_connection",
       "description": "ComfyUI 连接",
-      "hint": "用于连接 ComfyUI。多数用户先用绘世启动器、ComfyUI portable 或自己的方式手动启动 ComfyUI 就可以；只有打开“由 AstrBot 拉起 ComfyUI”时，启动命令才需要填写。",
+      "hint": "用于连接 ComfyUI。通常请先用绘世启动器、ComfyUI portable 或自己的方式启动 ComfyUI；AstrBot 在服务器时请填写本机的局域网或 Tailscale 地址。只有 AstrBot 和 ComfyUI 同机时，才建议开启“由 AstrBot 启动 ComfyUI”。",
       "items": [
         "comfyui_base_url",
         "workflow",
@@ -126,17 +126,6 @@
         "max_send_images",
         "admin_only",
         "allowed_sender_ids"
-      ]
-    },
-    {
-      "key": "anima_master_verify",
-      "description": "生成后自我验证",
-      "hint": "开启后用多模态模型检查成品图是否符合请求，不达标会自动带修正提示重画一次再发送。需要支持读图的模型；会增加一次看图调用。",
-      "items": [
-        "enable_verify",
-        "verify_provider_id",
-        "verify_pass_score",
-        "max_verify_retry"
       ]
     },
     {

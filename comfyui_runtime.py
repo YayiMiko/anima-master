@@ -2,13 +2,34 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from pathlib import Path
-import subprocess
 import sys
 from typing import Any, Callable
 
 import astrbot.api.message_components as Comp
+
+try:
+    from .chat_delivery import (
+        ack_timeout_delivery,
+        is_ack_timeout,
+        no_output_delivery,
+        operation_failed_delivery,
+        send_failed_delivery,
+        sent_delivery,
+        skipped_delivery,
+    )
+    from .comfyui_startup import ComfyUIStartupManager
+except Exception:  # pragma: no cover - fallback for direct script-style imports.
+    from chat_delivery import (
+        ack_timeout_delivery,
+        is_ack_timeout,
+        no_output_delivery,
+        operation_failed_delivery,
+        send_failed_delivery,
+        sent_delivery,
+        skipped_delivery,
+    )
+    from comfyui_startup import ComfyUIStartupManager
 
 try:
     from aiocqhttp.exceptions import ActionFailed
@@ -54,27 +75,14 @@ class ComfyUIRuntime:
         self._bool = get_bool
         self._int = get_int
         self._str = get_str
-        self._startup_lock = asyncio.Lock()
-
-    def is_auto_start_allowed(self, event: Any) -> bool:
-        if not self._bool("auto_start", False):
-            return False
-        allowed = self.config.get("auto_start_allowed_sender_ids", [])
-        if isinstance(allowed, str):
-            allowed = [allowed]
-        allowed_set = {str(item).strip() for item in allowed or [] if str(item).strip()}
-        if str(event.get_sender_id()) in allowed_set:
-            return True
-        if self._bool("auto_start_admin_only", True):
-            return event.is_admin()
-        return True
-
-    def is_ready(self, payload: dict[str, Any]) -> bool:
-        return bool(
-            payload.get("ok")
-            and payload.get("unet_available")
-            and payload.get("clip_available")
-            and payload.get("vae_available")
+        self._startup = ComfyUIStartupManager(
+            root=self.root,
+            config=self.config,
+            logger=self.logger,
+            get_bool=self._bool,
+            get_int=self._int,
+            get_str=self._str,
+            run_status=lambda: self.run_tool(["status"]),
         )
 
     async def run_python_tool(
@@ -127,100 +135,8 @@ class ComfyUIRuntime:
     async def run_prompt_tool(self, args: list[str]) -> dict[str, Any]:
         return await self.run_python_tool(self.prompt_tool, args, 120)
 
-    async def start_comfyui_process(self) -> dict[str, Any]:
-        command = self._str("startup_command", "").strip()
-        workdir = self._str("startup_workdir", "").strip()
-        visible_window = self._bool("startup_visible_window", True)
-        if not command:
-            return {"ok": False, "error": "startup_command_not_configured"}
-        if workdir and not Path(workdir).exists():
-            return {"ok": False, "error": f"startup_workdir_not_found: {workdir}"}
-        flags = 0
-        if sys.platform == "win32" and not visible_window:
-            flags |= getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-        elif sys.platform == "win32":
-            flags |= getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
-            flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-        env = os.environ.copy()
-        env.setdefault("PYTHONIOENCODING", "utf-8")
-        env.setdefault("PYTHONUTF8", "1")
-        env.setdefault("TQDM_DISABLE", "1")
-        try:
-            if sys.platform == "win32" and visible_window:
-                command_path = Path(command.strip('"'))
-                if command_path.suffix.lower() in {".bat", ".cmd"} and command_path.exists():
-                    cmd_args = [
-                        "cmd.exe",
-                        "/k",
-                        "call",
-                        str(command_path),
-                    ]
-                else:
-                    cmd_args = [
-                        "cmd.exe",
-                        "/s",
-                        "/k",
-                        f'"title AstrBot ComfyUI && chcp 65001 >nul && {command}"',
-                    ]
-                await asyncio.create_subprocess_exec(
-                    *cmd_args,
-                    cwd=workdir or str(self.root),
-                    env=env,
-                    creationflags=flags,
-                )
-            else:
-                await asyncio.create_subprocess_shell(
-                    command,
-                    cwd=workdir or str(self.root),
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    env=env,
-                    creationflags=flags,
-                )
-        except Exception as exc:
-            return {"ok": False, "error": f"startup_failed: {type(exc).__name__}: {exc}"}
-        self.logger.info(
-            "[comfyui_agent] auto_start launched command=%s workdir=%s visible_window=%s",
-            command,
-            workdir or str(self.root),
-            visible_window,
-        )
-        return {"ok": True}
-
     async def ensure_ready(self, event: Any) -> dict[str, Any]:
-        status = await self.run_tool(["status"])
-        if self.is_ready(status):
-            return {"ok": True, "status": status}
-        if not self._bool("auto_start", False):
-            return {"ok": False, "error": "comfyui_offline", "status": status}
-        if not self.is_auto_start_allowed(event):
-            return {"ok": False, "error": "auto_start_not_permitted", "status": status}
-
-        async with self._startup_lock:
-            status = await self.run_tool(["status"])
-            if self.is_ready(status):
-                return {"ok": True, "status": status}
-
-            launched = await self.start_comfyui_process()
-            if not launched.get("ok"):
-                return launched
-
-            wait_seconds = max(5, self._int("startup_wait_seconds", 120))
-            poll_interval = max(1, self._int("startup_poll_interval", 3))
-            deadline = asyncio.get_running_loop().time() + wait_seconds
-            last_status: dict[str, Any] = {}
-            while asyncio.get_running_loop().time() < deadline:
-                await asyncio.sleep(poll_interval)
-                last_status = await self.run_tool(["status"])
-                if self.is_ready(last_status):
-                    self.logger.info("[comfyui_agent] auto_start ready")
-                    return {"ok": True, "status": last_status}
-            return {
-                "ok": False,
-                "error": f"auto_start_timeout_after_{wait_seconds}s",
-                "status": last_status,
-            }
+        return await self._startup.ensure_ready(event)
 
     def failure_reason(self, payload: dict[str, Any]) -> str:
         detail = str(payload.get("error") or "unknown_error")
@@ -268,12 +184,16 @@ class ComfyUIRuntime:
             )
         if not payload.get("ok"):
             reason = self.failure_reason(payload)
-            await event.send(event.plain_result(f"ComfyUI 操作失败：{reason}。"))
-            return f"ComfyUI 操作失败：{reason}。"
+            message = f"ComfyUI 操作失败：{reason}。"
+            payload["delivery"] = operation_failed_delivery(payload, message)
+            await event.send(event.plain_result(message))
+            return message
 
         outputs = [str(item) for item in payload.get("outputs", []) if Path(str(item)).exists()]
         if not outputs:
-            await event.send(event.plain_result("ComfyUI 完成了任务，但没有拿到可发送的图片。"))
+            message = "ComfyUI 完成了任务，但没有拿到可发送的图片。"
+            payload["delivery"] = no_output_delivery(message)
+            await event.send(event.plain_result(message))
             return "ComfyUI operation finished with no output image."
 
         if self._bool("send_result_to_chat", True):
@@ -281,22 +201,29 @@ class ComfyUIRuntime:
                 try:
                     await event.send(event.chain_result([Comp.Image.fromFileSystem(output)]))
                 except Exception as exc:
-                    is_action_failed = ActionFailed is not None and isinstance(exc, ActionFailed)
-                    retcode = getattr(exc, "retcode", None)
                     wording = str(getattr(exc, "wording", "") or getattr(exc, "message", "") or exc)
-                    if is_action_failed and (retcode == 1200 or "Timeout" in wording):
+                    if is_ack_timeout(exc, ActionFailed):
                         self.logger.warning(
                             "[comfyui_agent] image generated but platform send ACK timed out; "
                             "图片可能已经送达。path=%s error=%s",
                             output,
                             wording[:500],
                         )
-                        return "ComfyUI 已生成图片，但聊天平台发送回执超时：" + ", ".join(outputs)
+                        message = "ComfyUI 已生成图片，但聊天平台发送回执超时：" + ", ".join(outputs)
+                        payload["delivery"] = ack_timeout_delivery(outputs, output, exc, message)
+                        return message
                     self.logger.warning(
                         "[comfyui_agent] image generated but sending failed. path=%s error=%s: %s",
                         output,
                         type(exc).__name__,
                         str(exc)[:500],
                     )
-                    return "ComfyUI 已生成图片，但发送失败：" + ", ".join(outputs)
-        return "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
+                    message = "ComfyUI 已生成图片，但发送失败：" + ", ".join(outputs)
+                    payload["delivery"] = send_failed_delivery(outputs, output, exc, message)
+                    return message
+            message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
+            payload["delivery"] = sent_delivery(outputs, message)
+            return message
+        message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
+        payload["delivery"] = skipped_delivery(outputs, message)
+        return message

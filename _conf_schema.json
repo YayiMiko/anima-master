@@ -15,7 +15,7 @@
     "description": "ComfyUI 地址",
     "type": "string",
     "default": "http://127.0.0.1:8188",
-    "hint": "填写 AstrBot 能访问到的 ComfyUI API 服务地址，不是绘世启动器页面。同机通常用 http://127.0.0.1:8188；跨机器时填写局域网或 Tailscale 地址。"
+    "hint": "填写 AstrBot 能访问到的 ComfyUI API 服务地址，不是绘世启动器页面。同机通常用 http://127.0.0.1:8188；AstrBot 在服务器、ComfyUI 在本机时，请填写本机的局域网或 Tailscale 地址。"
   },
   "workflow": {
     "description": "插件工作流类型",
@@ -282,10 +282,10 @@
     }
   },
   "default_artist_tags": {
-    "description": "默认画师组",
+    "description": "备用画师 tags",
     "type": "string",
     "default": "",
-    "hint": "通常不用填；只有没有启用任何画师组时才会读取这里。示例：@artist_a, @artist_b,",
+    "hint": "通常不用填；只有未启用画师组时才会读取这里。示例：@artist_a, @artist_b,",
     "collapsed": true
   },
   "artist_presets": {
@@ -302,7 +302,7 @@
     "description": "启用的画师组",
     "type": "string",
     "default": "",
-    "hint": "必须与已保存的画师组名称完全一致。推荐在聊天里用 /anm 切换画师组 名称；手填时注意不要多空格。优先级高于默认画师组。示例：千代风格"
+    "hint": "必须与已保存的画师组名称完全一致。推荐在聊天里用 /anm 切换画师组 名称；手填时注意不要多空格。优先级高于默认画师 tags。示例：千代风格"
   },
   "sensual_mode_enabled": {
     "description": "涩气表现力优化",
@@ -441,17 +441,17 @@
     }
   },
   "auto_start": {
-    "description": "由 AstrBot 拉起 ComfyUI",
+    "description": "由 AstrBot 启动 ComfyUI",
     "type": "bool",
     "default": false,
-    "hint": "高级选项。默认关闭。关闭时请先用绘世启动器、ComfyUI portable 或自己的方式启动 ComfyUI；开启后必须填写下面的启动命令。它不是开机自启。",
+    "hint": "高级选项，仅适合 AstrBot 和 ComfyUI 在同一台机器上时使用。服务器 AstrBot 无法直接启动你本机 Windows 上的 ComfyUI。默认关闭；关闭时请用绘世启动器、ComfyUI portable 或自己的方式先启动 ComfyUI。不是开机自启。",
     "collapsed": true
   },
   "startup_command": {
-    "description": "启动 ComfyUI 的命令（开启上项后必填）",
+    "description": "启动命令（开启上项后必填）",
     "type": "string",
     "default": "",
-    "hint": "仅在开启“由 AstrBot 拉起 ComfyUI”后必填。这里要填能直接启动 ComfyUI 服务的命令，例如 ComfyUI portable 的 run_nvidia_gpu.bat。绘世启动器如果只是打开启动器界面，仍需要你在启动器里手动启动 ComfyUI。",
+    "hint": "仅在开启“由 AstrBot 启动 ComfyUI”后必填。命令会在 AstrBot 所在机器执行；如果 AstrBot 跑在服务器容器里，这里不能填写本机 Windows 路径。",
     "condition": {
       "auto_start": true
     }
@@ -547,35 +547,5 @@
     "default": false,
     "hint": "仅排查未发图或发送失败时临时开启；平时建议关闭。",
     "collapsed": true
-  },
-  "enable_verify": {
-    "description": "生成后自我验证",
-    "type": "bool",
-    "default": false,
-    "hint": "开启后用多模态模型检查成品图是否符合请求；不达标会自动调整提示词重画一次。会额外增加一次看图模型调用，注意与 provider_settings.tool_call_timeout 对齐。"
-  },
-  "verify_provider_id": {
-    "description": "验证用多模态模型",
-    "type": "string",
-    "default": "",
-    "hint": "留空则用当前会话的图像描述模型或默认对话模型。必须是支持读图的多模态模型，否则会自动跳过验证并照常发图。",
-    "collapsed": true,
-    "condition": {"enable_verify": true}
-  },
-  "verify_pass_score": {
-    "description": "验证通过分数线",
-    "type": "int",
-    "default": 7,
-    "hint": "0-10。生成图被打分低于此值判为不达标。分数越高越严格。",
-    "collapsed": true,
-    "condition": {"enable_verify": true}
-  },
-  "max_verify_retry": {
-    "description": "验证失败重画次数",
-    "type": "int",
-    "default": 1,
-    "hint": "验证不达标时自动带修正提示重画的最多次数。0 表示只验证不重画。",
-    "collapsed": true,
-    "condition": {"enable_verify": true}
   }
 }

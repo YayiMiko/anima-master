@@ -3,11 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Callable
 
-try:
-    from .task_summary import build_strategy_summary
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
-    from task_summary import build_strategy_summary
-
 
 class GenerationTaskRunner:
     """Orchestrate one text-to-image generation task."""
@@ -96,35 +91,32 @@ class GenerationTaskRunner:
         started_at = datetime.now()
         original_prompt = str(prompt or "").strip()
         reference_requested = self._wants_reference_image(original_prompt)
-        task: dict[str, Any] = {
-            "time": started_at.isoformat(timespec="seconds"),
-            "action": "generate",
-            "platform_id": event.get_platform_id(),
-            "session_id": event.get_session_id(),
-            "sender_id": event.get_sender_id(),
-            "original_prompt": self._shorten(original_prompt, 1000),
-            "reference_image_requested": reference_requested,
-            "reference_context_applied": False,
-            "width": width or self._int("width", 1024),
-            "height": height or self._int("height", 1536),
-            "steps": steps or self._int("steps", 30),
-            "cfg": cfg or self._float("cfg", 5.0),
-            "workflow": self._str("workflow", "anima_t2i"),
-        }
+        task = self._task_recorder.build_generation_start(
+            event=event,
+            started_at=started_at,
+            original_prompt=original_prompt,
+            reference_requested=reference_requested,
+            width=width or self._int("width", 1024),
+            height=height or self._int("height", 1536),
+            steps=steps or self._int("steps", 30),
+            cfg=cfg or self._float("cfg", 5.0),
+            workflow=self._str("workflow", "anima_t2i"),
+            shorten=self._shorten,
+        )
         if not self._is_allowed(event):
             payload = {"ok": False, "error": "not_permitted"}
-            task.update({"ok": False, "error": payload["error"]})
+            self._task_recorder.mark_failure(task, payload["error"])
             self._task_recorder.write(task)
             return payload
         ready = await self._ensure_ready(event)
         if not ready.get("ok"):
-            task.update({"ok": False, "error": ready.get("error") or "comfyui_not_ready"})
+            self._task_recorder.mark_failure(task, ready.get("error") or "comfyui_not_ready")
             self._task_recorder.write(task)
             return ready
         prompt = original_prompt
         if not prompt:
             payload = {"ok": False, "error": "missing_prompt"}
-            task.update({"ok": False, "error": payload["error"]})
+            self._task_recorder.mark_failure(task, payload["error"])
             self._task_recorder.write(task)
             return payload
         prompt = await self._augment_reference_image(event, prompt)
@@ -135,25 +127,19 @@ class GenerationTaskRunner:
                 "error": "reference_image_not_found",
                 "image_input_summary": image_input_summary,
             }
-            task.update(
-                {
-                    "ok": False,
-                    "error": payload["error"],
-                    "reference_image_found": False,
-                    "image_input_summary": image_input_summary,
-                }
-            )
+            self._task_recorder.mark_reference_missing(task, image_input_summary)
             self._task_recorder.write(task)
             return payload
         if reference_requested:
-            task["image_input_summary"] = dict(self._image_inputs.last_summary)
-            task["reference_context_summary"] = dict(self._reference_context.last_summary)
-        task["reference_context_applied"] = reference_requested and prompt != original_prompt
+            self._task_recorder.mark_reference_context(
+                task,
+                image_input_summary=dict(self._image_inputs.last_summary),
+                reference_context_summary=dict(self._reference_context.last_summary),
+                applied=prompt != original_prompt,
+            )
         prompt = self._augment_quoted_spell(event, prompt)
         prompt = await self._build_prompt(event, prompt)
-        prompt_summary = dict(self._prompt_summary())
-        task["prompt_summary"] = prompt_summary
-        task["strategy_summary"] = build_strategy_summary(task, prompt_summary)
+        self._task_recorder.mark_prompt_built(task, dict(self._prompt_summary()))
         args = ["generate", "--prompt", prompt]
         if width:
             args.extend(["--width", str(int(width))])
@@ -166,15 +152,25 @@ class GenerationTaskRunner:
         if negative_prompt:
             args.extend(["--negative-prompt", str(negative_prompt)])
         payload = await self._run_tool(args)
-        task.update(
-            {
-                "ok": bool(payload.get("ok")),
-                "error": payload.get("error") or "",
-                "outputs": payload.get("outputs") or [],
-                "elapsed_seconds": round((datetime.now() - started_at).total_seconds(), 2),
-            }
+        self._task_recorder.mark_completed(
+            task,
+            payload=payload,
+            elapsed_seconds=round((datetime.now() - started_at).total_seconds(), 2),
+            include_payload=self._bool("debug_send_payload_enabled", False),
         )
-        if self._bool("debug_send_payload_enabled", False):
-            task["tool_payload"] = payload
         self._task_recorder.write(task)
         return payload
+
+    def record_delivery(self, delivery: dict[str, Any] | None) -> None:
+        """Persist delivery state into the latest task record.
+
+        Args:
+            delivery: Delivery state produced after sending generated outputs.
+        """
+        if not isinstance(delivery, dict) or not delivery:
+            return
+        task = self._task_recorder.read()
+        if not task:
+            return
+        self._task_recorder.mark_delivery(task, delivery)
+        self._task_recorder.write(task)

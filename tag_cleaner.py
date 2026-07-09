@@ -137,111 +137,6 @@ MULTI_CHARACTER_BLOCKLIST = {
     "twins",
 }
 
-NON_CHARACTER_NAME_WORDS = {
-    "arm",
-    "arms",
-    "back",
-    "background",
-    "bangs",
-    "bare",
-    "black",
-    "blonde",
-    "blue",
-    "blush",
-    "boots",
-    "bow",
-    "bracelet",
-    "braid",
-    "braids",
-    "brown",
-    "cape",
-    "charm",
-    "choker",
-    "cloud",
-    "coat",
-    "collar",
-    "constellation",
-    "costume",
-    "cover",
-    "dress",
-    "ear",
-    "ears",
-    "eye",
-    "eyes",
-    "flower",
-    "flowers",
-    "frill",
-    "frilled",
-    "gloves",
-    "glow",
-    "gold",
-    "golden",
-    "green",
-    "grey",
-    "gray",
-    "hair",
-    "hand",
-    "hands",
-    "hat",
-    "headdress",
-    "heel",
-    "heels",
-    "high",
-    "jacket",
-    "kimono",
-    "lace",
-    "leg",
-    "legs",
-    "light",
-    "long",
-    "looking",
-    "moon",
-    "mouth",
-    "night",
-    "novel",
-    "off",
-    "open",
-    "ornament",
-    "outfit",
-    "pattern",
-    "pink",
-    "pose",
-    "purple",
-    "red",
-    "ribbon",
-    "ring",
-    "robe",
-    "serafuku",
-    "shadow",
-    "shirt",
-    "shoes",
-    "short",
-    "shoulder",
-    "side",
-    "simple",
-    "sitting",
-    "skirt",
-    "sky",
-    "sleeve",
-    "sleeveless",
-    "smile",
-    "socks",
-    "star",
-    "standing",
-    "stockings",
-    "style",
-    "sweater",
-    "thigh",
-    "thighhighs",
-    "thighs",
-    "trim",
-    "uniform",
-    "up",
-    "way",
-    "white",
-    "yukata",
-}
-
 ARTIST_FUNCTION_RE = re.compile(
     r"^artist\s*:\s*(?P<name>[^:=(){}[\]]+?)\s*(?:[:=]\s*[-+]?(?:\d+(?:\.\d+)?|\.\d+)\s*)?$",
     re.I,
@@ -335,22 +230,12 @@ def is_character_identity_tag(key: str) -> bool:
     return any(pattern.search(compact) for pattern in CHARACTER_IDENTITY_PATTERNS)
 
 
-def looks_like_character_name_tag(key: str) -> bool:
-    """Return whether a tag looks like a bare character-name tag."""
-    compact = normalize_tag_key(key)
-    if not re.fullmatch(r"[a-z][a-z0-9']+(?:_[a-z][a-z0-9']+){1,2}", compact):
-        return False
-    words = set(compact.split("_"))
-    return not words.intersection(NON_CHARACTER_NAME_WORDS)
-
-
 def clean_content_tags(
     text: str,
     max_tags: int = 120,
     strip_character_tags: bool = True,
     protected_core_tags: tuple[str, ...] = (),
     allow_multi_character: bool = False,
-    strip_unprotected_character_names: bool = False,
 ) -> str:
     """Clean LLM-generated content tags before final prompt composition."""
     tags = split_tags(text)
@@ -375,8 +260,6 @@ def clean_content_tags(
         if not allow_multi_character and key in MULTI_CHARACTER_BLOCKLIST:
             continue
         if protected and parenthesized_core_re.fullmatch(key) and key not in protected:
-            continue
-        if strip_unprotected_character_names and key not in protected and looks_like_character_name_tag(key):
             continue
         if artist_re.match(tag.strip()):
             continue
