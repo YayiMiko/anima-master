@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 try:
+    from .prompt_constraints import PromptConstraintPlan, apply_prompt_constraints
     from .prompt_presets import (
         DEFAULT_ARTIST_TAGS,
         DEFAULT_CHARACTER_TAGS,
@@ -15,6 +16,7 @@ try:
     )
     from .tag_cleaner import clean_content_tags, join_prompt_parts
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
+    from prompt_constraints import PromptConstraintPlan, apply_prompt_constraints
     from prompt_presets import (
         DEFAULT_ARTIST_TAGS,
         DEFAULT_CHARACTER_TAGS,
@@ -39,6 +41,10 @@ class PromptBuildResult:
     required_core_tags: tuple[str, ...] = ()
     character_name: str = ""
     used_sensual_mode: bool = False
+    constraint_mode: bool = False
+    constraint_tags: tuple[str, ...] = ()
+    removed_constraint_tags: tuple[str, ...] = ()
+    constraint_reason: str = ""
 
 
 def build_final_prompt(
@@ -47,6 +53,7 @@ def build_final_prompt(
     llm_content: str,
     config: dict[str, Any],
     required_core_tags: tuple[str, ...] = (),
+    constraint_plan: PromptConstraintPlan | None = None,
 ) -> PromptBuildResult:
     config = apply_config_preset(config)
     raw_mode, raw_prompt = strip_raw_prefix(user_prompt)
@@ -61,6 +68,10 @@ def build_final_prompt(
             required_core_tags=(),
             character_name="",
             used_sensual_mode=False,
+            constraint_mode=False,
+            constraint_tags=(),
+            removed_constraint_tags=(),
+            constraint_reason="",
         )
 
     fixed_character = selected_fixed_character(user_prompt, config)
@@ -106,6 +117,8 @@ def build_final_prompt(
         protected_core_tags=required_core_tags,
         allow_multi_character=allow_multi_character,
     )
+    constraint_result = apply_prompt_constraints(content, constraint_plan)
+    content = constraint_result.content_tags
     parts = [quality]
     if required_core_tags:
         parts.append(", ".join(required_core_tags))
@@ -123,4 +136,8 @@ def build_final_prompt(
         required_core_tags=tuple(required_core_tags),
         character_name=character_name,
         used_sensual_mode=use_sensual,
+        constraint_mode=constraint_result.triggered,
+        constraint_tags=constraint_result.priority_tags,
+        removed_constraint_tags=constraint_result.removed_tags,
+        constraint_reason=constraint_result.reason,
     )

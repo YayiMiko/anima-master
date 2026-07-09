@@ -16,6 +16,7 @@ try:
     from .prompt_builder import (
         build_final_prompt,
     )
+    from .prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
     from .prompt_presets import (
         apply_config_preset,
         selected_fixed_character,
@@ -38,6 +39,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
     from prompt_builder import (
         build_final_prompt,
     )
+    from prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
     from prompt_presets import (
         apply_config_preset,
         selected_fixed_character,
@@ -172,6 +174,24 @@ class PromptPipeline:
         if use_deep_thinking:
             kwargs["reasoning_effort"] = self._str("prompt_builder_reasoning_effort", "high") or "high"
             kwargs["thinking"] = {"type": "enabled"}
+        response = await self.context.llm_generate(**kwargs)
+        return str(getattr(response, "completion_text", "") or "").strip()
+
+    async def _generate_constraint_plan_with_llm(
+        self,
+        *,
+        provider_id: str,
+        plan_prompt: str,
+    ) -> str:
+        kwargs: dict[str, Any] = {
+            "chat_provider_id": provider_id,
+            "prompt": plan_prompt,
+            "system_prompt": (
+                "You are a strict JSON planner for anime image prompt constraints. "
+                "Return only valid JSON. Do not output Markdown or explanations."
+            ),
+            "max_tokens": 450,
+        }
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()
 
@@ -339,15 +359,30 @@ class PromptPipeline:
             user_prompt=prompt,
             fixed_character=use_fixed_character,
         )
+        constraint_raw = ""
+        constraint_plan = parse_constraint_plan("")
+        try:
+            constraint_raw = await self._generate_constraint_plan_with_llm(
+                provider_id=provider_id,
+                plan_prompt=build_constraint_plan_prompt(
+                    user_prompt=prompt,
+                    llm_content=llm_content or prompt,
+                    fixed_character_name=fixed_character_name,
+                ),
+            )
+            constraint_plan = parse_constraint_plan(constraint_raw)
+        except Exception as constraint_exc:
+            self.logger.warning("[comfyui_agent] prompt constraint planner failed: %s", constraint_exc)
         built = build_final_prompt(
             user_prompt=prompt,
             llm_content=llm_content,
             config=prompt_config,
             required_core_tags=required_core_tags,
+            constraint_plan=constraint_plan,
         )
         content_tag_count = len(split_tags(built.content_tags))
         short_content_retry = False
-        if not llm_failed and not built.raw_mode and content_tag_count < 60:
+        if not llm_failed and not built.raw_mode and not built.constraint_mode and content_tag_count < 60:
             retry_prompt = (
                 llm_prompt
                 + "\n-----------\n"
@@ -373,6 +408,7 @@ class PromptPipeline:
                     llm_content=retry_content,
                     config=prompt_config,
                     required_core_tags=required_core_tags,
+                    constraint_plan=constraint_plan,
                 )
                 retry_tag_count = len(split_tags(retry_built.content_tags))
                 if retry_tag_count > content_tag_count:
@@ -383,7 +419,7 @@ class PromptPipeline:
             except Exception as retry_exc:
                 self.logger.warning("[comfyui_agent] prompt builder short-content retry failed: %s", retry_exc)
         self.logger.info(
-            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s required_core_tags=%s content_tags=%s content_chars=%s final_chars=%s final_head=%s",
+            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s constraint=%s required_core_tags=%s content_tags=%s content_chars=%s final_chars=%s final_head=%s",
             built.raw_mode,
             bool(search_context),
             research_plan.use_deep_thinking,
@@ -391,6 +427,7 @@ class PromptPipeline:
             built.used_sensual_mode,
             built.used_fixed_character,
             built.used_default_style,
+            built.constraint_mode,
             ",".join(built.required_core_tags) or "none",
             content_tag_count,
             len(built.content_tags),
@@ -408,6 +445,10 @@ class PromptPipeline:
                 "fixed_character_name": built.character_name,
                 "sensual_mode": built.used_sensual_mode,
                 "default_style": built.used_default_style,
+                "constraint_mode": built.constraint_mode,
+                "constraint_tags": list(built.constraint_tags),
+                "removed_constraint_tags": list(built.removed_constraint_tags),
+                "constraint_reason": built.constraint_reason,
                 "required_core_tags": list(built.required_core_tags),
                 "outfit_transfer": outfit_plan.enabled,
                 "outfit_transfer_source": outfit_plan.source_subject,
@@ -432,6 +473,7 @@ class PromptPipeline:
                 {
                     "llm_prompt": llm_prompt,
                     "outfit_summary": outfit_summary,
+                    "constraint_plan": constraint_raw,
                     "llm_content": llm_content,
                     "final_prompt": built.final_prompt,
                 }
