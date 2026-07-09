@@ -35,6 +35,8 @@ IMAGE_RESOLVER = ComfyUIImageResolver(WORKSPACE)
 DEFAULT_CONFIG = {
     "comfyui_base_url": "http://127.0.0.1:8188",
     "workflow": "anima_t2i",
+    "custom_workflow_enabled": True,
+    "custom_workflow_path": "",
     "timeout": 300,
     "poll_interval": 2,
     "width": 1024,
@@ -86,8 +88,19 @@ def _json_file(path: Path) -> dict[str, Any]:
 
 def load_config() -> dict[str, Any]:
     config = dict(DEFAULT_CONFIG)
-    config.update(_json_file(CONFIG))
+    config.update(_flatten_config(_json_file(CONFIG)))
     return config
+
+
+def _flatten_config(config: dict[str, Any]) -> dict[str, Any]:
+    flat: dict[str, Any] = {}
+    for key, value in dict(config or {}).items():
+        if str(key).startswith("anima_master_") and isinstance(value, dict):
+            flat.update(value)
+    for key, value in dict(config or {}).items():
+        if not (str(key).startswith("anima_master_") and isinstance(value, dict)):
+            flat[key] = value
+    return flat
 
 
 def _inside_workspace(path: Path) -> Path:

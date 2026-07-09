@@ -1,551 +1,653 @@
 {
-  "reset_to_defaults": {
-    "description": "一键恢复默认配置",
-    "type": "bool",
-    "default": false,
-    "hint": "打开后保存配置并重载插件，即会恢复默认值；恢复后此开关会自动关闭。"
-  },
-  "chiyo_preset_enabled": {
-    "description": "一键启用千代预设",
-    "type": "bool",
-    "default": false,
-    "hint": "开启后补入“千代风格”画师组，并把“狐莉”加入角色列表；狐莉只会在明确提到时使用。"
-  },
-  "comfyui_base_url": {
-    "description": "ComfyUI 地址",
-    "type": "string",
-    "default": "http://127.0.0.1:8188",
-    "hint": "填写 AstrBot 能访问到的 ComfyUI API 服务地址，不是绘世启动器页面。同机通常用 http://127.0.0.1:8188；AstrBot 在服务器、ComfyUI 在本机时，请填写本机的局域网或 Tailscale 地址。"
-  },
-  "workflow": {
-    "description": "插件工作流类型",
-    "type": "string",
-    "default": "anima_t2i",
-    "hint": "这是插件内置的工作流类型，不是 ComfyUI 里保存的工作流名称。当前保持默认即可。示例：anima_t2i",
-    "collapsed": true
-  },
-  "timeout": {
-    "description": "单次生成超时（秒）",
-    "type": "int",
-    "default": 300,
-    "hint": "示例：300",
-    "collapsed": true
-  },
-  "poll_interval": {
-    "description": "生成状态查询间隔（秒）",
-    "type": "int",
-    "default": 2,
-    "hint": "示例：2",
-    "collapsed": true
-  },
-  "width": {
-    "description": "默认宽度",
-    "type": "int",
-    "default": 1024,
-    "hint": "默认推荐 1024 x 1536；如果填写了不支持的尺寸，插件会自动贴近到可用尺寸。示例：1024"
-  },
-  "height": {
-    "description": "默认高度",
-    "type": "int",
-    "default": 1536,
-    "hint": "默认推荐 1024 x 1536；如果填写了不支持的尺寸，插件会自动贴近到可用尺寸。示例：1536"
-  },
-  "allowed_sizes": {
-    "description": "可用尺寸列表",
-    "type": "list",
-    "default": [
-      "832x1216",
-      "896x1152",
-      "1024x1024",
-      "1152x896",
-      "1216x832",
-      "768x1344",
-      "1344x768",
-      "1024x1536"
-    ],
-    "hint": "格式为 宽x高，例如 1024x1536。默认尺寸不在列表中时，会自动使用最接近的允许尺寸。",
-    "collapsed": true,
+  "anima_master_basic": {
+    "description": "预设与恢复",
+    "type": "object",
+    "hint": "用于恢复默认配置，或快速应用千代预设。",
     "items": {
-      "type": "string"
+      "reset_to_defaults": {
+        "description": "一键恢复默认配置",
+        "type": "bool",
+        "default": false,
+        "hint": "打开后保存配置并重载插件，即会恢复默认值；恢复后此开关会自动关闭。"
+      },
+      "chiyo_preset_enabled": {
+        "description": "一键启用千代预设",
+        "type": "bool",
+        "default": false,
+        "hint": "开启后补入“千代风格”画师组，并把“狐莉”加入角色列表；狐莉只会在明确提到时使用。"
+      }
     }
   },
-  "steps": {
-    "description": "采样步数",
-    "type": "int",
-    "default": 30,
-    "hint": "示例：30",
-    "collapsed": true
+  "anima_master_comfyui_connection": {
+    "description": "ComfyUI 连接",
+    "type": "object",
+    "hint": "用于连接 ComfyUI。通常请先用绘世启动器、ComfyUI portable 或自己的方式启动 ComfyUI；AstrBot 在服务器时请填写本机的局域网或 Tailscale 地址。只有 AstrBot 和 ComfyUI 同机时，才建议开启“由 AstrBot 启动 ComfyUI”。",
+    "items": {
+      "comfyui_base_url": {
+        "description": "ComfyUI 地址",
+        "type": "string",
+        "default": "http://127.0.0.1:8188",
+        "hint": "填写 AstrBot 能访问到的 ComfyUI API 服务地址，不是绘世启动器页面。同机通常用 http://127.0.0.1:8188；AstrBot 在服务器、ComfyUI 在本机时，请填写本机的局域网或 Tailscale 地址。"
+      },
+      "workflow": {
+        "description": "插件工作流类型",
+        "type": "string",
+        "default": "anima_t2i",
+        "hint": "这是插件内置的工作流类型，不是 ComfyUI 里保存的工作流名称。当前保持默认即可。示例：anima_t2i",
+        "collapsed": true,
+        "condition": {
+          "custom_workflow_enabled": false
+        }
+      },
+      "custom_workflow_enabled": {
+        "description": "使用自定义 ComfyUI 工作流",
+        "type": "bool",
+        "default": true,
+        "hint": "开启后使用下方填写的 ComfyUI API 工作流 JSON。关闭后使用插件内置工作流。"
+      },
+      "custom_workflow_path": {
+        "description": "自定义工作流 JSON 路径",
+        "type": "string",
+        "default": "",
+        "hint": "填写 AstrBot 能读取到的 ComfyUI API 工作流 JSON 路径。服务器部署时这是服务器路径，不是本机 Windows 路径；也可以填写相对插件目录的路径。留空时不启用。示例：workflows/anima_api.json",
+        "collapsed": false,
+        "condition": {
+          "custom_workflow_enabled": true
+        }
+      },
+      "timeout": {
+        "description": "单次生成超时（秒）",
+        "type": "int",
+        "default": 300,
+        "hint": "示例：300",
+        "collapsed": true
+      },
+      "poll_interval": {
+        "description": "生成状态查询间隔（秒）",
+        "type": "int",
+        "default": 2,
+        "hint": "示例：2",
+        "collapsed": true
+      },
+      "auto_start": {
+        "description": "由 AstrBot 启动 ComfyUI",
+        "type": "bool",
+        "default": false,
+        "hint": "高级选项，仅适合 AstrBot 和 ComfyUI 在同一台机器上时使用。服务器 AstrBot 无法直接启动你本机 Windows 上的 ComfyUI。默认关闭；关闭时请用绘世启动器、ComfyUI portable 或自己的方式先启动 ComfyUI。不是开机自启。",
+        "collapsed": true
+      },
+      "startup_command": {
+        "description": "启动命令（开启上项后必填）",
+        "type": "string",
+        "default": "",
+        "hint": "仅在开启“由 AstrBot 启动 ComfyUI”后必填。命令会在 AstrBot 所在机器执行；如果 AstrBot 跑在服务器容器里，这里不能填写本机 Windows 路径。",
+        "condition": {
+          "auto_start": true
+        }
+      },
+      "startup_workdir": {
+        "description": "启动工作目录",
+        "type": "string",
+        "default": "",
+        "hint": "示例：D:\\ComfyUI",
+        "collapsed": true,
+        "condition": {
+          "auto_start": true
+        }
+      },
+      "startup_visible_window": {
+        "description": "启动时显示窗口",
+        "type": "bool",
+        "default": true,
+        "collapsed": true,
+        "condition": {
+          "auto_start": true
+        }
+      },
+      "auto_start_admin_only": {
+        "description": "仅管理员可启动 ComfyUI",
+        "type": "bool",
+        "default": true,
+        "collapsed": true,
+        "condition": {
+          "auto_start": true
+        }
+      },
+      "auto_start_allowed_sender_ids": {
+        "description": "允许启动的用户",
+        "type": "list",
+        "default": [],
+        "collapsed": true,
+        "condition": {
+          "auto_start": true
+        },
+        "items": {
+          "type": "string"
+        },
+        "hint": "填写 QQ 号或 AstrBot 识别到的 sender_id；留空表示不限制。示例：123456789"
+      },
+      "startup_wait_seconds": {
+        "description": "等待 ComfyUI 就绪时间（秒）",
+        "type": "int",
+        "default": 120,
+        "hint": "示例：120",
+        "collapsed": true,
+        "condition": {
+          "auto_start": true
+        }
+      },
+      "startup_poll_interval": {
+        "description": "ComfyUI 就绪检查间隔（秒）",
+        "type": "int",
+        "default": 3,
+        "hint": "示例：3",
+        "collapsed": true,
+        "condition": {
+          "auto_start": true
+        }
+      }
+    }
   },
-  "cfg": {
-    "description": "CFG 强度",
-    "type": "float",
-    "default": 5,
-    "hint": "示例：5.0",
-    "collapsed": true
-  },
-  "sampler_name": {
-    "description": "采样器",
-    "type": "string",
-    "default": "er_sde",
-    "hint": "示例：er_sde"
-  },
-  "scheduler": {
-    "description": "调度器",
-    "type": "string",
-    "default": "normal",
-    "hint": "示例：normal"
-  },
-  "unet_name": {
-    "description": "主模型文件名",
-    "type": "string",
-    "default": "anima_baseV10.safetensors",
-    "hint": "首次配置时请确认它与 ComfyUI 下拉框中的文件名一致，不要填路径。示例：anima_baseV10.safetensors"
-  },
-  "clip_name": {
-    "description": "文本编码器文件名",
-    "type": "string",
-    "default": "qwen_3_06b_base.safetensors",
-    "hint": "首次配置时请确认它与 ComfyUI 下拉框中的文件名一致，不要填路径。示例：qwen_3_06b_base.safetensors"
-  },
-  "vae_name": {
-    "description": "VAE 文件名",
-    "type": "string",
-    "default": "qwen_image_vae.safetensors",
-    "hint": "首次配置时请确认它与 ComfyUI 下拉框中的文件名一致，不要填路径。示例：qwen_image_vae.safetensors"
-  },
-  "quality_prefix": {
-    "description": "质量词前缀",
-    "type": "string",
-    "default": "masterpiece, best quality, score_7, safe,",
-    "hint": "每次生图都会自动加在正面提示词前面。示例：masterpiece, best quality, score_7, safe,"
-  },
-  "negative_prompt": {
-    "description": "负面提示词",
-    "type": "string",
-    "default": "worst quality, low quality, score_1, score_2, score_3, artist name",
-    "hint": "每次生图都会作为反向提示词使用。示例：worst quality, low quality, score_1, score_2, score_3, artist name"
-  },
-  "prompt_optimize_enabled": {
-    "description": "启用自然语言优化",
-    "type": "bool",
-    "default": true,
-    "hint": "开启后会把中文描述扩展成适合生图的 tags；关闭后更接近原样提交。"
-  },
-  "prompt_builder_provider_id": {
-    "description": "自然语言优化模型",
-    "type": "string",
-    "default": "",
-    "hint": "留空使用当前会话主模型。只有想单独指定提示词优化模型时再填写。",
-    "collapsed": true,
+  "anima_master_models": {
+    "description": "模型文件",
+    "type": "object",
+    "hint": "首次配置时请对照 ComfyUI 下拉框确认；这里只填文件名，不填路径。如果状态检查显示模型不可用，优先检查这里。",
+    "items": {
+      "unet_name": {
+        "description": "主模型文件名",
+        "type": "string",
+        "default": "anima_baseV10.safetensors",
+        "hint": "首次配置时请确认它与 ComfyUI 下拉框中的文件名一致，不要填路径。示例：anima_baseV10.safetensors"
+      },
+      "clip_name": {
+        "description": "文本编码器文件名",
+        "type": "string",
+        "default": "qwen_3_06b_base.safetensors",
+        "hint": "首次配置时请确认它与 ComfyUI 下拉框中的文件名一致，不要填路径。示例：qwen_3_06b_base.safetensors"
+      },
+      "vae_name": {
+        "description": "VAE 文件名",
+        "type": "string",
+        "default": "qwen_image_vae.safetensors",
+        "hint": "首次配置时请确认它与 ComfyUI 下拉框中的文件名一致，不要填路径。示例：qwen_image_vae.safetensors"
+      }
+    },
     "condition": {
-      "prompt_optimize_enabled": true
+      "anima_master_comfyui_connection.custom_workflow_enabled": false
     }
   },
-  "prompt_builder_max_tokens": {
-    "description": "优化模型输出上限",
-    "type": "int",
-    "default": 1000,
-    "hint": "示例：1000",
-    "collapsed": true,
+  "anima_master_rendering": {
+    "description": "出图参数",
+    "type": "object",
+    "hint": "控制默认尺寸、采样步数、CFG、采样器和调度器。",
+    "items": {
+      "width": {
+        "description": "默认宽度",
+        "type": "int",
+        "default": 1024,
+        "hint": "默认推荐 1024 x 1536；如果填写了不支持的尺寸，插件会自动贴近到可用尺寸。示例：1024"
+      },
+      "height": {
+        "description": "默认高度",
+        "type": "int",
+        "default": 1536,
+        "hint": "默认推荐 1024 x 1536；如果填写了不支持的尺寸，插件会自动贴近到可用尺寸。示例：1536"
+      },
+      "allowed_sizes": {
+        "description": "可用尺寸列表",
+        "type": "list",
+        "default": [
+          "832x1216",
+          "896x1152",
+          "1024x1024",
+          "1152x896",
+          "1216x832",
+          "768x1344",
+          "1344x768",
+          "1024x1536"
+        ],
+        "hint": "格式为 宽x高，例如 1024x1536。默认尺寸不在列表中时，会自动使用最接近的允许尺寸。",
+        "collapsed": true,
+        "items": {
+          "type": "string"
+        }
+      },
+      "steps": {
+        "description": "采样步数",
+        "type": "int",
+        "default": 30,
+        "hint": "示例：30",
+        "collapsed": true
+      },
+      "cfg": {
+        "description": "CFG 强度",
+        "type": "float",
+        "default": 5,
+        "hint": "示例：5.0",
+        "collapsed": true
+      },
+      "sampler_name": {
+        "description": "采样器",
+        "type": "string",
+        "default": "er_sde",
+        "hint": "示例：er_sde"
+      },
+      "scheduler": {
+        "description": "调度器",
+        "type": "string",
+        "default": "normal",
+        "hint": "示例：normal"
+      }
+    },
     "condition": {
-      "prompt_optimize_enabled": true
+      "anima_master_comfyui_connection.custom_workflow_enabled": false
     }
   },
-  "prompt_builder_max_content_tags": {
-    "description": "内容 tags 数量上限",
-    "type": "int",
-    "default": 120,
-    "hint": "示例：120",
-    "collapsed": true,
-    "condition": {
-      "prompt_optimize_enabled": true
+  "anima_master_default_prompt": {
+    "description": "默认提示词",
+    "type": "object",
+    "hint": "控制每次生图都会自动加入的正面质量词和负面提示词。",
+    "items": {
+      "quality_prefix": {
+        "description": "质量词前缀",
+        "type": "string",
+        "default": "masterpiece, best quality, score_7, safe,",
+        "hint": "每次生图都会自动加在正面提示词前面。示例：masterpiece, best quality, score_7, safe,"
+      },
+      "negative_prompt": {
+        "description": "负面提示词",
+        "type": "string",
+        "default": "worst quality, low quality, score_1, score_2, score_3, artist name",
+        "hint": "每次生图都会作为反向提示词使用。示例：worst quality, low quality, score_1, score_2, score_3, artist name"
+      }
     }
   },
-  "prompt_builder_web_search_enabled": {
-    "description": "关键词触发联网搜索",
-    "type": "bool",
-    "default": true,
-    "hint": "只在指令里明确写“联网搜索”时使用；需要在 AstrBot 的联网搜索 / 提供商设置中配置 Tavily Key，否则不会成功搜索。",
-    "collapsed": true,
-    "condition": {
-      "prompt_optimize_enabled": true
+  "anima_master_prompting": {
+    "description": "自然语言优化",
+    "type": "object",
+    "hint": "控制中文描述转 Danbooru tags 的方式，以及是否启用联网搜索与深度思考。",
+    "items": {
+      "prompt_optimize_enabled": {
+        "description": "启用自然语言优化",
+        "type": "bool",
+        "default": true,
+        "hint": "开启后会把中文描述扩展成适合生图的 tags；关闭后更接近原样提交。"
+      },
+      "prompt_builder_provider_id": {
+        "description": "自然语言优化模型",
+        "type": "string",
+        "default": "",
+        "hint": "留空使用当前会话主模型。只有想单独指定提示词优化模型时再填写。",
+        "collapsed": true,
+        "condition": {
+          "prompt_optimize_enabled": true
+        }
+      },
+      "prompt_builder_max_tokens": {
+        "description": "优化模型输出上限",
+        "type": "int",
+        "default": 1000,
+        "hint": "示例：1000",
+        "collapsed": true,
+        "condition": {
+          "prompt_optimize_enabled": true
+        }
+      },
+      "prompt_builder_max_content_tags": {
+        "description": "内容 tags 数量上限",
+        "type": "int",
+        "default": 120,
+        "hint": "示例：120",
+        "collapsed": true,
+        "condition": {
+          "prompt_optimize_enabled": true
+        }
+      },
+      "prompt_builder_web_search_enabled": {
+        "description": "关键词触发联网搜索",
+        "type": "bool",
+        "default": true,
+        "hint": "只在指令里明确写“联网搜索”时使用；需要在 AstrBot 的联网搜索 / 提供商设置中配置 Tavily Key，否则不会成功搜索。",
+        "collapsed": true,
+        "condition": {
+          "prompt_optimize_enabled": true
+        }
+      },
+      "prompt_builder_search_max_results": {
+        "description": "搜索结果数量",
+        "type": "int",
+        "default": 5,
+        "hint": "示例：5",
+        "collapsed": true,
+        "condition": {
+          "prompt_optimize_enabled": true,
+          "prompt_builder_web_search_enabled": true
+        }
+      },
+      "prompt_builder_search_depth": {
+        "description": "搜索深度",
+        "type": "string",
+        "default": "advanced",
+        "hint": "可选：basic / advanced。 示例：advanced",
+        "collapsed": true,
+        "condition": {
+          "prompt_optimize_enabled": true,
+          "prompt_builder_web_search_enabled": true
+        }
+      },
+      "prompt_builder_search_query_template": {
+        "description": "搜索词模板",
+        "type": "string",
+        "default": "{prompt} 角色 外观 立绘 服装 配色 武器 官方图 official art character design outfit appearance wiki fandom",
+        "hint": "普通用户不需要修改；只有想改变联网搜索关键词组成时再改。{prompt} 会代表用户原始需求。",
+        "collapsed": true,
+        "condition": {
+          "prompt_optimize_enabled": true,
+          "prompt_builder_web_search_enabled": true
+        }
+      },
+      "prompt_builder_deep_thinking_enabled": {
+        "description": "关键词触发深度思考",
+        "type": "bool",
+        "default": true,
+        "hint": "只在指令里明确写“深度思考”时尝试启用；不支持会自动降级。",
+        "collapsed": true,
+        "condition": {
+          "prompt_optimize_enabled": true
+        }
+      },
+      "prompt_builder_reasoning_effort": {
+        "description": "思考强度",
+        "type": "string",
+        "default": "high",
+        "hint": "常用：high / max。 示例：high",
+        "collapsed": true,
+        "condition": {
+          "prompt_optimize_enabled": true,
+          "prompt_builder_deep_thinking_enabled": true
+        }
+      },
+      "prompt_builder_template": {
+        "description": "自然语言优化模板",
+        "type": "string",
+        "default": "你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。\n\n请先在内部判断用户输入类型：\n1. 如果用户输入很短、只是一两个短句，请主动进行审美补全，重点补出主体外观、服装结构、材质、配色、装饰物、动作和表情，让角色本身完整而精致。\n2. 如果用户输入很具体，请优先精确遵守用户要求，不要擅自改主题、角色身份、服装方向或构图重点。\n3. 如果用户输入已经像完整 Danbooru tags，请尽量保持原意，只做必要的补全和规范化。\n\n画面设计原则：\n- 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。\n- 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。\n- 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。\n- 具体内容段默认应当足够厚实，常规输出 70-120 个内容 tags；如果前缀已经包含质量词、固定角色和画师词，具体内容段的长度建议接近前缀长度的 2 倍左右。\n- 请把主题拆成多层可见细节：主体类型、体型/年龄感、发型变化、服装主件、内外层、领口、袖型、腰部结构、裙摆/裤装、鞋袜、材质、纹样、金属件、饰品、手部动作、肢体姿态、表情、视线、道具和少量画面稳定 tags。\n- 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。\n- 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。\n- 默认审美为可爱、明亮、精致、干净，适合二次元角色展示；用户要求涩气、阴暗、华丽或其它风格时，以用户要求为准。\n- 部分中文概念直译可能不是有效 tag，请转译为可见的 Danbooru 视觉元素。例如：苗族少女可以转成 ornate silver headdress、silver jewelry、embroidered dress。\n\n角色和参考规则：\n{character_rule}\n如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。\n即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n输出要求：\n- 只输出英文 Danbooru tags，用英文逗号分隔。\n- 不要输出解释、标题、Markdown、编号或中文。\n- 不要输出质量词，例如 masterpiece、best quality、worst quality、low quality、score_7。\n- 不要输出画师词，例如 @artist。\n- 不要重复固定角色已经提供的固有发色、瞳色、种族和固定配饰。\n- 不要为了凑长度重复同义 tags；长度应来自更多具体、可见、可生成的细节。\n\n用户主题：\n{theme}",
+        "hint": "决定插件如何把中文需求改写成 tags；普通用户不需要修改。详见 docs/prompting.md。",
+        "collapsed": true,
+        "condition": {
+          "prompt_optimize_enabled": true
+        }
+      }
     }
   },
-  "prompt_builder_search_max_results": {
-    "description": "搜索结果数量",
-    "type": "int",
-    "default": 5,
-    "hint": "示例：5",
-    "collapsed": true,
-    "condition": {
-      "prompt_optimize_enabled": true,
-      "prompt_builder_web_search_enabled": true
-    }
-  },
-  "prompt_builder_search_depth": {
-    "description": "搜索深度",
-    "type": "string",
-    "default": "advanced",
-    "hint": "可选：basic / advanced。 示例：advanced",
-    "collapsed": true,
-    "condition": {
-      "prompt_optimize_enabled": true,
-      "prompt_builder_web_search_enabled": true
-    }
-  },
-  "prompt_builder_search_query_template": {
-    "description": "搜索词模板",
-    "type": "string",
-    "default": "{prompt} 角色 外观 立绘 服装 配色 武器 官方图 official art character design outfit appearance wiki fandom",
-    "hint": "普通用户不需要修改；只有想改变联网搜索关键词组成时再改。{prompt} 会代表用户原始需求。",
-    "collapsed": true,
-    "condition": {
-      "prompt_optimize_enabled": true,
-      "prompt_builder_web_search_enabled": true
-    }
-  },
-  "prompt_builder_deep_thinking_enabled": {
-    "description": "关键词触发深度思考",
-    "type": "bool",
-    "default": true,
-    "hint": "只在指令里明确写“深度思考”时尝试启用；不支持会自动降级。",
-    "collapsed": true,
-    "condition": {
-      "prompt_optimize_enabled": true
-    }
-  },
-  "prompt_builder_reasoning_effort": {
-    "description": "思考强度",
-    "type": "string",
-    "default": "high",
-    "hint": "常用：high / max。 示例：high",
-    "collapsed": true,
-    "condition": {
-      "prompt_optimize_enabled": true,
-      "prompt_builder_deep_thinking_enabled": true
-    }
-  },
-  "danbooru_core_tag_lookup_enabled": {
+  "anima_master_tag_lookup": {
     "description": "联网校正角色 Tag",
-    "type": "bool",
-    "default": true,
-    "hint": "只处理少量疑似角色名；需要时访问 Donmai / Danbooru。"
-  },
-  "danbooru_tag_base_urls": {
-    "description": "Donmai 查询地址",
-    "type": "string",
-    "default": "https://safebooru.donmai.us,https://danbooru.donmai.us",
-    "hint": "逗号分隔，仅用于核心角色 tag 查询。示例：https://safebooru.donmai.us,https://danbooru.donmai.us",
-    "collapsed": true,
-    "condition": {
-      "danbooru_core_tag_lookup_enabled": true
-    }
-  },
-  "danbooru_tag_user_agent": {
-    "description": "访问标识 User-Agent",
-    "type": "string",
-    "default": "AstrBotAnimaMaster",
-    "hint": "访问 Donmai 只读 API 时使用。示例：AstrBotAnimaMaster",
-    "collapsed": true,
-    "condition": {
-      "danbooru_core_tag_lookup_enabled": true
-    }
-  },
-  "danbooru_tag_lookup_timeout": {
-    "description": "查询超时（秒）",
-    "type": "float",
-    "default": 6,
-    "hint": "示例：6",
-    "collapsed": true,
-    "condition": {
-      "danbooru_core_tag_lookup_enabled": true
-    }
-  },
-  "danbooru_tag_max_candidates": {
-    "description": "候选 tag 上限",
-    "type": "int",
-    "default": 6,
-    "hint": "示例：6",
-    "collapsed": true,
-    "condition": {
-      "danbooru_core_tag_lookup_enabled": true
-    }
-  },
-  "fixed_characters": {
-    "description": "角色",
-    "type": "list",
-    "default": [],
-    "hint": "每行一个角色，格式：角色名=tags。只有用户提到角色名时才会使用。推荐在聊天里用 /anm 添加角色 名称=tags 添加。示例：狐莉=1girl, solo, fox girl",
-    "collapsed": true,
+    "type": "object",
+    "hint": "用于校正少量角色核心 tag；只在需要时访问 Donmai / Danbooru。",
     "items": {
-      "type": "string"
+      "danbooru_core_tag_lookup_enabled": {
+        "description": "联网校正角色 Tag",
+        "type": "bool",
+        "default": true,
+        "hint": "只处理少量疑似角色名；需要时访问 Donmai / Danbooru。"
+      },
+      "danbooru_tag_base_urls": {
+        "description": "Donmai 查询地址",
+        "type": "string",
+        "default": "https://safebooru.donmai.us,https://danbooru.donmai.us",
+        "hint": "逗号分隔，仅用于核心角色 tag 查询。示例：https://safebooru.donmai.us,https://danbooru.donmai.us",
+        "collapsed": true,
+        "condition": {
+          "danbooru_core_tag_lookup_enabled": true
+        }
+      },
+      "danbooru_tag_user_agent": {
+        "description": "访问标识 User-Agent",
+        "type": "string",
+        "default": "AstrBotAnimaMaster",
+        "hint": "访问 Donmai 只读 API 时使用。示例：AstrBotAnimaMaster",
+        "collapsed": true,
+        "condition": {
+          "danbooru_core_tag_lookup_enabled": true
+        }
+      },
+      "danbooru_tag_lookup_timeout": {
+        "description": "查询超时（秒）",
+        "type": "float",
+        "default": 6,
+        "hint": "示例：6",
+        "collapsed": true,
+        "condition": {
+          "danbooru_core_tag_lookup_enabled": true
+        }
+      },
+      "danbooru_tag_max_candidates": {
+        "description": "候选 tag 上限",
+        "type": "int",
+        "default": 6,
+        "hint": "示例：6",
+        "collapsed": true,
+        "condition": {
+          "danbooru_core_tag_lookup_enabled": true
+        }
+      }
     }
   },
-  "default_artist_tags": {
-    "description": "备用画师 tags",
-    "type": "string",
-    "default": "",
-    "hint": "通常不用填；只有未启用画师组时才会读取这里。示例：@artist_a, @artist_b,",
-    "collapsed": true
-  },
-  "artist_presets": {
-    "description": "已保存的画师组",
-    "type": "list",
-    "default": [],
-    "hint": "每行一个画师组，格式：名称=tags。推荐在聊天里用 /anm 创建画师组 名称=tags 添加。示例：千代风格=@artist_a, @artist_b,",
-    "collapsed": true,
+  "anima_master_style": {
+    "description": "角色与风格",
+    "type": "object",
+    "hint": "用于角色、画师组和风格，以及涩气表现力相关设置。",
     "items": {
-      "type": "string"
+      "fixed_characters": {
+        "description": "角色",
+        "type": "list",
+        "default": [],
+        "hint": "每行一个角色，格式：角色名=tags。只有用户提到角色名时才会使用。推荐在聊天里用 /anm 添加角色 名称=tags 添加。示例：狐莉=1girl, solo, fox girl",
+        "collapsed": true,
+        "items": {
+          "type": "string"
+        }
+      },
+      "artist_presets": {
+        "description": "已保存的画师组",
+        "type": "list",
+        "default": [],
+        "hint": "每行一个画师组，格式：名称=tags。推荐在聊天里用 /anm 创建画师组 名称=tags 添加。示例：千代风格=@artist_a, @artist_b,",
+        "collapsed": true,
+        "items": {
+          "type": "string"
+        }
+      },
+      "active_artist_preset": {
+        "description": "启用的画师组",
+        "type": "string",
+        "default": "",
+        "hint": "必须与已保存的画师组名称完全一致。推荐在聊天里用 /anm 切换画师组 名称；手填时注意不要多空格。优先级高于默认画师 tags。示例：千代风格"
+      },
+      "default_artist_tags": {
+        "description": "备用画师 tags",
+        "type": "string",
+        "default": "",
+        "hint": "通常不用填；只有未启用画师组时才会读取这里。示例：@artist_a, @artist_b,",
+        "collapsed": true
+      },
+      "sensual_mode_enabled": {
+        "description": "涩气表现力优化",
+        "type": "bool",
+        "default": true,
+        "hint": "命中相关关键词时，让模型自行补充更有表现力的 tags；不会硬编码固定 tag。"
+      },
+      "sensual_mode_markers": {
+        "description": "涩气触发词",
+        "type": "list",
+        "default": [
+          "色气",
+          "涩气",
+          "擦边",
+          "边界感",
+          "性感",
+          "诱惑",
+          "魅惑",
+          "妖艳",
+          "撩人",
+          "暧昧",
+          "挑逗",
+          "诱人",
+          "透明",
+          "透视",
+          "黑纱",
+          "薄纱",
+          "蕾丝",
+          "吊带",
+          "紧身",
+          "露肩",
+          "绝对领域",
+          "小恶魔",
+          "suggestive",
+          "seductive",
+          "sexy",
+          "sensual",
+          "alluring",
+          "see-through",
+          "sheer",
+          "transparent",
+          "lace",
+          "garter",
+          "teasing"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "hint": "示例：涩气, 透明, lace, teasing",
+        "collapsed": true,
+        "condition": {
+          "sensual_mode_enabled": true
+        }
+      }
     }
   },
-  "active_artist_preset": {
-    "description": "启用的画师组",
-    "type": "string",
-    "default": "",
-    "hint": "必须与已保存的画师组名称完全一致。推荐在聊天里用 /anm 切换画师组 名称；手填时注意不要多空格。优先级高于默认画师 tags。示例：千代风格"
-  },
-  "sensual_mode_enabled": {
-    "description": "涩气表现力优化",
-    "type": "bool",
-    "default": true,
-    "hint": "命中相关关键词时，让模型自行补充更有表现力的 tags；不会硬编码固定 tag。"
-  },
-  "sensual_mode_markers": {
-    "description": "涩气触发词",
-    "type": "list",
-    "default": [
-      "色气",
-      "涩气",
-      "擦边",
-      "边界感",
-      "性感",
-      "诱惑",
-      "魅惑",
-      "妖艳",
-      "撩人",
-      "暧昧",
-      "挑逗",
-      "诱人",
-      "透明",
-      "透视",
-      "黑纱",
-      "薄纱",
-      "蕾丝",
-      "吊带",
-      "紧身",
-      "露肩",
-      "绝对领域",
-      "小恶魔",
-      "suggestive",
-      "seductive",
-      "sexy",
-      "sensual",
-      "alluring",
-      "see-through",
-      "sheer",
-      "transparent",
-      "lace",
-      "garter",
-      "teasing"
-    ],
+  "anima_master_experimental": {
+    "description": "实验与附加功能",
+    "type": "object",
+    "hint": "包含图生图、放大和去背景等附加能力；不影响基础文生图。",
     "items": {
-      "type": "string"
-    },
-    "hint": "示例：涩气, 透明, lace, teasing",
-    "collapsed": true,
-    "condition": {
-      "sensual_mode_enabled": true
+      "img2img_enabled": {
+        "description": "启用图生图 / 改图",
+        "type": "bool",
+        "default": false,
+        "hint": "实验功能，默认关闭。关闭后相关指令会返回关闭提示。",
+        "collapsed": true
+      },
+      "prompt_optimize_img2img_enabled": {
+        "description": "改图时优化提示词",
+        "type": "bool",
+        "default": false,
+        "hint": "当前只适合整图改图；局部重绘请谨慎使用。",
+        "collapsed": true,
+        "condition": {
+          "img2img_enabled": true
+        }
+      },
+      "edit_denoise": {
+        "description": "改图重绘强度",
+        "type": "float",
+        "default": 0.55,
+        "hint": "示例：0.55",
+        "collapsed": true,
+        "condition": {
+          "img2img_enabled": true
+        }
+      },
+      "max_image_side": {
+        "description": "输入图最长边",
+        "type": "int",
+        "default": 1024,
+        "hint": "示例：1024",
+        "collapsed": true,
+        "condition": {
+          "img2img_enabled": true
+        }
+      },
+      "upscale_factor": {
+        "description": "默认放大倍率",
+        "type": "float",
+        "default": 2.0,
+        "hint": "示例：2.0",
+        "collapsed": true
+      },
+      "remove_bg_model": {
+        "description": "去背景模型",
+        "type": "string",
+        "default": "BiRefNet_lite",
+        "hint": "示例：BiRefNet_lite",
+        "collapsed": true
+      }
     }
   },
-  "img2img_enabled": {
-    "description": "启用图生图 / 改图",
-    "type": "bool",
-    "default": false,
-    "hint": "实验功能，默认关闭。关闭后相关指令会返回关闭提示。",
-    "collapsed": true
-  },
-  "prompt_optimize_img2img_enabled": {
-    "description": "改图时优化提示词",
-    "type": "bool",
-    "default": false,
-    "hint": "当前只适合整图改图；局部重绘请谨慎使用。",
-    "collapsed": true,
-    "condition": {
-      "img2img_enabled": true
-    }
-  },
-  "edit_denoise": {
-    "description": "改图重绘强度",
-    "type": "float",
-    "default": 0.55,
-    "hint": "示例：0.55",
-    "collapsed": true,
-    "condition": {
-      "img2img_enabled": true
-    }
-  },
-  "max_image_side": {
-    "description": "输入图最长边",
-    "type": "int",
-    "default": 1024,
-    "hint": "示例：1024",
-    "collapsed": true,
-    "condition": {
-      "img2img_enabled": true
-    }
-  },
-  "upscale_factor": {
-    "description": "默认放大倍率",
-    "type": "float",
-    "default": 2.0,
-    "hint": "示例：2.0",
-    "collapsed": true
-  },
-  "remove_bg_model": {
-    "description": "去背景模型",
-    "type": "string",
-    "default": "BiRefNet_lite",
-    "hint": "示例：BiRefNet_lite",
-    "collapsed": true
-  },
-  "send_result_to_chat": {
-    "description": "发送图片到聊天",
-    "type": "bool",
-    "default": true,
-    "hint": "关闭后只生成文件，不把图片发回聊天。"
-  },
-  "max_send_images": {
-    "description": "最多发送图片数",
-    "type": "int",
-    "default": 1,
-    "hint": "示例：1",
-    "collapsed": true,
-    "condition": {
-      "send_result_to_chat": true
-    }
-  },
-  "admin_only": {
-    "description": "仅管理员可用",
-    "type": "bool",
-    "default": false,
-    "hint": "开启后只有 AstrBot 识别为管理员的用户可以使用。"
-  },
-  "allowed_sender_ids": {
-    "description": "用户白名单",
-    "type": "list",
-    "default": [],
-    "hint": "填写 QQ 号或 AstrBot 识别到的 sender_id；留空表示不限制。示例：123456789",
-    "collapsed": true,
+  "anima_master_delivery": {
+    "description": "发送与权限",
+    "type": "object",
+    "hint": "控制图片是否发回聊天，以及哪些用户可以使用插件。",
     "items": {
-      "type": "string"
+      "send_result_to_chat": {
+        "description": "发送图片到聊天",
+        "type": "bool",
+        "default": true,
+        "hint": "关闭后只生成文件，不把图片发回聊天。"
+      },
+      "max_send_images": {
+        "description": "最多发送图片数",
+        "type": "int",
+        "default": 1,
+        "hint": "示例：1",
+        "collapsed": true,
+        "condition": {
+          "send_result_to_chat": true
+        }
+      },
+      "admin_only": {
+        "description": "仅管理员可用",
+        "type": "bool",
+        "default": false,
+        "hint": "开启后只有 AstrBot 识别为管理员的用户可以使用。"
+      },
+      "allowed_sender_ids": {
+        "description": "用户白名单",
+        "type": "list",
+        "default": [],
+        "hint": "填写 QQ 号或 AstrBot 识别到的 sender_id；留空表示不限制。示例：123456789",
+        "collapsed": true,
+        "items": {
+          "type": "string"
+        }
+      }
     }
   },
-  "auto_start": {
-    "description": "由 AstrBot 启动 ComfyUI",
-    "type": "bool",
-    "default": false,
-    "hint": "高级选项，仅适合 AstrBot 和 ComfyUI 在同一台机器上时使用。服务器 AstrBot 无法直接启动你本机 Windows 上的 ComfyUI。默认关闭；关闭时请用绘世启动器、ComfyUI portable 或自己的方式先启动 ComfyUI。不是开机自启。",
-    "collapsed": true
-  },
-  "startup_command": {
-    "description": "启动命令（开启上项后必填）",
-    "type": "string",
-    "default": "",
-    "hint": "仅在开启“由 AstrBot 启动 ComfyUI”后必填。命令会在 AstrBot 所在机器执行；如果 AstrBot 跑在服务器容器里，这里不能填写本机 Windows 路径。",
-    "condition": {
-      "auto_start": true
-    }
-  },
-  "startup_workdir": {
-    "description": "启动工作目录",
-    "type": "string",
-    "default": "",
-    "hint": "示例：D:\\ComfyUI",
-    "collapsed": true,
-    "condition": {
-      "auto_start": true
-    }
-  },
-  "startup_visible_window": {
-    "description": "启动时显示窗口",
-    "type": "bool",
-    "default": true,
-    "collapsed": true,
-    "condition": {
-      "auto_start": true
-    }
-  },
-  "auto_start_admin_only": {
-    "description": "仅管理员可启动 ComfyUI",
-    "type": "bool",
-    "default": true,
-    "collapsed": true,
-    "condition": {
-      "auto_start": true
-    }
-  },
-  "auto_start_allowed_sender_ids": {
-    "description": "允许启动的用户",
-    "type": "list",
-    "default": [],
-    "collapsed": true,
-    "condition": {
-      "auto_start": true
-    },
+  "anima_master_debug": {
+    "description": "排查问题",
+    "type": "object",
+    "hint": "只在排查问题时临时开启，平时建议保持关闭。",
     "items": {
-      "type": "string"
-    },
-    "hint": "填写 QQ 号或 AstrBot 识别到的 sender_id；留空表示不限制。示例：123456789"
-  },
-  "startup_wait_seconds": {
-    "description": "等待 ComfyUI 就绪时间（秒）",
-    "type": "int",
-    "default": 120,
-    "hint": "示例：120",
-    "collapsed": true,
-    "condition": {
-      "auto_start": true
+      "debug_prompt_enabled": {
+        "description": "保存完整提示词日志",
+        "type": "bool",
+        "default": false,
+        "hint": "仅排查提示词问题时临时开启；平时建议关闭。",
+        "collapsed": true
+      },
+      "debug_image_reference_enabled": {
+        "description": "保存引用图解析日志",
+        "type": "bool",
+        "default": false,
+        "hint": "仅排查引用图问题时临时开启；平时建议关闭。",
+        "collapsed": true
+      },
+      "debug_send_payload_enabled": {
+        "description": "保存发送过程日志",
+        "type": "bool",
+        "default": false,
+        "hint": "仅排查未发图或发送失败时临时开启；平时建议关闭。",
+        "collapsed": true
+      }
     }
-  },
-  "startup_poll_interval": {
-    "description": "ComfyUI 就绪检查间隔（秒）",
-    "type": "int",
-    "default": 3,
-    "hint": "示例：3",
-    "collapsed": true,
-    "condition": {
-      "auto_start": true
-    }
-  },
-  "prompt_builder_template": {
-    "description": "自然语言优化模板",
-    "type": "string",
-    "default": "你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。\n\n请先在内部判断用户输入类型：\n1. 如果用户输入很短、只是一两个短句，请主动进行审美补全，重点补出主体外观、服装结构、材质、配色、装饰物、动作和表情，让角色本身完整而精致。\n2. 如果用户输入很具体，请优先精确遵守用户要求，不要擅自改主题、角色身份、服装方向或构图重点。\n3. 如果用户输入已经像完整 Danbooru tags，请尽量保持原意，只做必要的补全和规范化。\n\n画面设计原则：\n- 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。\n- 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。\n- 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。\n- 具体内容段默认应当足够厚实，常规输出 70-120 个内容 tags；如果前缀已经包含质量词、固定角色和画师词，具体内容段的长度建议接近前缀长度的 2 倍左右。\n- 请把主题拆成多层可见细节：主体类型、体型/年龄感、发型变化、服装主件、内外层、领口、袖型、腰部结构、裙摆/裤装、鞋袜、材质、纹样、金属件、饰品、手部动作、肢体姿态、表情、视线、道具和少量画面稳定 tags。\n- 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。\n- 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。\n- 默认审美为可爱、明亮、精致、干净，适合二次元角色展示；用户要求涩气、阴暗、华丽或其它风格时，以用户要求为准。\n- 部分中文概念直译可能不是有效 tag，请转译为可见的 Danbooru 视觉元素。例如：苗族少女可以转成 ornate silver headdress、silver jewelry、embroidered dress。\n\n角色和参考规则：\n{character_rule}\n如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。\n即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n输出要求：\n- 只输出英文 Danbooru tags，用英文逗号分隔。\n- 不要输出解释、标题、Markdown、编号或中文。\n- 不要输出质量词，例如 masterpiece、best quality、worst quality、low quality、score_7。\n- 不要输出画师词，例如 @artist。\n- 不要重复固定角色已经提供的固有发色、瞳色、种族和固定配饰。\n- 不要为了凑长度重复同义 tags；长度应来自更多具体、可见、可生成的细节。\n\n用户主题：\n{theme}",
-    "hint": "决定插件如何把中文需求改写成 tags；普通用户不需要修改。详见 docs/prompting.md。",
-    "collapsed": true,
-    "condition": {
-      "prompt_optimize_enabled": true
-    }
-  },
-  "debug_prompt_enabled": {
-    "description": "保存完整提示词日志",
-    "type": "bool",
-    "default": false,
-    "hint": "仅排查提示词问题时临时开启；平时建议关闭。",
-    "collapsed": true
-  },
-  "debug_image_reference_enabled": {
-    "description": "保存引用图解析日志",
-    "type": "bool",
-    "default": false,
-    "hint": "仅排查引用图问题时临时开启；平时建议关闭。",
-    "collapsed": true
-  },
-  "debug_send_payload_enabled": {
-    "description": "保存发送过程日志",
-    "type": "bool",
-    "default": false,
-    "hint": "仅排查未发图或发送失败时临时开启；平时建议关闭。",
-    "collapsed": true
   }
 }

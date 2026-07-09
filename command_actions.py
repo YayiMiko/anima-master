@@ -1,18 +1,24 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any, Callable
 
 try:
     from .command_router import help_text
+    from .config_defaults import persist_flat_config_key
     from .deployment_diagnostics import compact_status_text, diagnostic_text
     from .prompt_presets import active_artist_preset_name, artist_presets, fixed_character_tags, merge_tag_text
     from .tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from command_router import help_text
+    from config_defaults import persist_flat_config_key
     from deployment_diagnostics import compact_status_text, diagnostic_text
     from prompt_presets import active_artist_preset_name, artist_presets, fixed_character_tags, merge_tag_text
     from tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
+
+
+SCHEMA_PATH = Path(__file__).with_name("_conf_schema.json")
 
 
 class CommandActionHandler:
@@ -74,7 +80,7 @@ class CommandActionHandler:
     def _persist_config_key(self, key: str, value: Any) -> None:
         self.config[key] = value
         if isinstance(self._config_store, dict):
-            self._config_store[key] = value
+            persist_flat_config_key(self._config_store, SCHEMA_PATH, key, value)
         save_config = getattr(self._config_store, "save_config", None)
         if callable(save_config):
             save_config()

@@ -10,12 +10,12 @@ from astrbot.core.star.filter.command import GreedyStr
 
 try:
     from .command_router import parse_hard_route
-    from .config_defaults import maybe_reset_to_defaults
+    from .config_defaults import flatten_config, group_config, maybe_migrate_to_grouped_config, maybe_reset_to_defaults
     from .prompt_presets import apply_config_preset, maybe_materialize_chiyo_preset
     from .service_container import build_services
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from command_router import parse_hard_route
-    from config_defaults import maybe_reset_to_defaults
+    from config_defaults import flatten_config, group_config, maybe_migrate_to_grouped_config, maybe_reset_to_defaults
     from prompt_presets import apply_config_preset, maybe_materialize_chiyo_preset
     from service_container import build_services
 
@@ -25,14 +25,19 @@ class ComfyUIAgentPlugin(Star):
 
     def __init__(self, context: Context, config: AstrBotConfig | None = None):
         super().__init__(context, config)
+        schema_path = Path(__file__).with_name("_conf_schema.json")
+        grouped_or_reset = maybe_migrate_to_grouped_config(config or {}, schema_path)
         raw_or_reset = maybe_reset_to_defaults(
             config or {},
-            Path(__file__).with_name("_conf_schema.json"),
+            schema_path,
         )
+        raw_or_reset = flatten_config(raw_or_reset or grouped_or_reset)
         raw_config = maybe_materialize_chiyo_preset(
-            config if config is not None else raw_or_reset,
+            None,
             base_config=raw_or_reset,
         )
+        if config is not None and group_config(raw_config, schema_path) != dict(config or {}):
+            config.save_config(replace_config=group_config(raw_config, schema_path))
         self.config = apply_config_preset(raw_config)
         self._danbooru_tag_cache: dict[str, list[Any]] = {}
         self._last_prompt_summary: dict[str, Any] = {}

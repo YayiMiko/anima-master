@@ -16,6 +16,8 @@
       "items": [
         "comfyui_base_url",
         "workflow",
+        "custom_workflow_enabled",
+        "custom_workflow_path",
         "timeout",
         "poll_interval",
         "auto_start",

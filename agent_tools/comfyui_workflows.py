@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import copy
+import json
+from pathlib import Path
 from typing import Any
 
 
@@ -163,7 +166,106 @@ def workflow(
     seed: int,
 ) -> dict[str, Any]:
     """Build the configured generation workflow graph."""
+    if bool(config.get("custom_workflow_enabled", False)):
+        return custom_t2i_workflow(config, prompt, negative_prompt, width, height, steps, cfg, seed)
+
     workflow_name = str(config.get("workflow") or "anima_t2i")
     if workflow_name != "anima_t2i":
         raise SystemExit(f"unsupported workflow: {workflow_name}")
     return anima_t2i_workflow(config, prompt, negative_prompt, width, height, steps, cfg, seed)
+
+
+def custom_t2i_workflow(
+    config: dict[str, Any],
+    prompt: str,
+    negative_prompt: str,
+    width: int,
+    height: int,
+    steps: int,
+    cfg: float,
+    seed: int,
+) -> dict[str, Any]:
+    """Build a text-to-image workflow from a user-provided ComfyUI API JSON."""
+    path_text = str(config.get("custom_workflow_path") or "").strip()
+    if not path_text:
+        raise SystemExit("custom_workflow_path_not_configured")
+
+    path = Path(path_text).expanduser()
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parents[1] / path
+    if not path.exists():
+        raise SystemExit(f"custom_workflow_not_found: {path}")
+
+    raw = json.loads(path.read_text(encoding="utf-8-sig"))
+    body = raw.get("prompt") if isinstance(raw, dict) and isinstance(raw.get("prompt"), dict) else raw
+    if not isinstance(body, dict):
+        raise SystemExit("custom_workflow_invalid_json")
+
+    workflow_body = copy.deepcopy(body)
+    _apply_custom_workflow_inputs(workflow_body, config, prompt, negative_prompt, width, height, steps, cfg, seed)
+    return workflow_body
+
+
+def _apply_custom_workflow_inputs(
+    workflow_body: dict[str, Any],
+    config: dict[str, Any],
+    prompt: str,
+    negative_prompt: str,
+    width: int,
+    height: int,
+    steps: int,
+    cfg: float,
+    seed: int,
+) -> None:
+    text_nodes = _text_encode_nodes(workflow_body)
+    positive_ids = _auto_positive_node_ids(text_nodes)
+    negative_ids = _auto_negative_node_ids(text_nodes, positive_ids)
+
+    if not positive_ids:
+        raise SystemExit("custom_workflow_positive_node_not_found")
+
+    for node_id in positive_ids:
+        _set_node_input(workflow_body, node_id, "text", prompt)
+    for node_id in negative_ids:
+        _set_node_input(workflow_body, node_id, "text", negative_prompt)
+
+    for node in workflow_body.values():
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        if "seed" in inputs:
+            inputs["seed"] = seed
+        if "noise_seed" in inputs:
+            inputs["noise_seed"] = seed
+
+
+def _text_encode_nodes(workflow_body: dict[str, Any]) -> list[str]:
+    node_ids: list[str] = []
+    for node_id, node in workflow_body.items():
+        if not isinstance(node, dict):
+            continue
+        class_type = str(node.get("class_type") or "")
+        inputs = node.get("inputs")
+        if "TextEncode" in class_type and isinstance(inputs, dict) and isinstance(inputs.get("text"), str):
+            node_ids.append(str(node_id))
+    return node_ids
+
+
+def _auto_positive_node_ids(text_nodes: list[str]) -> list[str]:
+    return text_nodes[:1]
+
+
+def _auto_negative_node_ids(workflow_body_text_nodes: list[str], positive_ids: list[str]) -> list[str]:
+    return [node_id for node_id in workflow_body_text_nodes if node_id not in set(positive_ids)][:1]
+
+
+def _set_node_input(workflow_body: dict[str, Any], node_id: str, input_name: str, value: Any) -> None:
+    node = workflow_body.get(str(node_id))
+    if not isinstance(node, dict):
+        raise SystemExit(f"custom_workflow_node_not_found: {node_id}")
+    inputs = node.get("inputs")
+    if not isinstance(inputs, dict):
+        raise SystemExit(f"custom_workflow_node_has_no_inputs: {node_id}")
+    inputs[input_name] = value
