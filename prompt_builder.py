@@ -4,11 +4,10 @@ from typing import Any
 try:
     from .prompt_constraints import PromptConstraintPlan, apply_prompt_constraints
     from .prompt_presets import (
-        DEFAULT_ARTIST_TAGS,
         DEFAULT_CHARACTER_TAGS,
         DEFAULT_QUALITY_TAGS,
-        apply_config_preset,
         active_artist_tags,
+        apply_config_preset,
         selected_fixed_character,
         strip_raw_prefix,
         wants_default_style,
@@ -18,11 +17,10 @@ try:
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from prompt_constraints import PromptConstraintPlan, apply_prompt_constraints
     from prompt_presets import (
-        DEFAULT_ARTIST_TAGS,
         DEFAULT_CHARACTER_TAGS,
         DEFAULT_QUALITY_TAGS,
-        apply_config_preset,
         active_artist_tags,
+        apply_config_preset,
         selected_fixed_character,
         strip_raw_prefix,
         wants_default_style,
@@ -42,6 +40,7 @@ class PromptBuildResult:
     character_name: str = ""
     used_sensual_mode: bool = False
     constraint_mode: bool = False
+    weighted_style_tags: tuple[str, ...] = ()
     constraint_tags: tuple[str, ...] = ()
     removed_constraint_tags: tuple[str, ...] = ()
     constraint_reason: str = ""
@@ -69,6 +68,7 @@ def build_final_prompt(
             character_name="",
             used_sensual_mode=False,
             constraint_mode=False,
+            weighted_style_tags=(),
             constraint_tags=(),
             removed_constraint_tags=(),
             constraint_reason="",
@@ -122,6 +122,8 @@ def build_final_prompt(
     parts = [quality]
     if required_core_tags:
         parts.append(", ".join(required_core_tags))
+    if constraint_result.weighted_style_tags:
+        parts.append(", ".join(constraint_result.weighted_style_tags))
     if use_character:
         parts.append(character)
     if use_style:
@@ -137,6 +139,7 @@ def build_final_prompt(
         character_name=character_name,
         used_sensual_mode=use_sensual,
         constraint_mode=constraint_result.triggered,
+        weighted_style_tags=constraint_result.weighted_style_tags,
         constraint_tags=constraint_result.priority_tags,
         removed_constraint_tags=constraint_result.removed_tags,
         constraint_reason=constraint_result.reason,

@@ -5,8 +5,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-
-DEFAULT_NEGATIVE_PROMPT = "worst quality, low quality, score_1, score_2, score_3, artist name"
+DEFAULT_NEGATIVE_PROMPT = (
+    "worst quality, low quality, score_1, score_2, score_3, artist name"
+)
 
 
 def anima_t2i_workflow(
@@ -38,7 +39,9 @@ def anima_t2i_workflow(
         },
         "15": {
             "class_type": "VAELoader",
-            "inputs": {"vae_name": config.get("vae_name", "qwen_image_vae.safetensors")},
+            "inputs": {
+                "vae_name": config.get("vae_name", "qwen_image_vae.safetensors")
+            },
         },
         "28": {
             "class_type": "EmptyLatentImage",
@@ -76,7 +79,7 @@ def anima_t2i_workflow(
         },
         "9": {
             "class_type": "SaveImage",
-            "inputs": {"images": ["8", 0], "filename_prefix": "AstrBot_ComfyUI/comfyui"},
+            "inputs": {"images": ["8", 0], "filename_prefix": "astrbot/anm"},
         },
     }
 
@@ -94,7 +97,9 @@ def anima_img2img_workflow(
 ) -> dict[str, Any]:
     """Build the Anima image-to-image workflow graph."""
     negative_prompt = str(config.get("negative_prompt", DEFAULT_NEGATIVE_PROMPT))
-    workflow = anima_t2i_workflow(config, prompt, negative_prompt, width, height, steps, cfg, seed)
+    workflow = anima_t2i_workflow(
+        config, prompt, negative_prompt, width, height, steps, cfg, seed
+    )
     workflow["10"] = {"class_type": "LoadImage", "inputs": {"image": image_name}}
     workflow["13"] = {
         "class_type": "ImageScale",
@@ -112,21 +117,27 @@ def anima_img2img_workflow(
     }
     workflow["19"]["inputs"]["latent_image"] = ["14", 0]
     workflow["19"]["inputs"]["denoise"] = denoise
-    workflow["9"]["inputs"]["filename_prefix"] = "AstrBot_ComfyUI/edit"
+    workflow["9"]["inputs"]["filename_prefix"] = "astrbot/edit"
     return workflow
 
 
-def upscale_workflow(config: dict[str, Any], image_name: str, scale: float) -> dict[str, Any]:
+def upscale_workflow(
+    config: dict[str, Any], image_name: str, scale: float
+) -> dict[str, Any]:
     """Build a simple image upscale workflow graph."""
     return {
         "10": {"class_type": "LoadImage", "inputs": {"image": image_name}},
         "20": {
             "class_type": "ImageScaleBy",
-            "inputs": {"image": ["10", 0], "upscale_method": "lanczos", "scale_by": scale},
+            "inputs": {
+                "image": ["10", 0],
+                "upscale_method": "lanczos",
+                "scale_by": scale,
+            },
         },
         "30": {
             "class_type": "SaveImage",
-            "inputs": {"images": ["20", 0], "filename_prefix": "AstrBot_ComfyUI/upscale"},
+            "inputs": {"images": ["20", 0], "filename_prefix": "astrbot/upscale"},
         },
     }
 
@@ -150,7 +161,7 @@ def remove_bg_workflow(config: dict[str, Any], image_name: str) -> dict[str, Any
         },
         "30": {
             "class_type": "SaveImage",
-            "inputs": {"images": ["20", 0], "filename_prefix": "AstrBot_ComfyUI/remove_bg"},
+            "inputs": {"images": ["20", 0], "filename_prefix": "astrbot/remove_bg"},
         },
     }
 
@@ -167,12 +178,16 @@ def workflow(
 ) -> dict[str, Any]:
     """Build the configured generation workflow graph."""
     if bool(config.get("custom_workflow_enabled", False)):
-        return custom_t2i_workflow(config, prompt, negative_prompt, width, height, steps, cfg, seed)
+        return custom_t2i_workflow(
+            config, prompt, negative_prompt, width, height, steps, cfg, seed
+        )
 
     workflow_name = str(config.get("workflow") or "anima_t2i")
     if workflow_name != "anima_t2i":
         raise SystemExit(f"unsupported workflow: {workflow_name}")
-    return anima_t2i_workflow(config, prompt, negative_prompt, width, height, steps, cfg, seed)
+    return anima_t2i_workflow(
+        config, prompt, negative_prompt, width, height, steps, cfg, seed
+    )
 
 
 def custom_t2i_workflow(
@@ -197,12 +212,18 @@ def custom_t2i_workflow(
         raise SystemExit(f"custom_workflow_not_found: {path}")
 
     raw = json.loads(path.read_text(encoding="utf-8-sig"))
-    body = raw.get("prompt") if isinstance(raw, dict) and isinstance(raw.get("prompt"), dict) else raw
+    body = (
+        raw.get("prompt")
+        if isinstance(raw, dict) and isinstance(raw.get("prompt"), dict)
+        else raw
+    )
     if not isinstance(body, dict):
         raise SystemExit("custom_workflow_invalid_json")
 
     workflow_body = copy.deepcopy(body)
-    _apply_custom_workflow_inputs(workflow_body, config, prompt, negative_prompt, width, height, steps, cfg, seed)
+    _apply_custom_workflow_inputs(
+        workflow_body, config, prompt, negative_prompt, width, height, steps, cfg, seed
+    )
     return workflow_body
 
 
@@ -232,9 +253,12 @@ def _apply_custom_workflow_inputs(
     for node in workflow_body.values():
         if not isinstance(node, dict):
             continue
+        class_type = str(node.get("class_type") or "")
         inputs = node.get("inputs")
         if not isinstance(inputs, dict):
             continue
+        if class_type == "SaveImage" and "filename_prefix" in inputs:
+            inputs["filename_prefix"] = "astrbot/anm"
         if "seed" in inputs:
             inputs["seed"] = seed
         if "noise_seed" in inputs:
@@ -248,7 +272,11 @@ def _text_encode_nodes(workflow_body: dict[str, Any]) -> list[str]:
             continue
         class_type = str(node.get("class_type") or "")
         inputs = node.get("inputs")
-        if "TextEncode" in class_type and isinstance(inputs, dict) and isinstance(inputs.get("text"), str):
+        if (
+            "TextEncode" in class_type
+            and isinstance(inputs, dict)
+            and isinstance(inputs.get("text"), str)
+        ):
             node_ids.append(str(node_id))
     return node_ids
 
@@ -257,11 +285,19 @@ def _auto_positive_node_ids(text_nodes: list[str]) -> list[str]:
     return text_nodes[:1]
 
 
-def _auto_negative_node_ids(workflow_body_text_nodes: list[str], positive_ids: list[str]) -> list[str]:
-    return [node_id for node_id in workflow_body_text_nodes if node_id not in set(positive_ids)][:1]
+def _auto_negative_node_ids(
+    workflow_body_text_nodes: list[str], positive_ids: list[str]
+) -> list[str]:
+    return [
+        node_id
+        for node_id in workflow_body_text_nodes
+        if node_id not in set(positive_ids)
+    ][:1]
 
 
-def _set_node_input(workflow_body: dict[str, Any], node_id: str, input_name: str, value: Any) -> None:
+def _set_node_input(
+    workflow_body: dict[str, Any], node_id: str, input_name: str, value: Any
+) -> None:
     node = workflow_body.get(str(node_id))
     if not isinstance(node, dict):
         raise SystemExit(f"custom_workflow_node_not_found: {node_id}")

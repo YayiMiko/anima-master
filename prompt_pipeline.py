@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 try:
     from .danbooru_resolver import DanbooruResolver
@@ -116,9 +117,13 @@ class PromptPipeline:
             )
             return str(provider_id or "").strip()
         except Exception as exc:
-            self.logger.warning("[comfyui_agent] failed to get current chat provider: %s", exc)
+            self.logger.warning(
+                "[comfyui_agent] failed to get current chat provider: %s", exc
+            )
         cfg = self.context.get_config(umo=event.unified_msg_origin)
-        return str(cfg.get("provider_settings", {}).get("default_provider_id") or "").strip()
+        return str(
+            cfg.get("provider_settings", {}).get("default_provider_id") or ""
+        ).strip()
 
     async def _generate_prompt_tags_with_llm(
         self,
@@ -148,7 +153,9 @@ class PromptPipeline:
             "max_tokens": self._int("prompt_builder_max_tokens", 700),
         }
         if use_deep_thinking:
-            kwargs["reasoning_effort"] = self._str("prompt_builder_reasoning_effort", "high") or "high"
+            kwargs["reasoning_effort"] = (
+                self._str("prompt_builder_reasoning_effort", "high") or "high"
+            )
             kwargs["thinking"] = {"type": "enabled"}
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()
@@ -172,7 +179,9 @@ class PromptPipeline:
             "max_tokens": min(self._int("prompt_builder_max_tokens", 700), 500),
         }
         if use_deep_thinking:
-            kwargs["reasoning_effort"] = self._str("prompt_builder_reasoning_effort", "high") or "high"
+            kwargs["reasoning_effort"] = (
+                self._str("prompt_builder_reasoning_effort", "high") or "high"
+            )
             kwargs["thinking"] = {"type": "enabled"}
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()
@@ -195,7 +204,9 @@ class PromptPipeline:
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()
 
-    async def build(self, event: Any, user_prompt: str, mode: str = "txt2img") -> PromptPipelineResult:
+    async def build(
+        self, event: Any, user_prompt: str, mode: str = "txt2img"
+    ) -> PromptPipelineResult:
         """Build the final prompt and summary for one generation request.
 
         Args:
@@ -236,7 +247,9 @@ class PromptPipeline:
 
         provider_id = await self._current_chat_provider_id(event)
         if not provider_id:
-            self.logger.warning("[comfyui_agent] prompt builder has no provider; using original prompt")
+            self.logger.warning(
+                "[comfyui_agent] prompt builder has no provider; using original prompt"
+            )
             summary.update(
                 {
                     "skipped_reason": "no_chat_provider",
@@ -253,7 +266,9 @@ class PromptPipeline:
         use_sensual_mode = wants_sensual_mode(prompt, prompt_config)
         outfit_plan = detect_outfit_transfer(prompt, fixed_character_name)
         required_core_tags = (
-            self._danbooru_resolver.required_core_tags_for_prompt(prompt) if not use_fixed_character else ()
+            self._danbooru_resolver.required_core_tags_for_prompt(prompt)
+            if not use_fixed_character
+            else ()
         )
         self.logger.info(
             "[comfyui_agent] prompt builder input fixed_character=%s sensual=%s required_core_tags=%s prompt=%s",
@@ -282,7 +297,9 @@ class PromptPipeline:
         )
         outfit_summary = ""
         outfit_summary_source = ""
-        reference_tag_text = extract_reference_tag_text(prompt) if outfit_plan.enabled else ""
+        reference_tag_text = (
+            extract_reference_tag_text(prompt) if outfit_plan.enabled else ""
+        )
         if reference_tag_text:
             outfit_summary = filter_outfit_tags(reference_tag_text, max_tags=42)
             if outfit_summary:
@@ -303,9 +320,14 @@ class PromptPipeline:
                 if outfit_summary:
                     outfit_summary_source = "search_summary"
                 if self._bool("debug_prompt_enabled", False):
-                    self.logger.info("[comfyui_agent] outfit summary LLM output:\n%s", raw_outfit_summary)
+                    self.logger.info(
+                        "[comfyui_agent] outfit summary LLM output:\n%s",
+                        raw_outfit_summary,
+                    )
             except Exception as exc:
-                self.logger.warning("[comfyui_agent] outfit summary build failed: %s", exc)
+                self.logger.warning(
+                    "[comfyui_agent] outfit summary build failed: %s", exc
+                )
         llm_prompt = build_llm_prompt(
             prompt,
             search_context=search_context,
@@ -314,10 +336,14 @@ class PromptPipeline:
             sensual_mode=use_sensual_mode,
             mode=mode,
             prompt_builder_template=self._str("prompt_builder_template", ""),
-            outfit_transfer_rule=build_outfit_transfer_block(outfit_plan, outfit_summary),
+            outfit_transfer_rule=build_outfit_transfer_block(
+                outfit_plan, outfit_summary
+            ),
         )
         if self._bool("debug_prompt_enabled", False):
-            self.logger.info("[comfyui_agent] prompt builder LLM prompt:\n%s", llm_prompt)
+            self.logger.info(
+                "[comfyui_agent] prompt builder LLM prompt:\n%s", llm_prompt
+            )
         llm_content = ""
         llm_error = ""
         try:
@@ -330,7 +356,9 @@ class PromptPipeline:
             )
         except Exception as exc:
             if not research_plan.use_deep_thinking:
-                self.logger.warning("[comfyui_agent] prompt builder LLM failed: %s", exc)
+                self.logger.warning(
+                    "[comfyui_agent] prompt builder LLM failed: %s", exc
+                )
                 llm_error = str(exc)
                 llm_content = ""
             else:
@@ -347,12 +375,16 @@ class PromptPipeline:
                         character_name=fixed_character_name,
                     )
                 except Exception as retry_exc:
-                    self.logger.warning("[comfyui_agent] prompt builder LLM failed: %s", retry_exc)
+                    self.logger.warning(
+                        "[comfyui_agent] prompt builder LLM failed: %s", retry_exc
+                    )
                     llm_error = str(retry_exc)
                     llm_content = ""
 
         if self._bool("debug_prompt_enabled", False):
-            self.logger.info("[comfyui_agent] prompt builder LLM output:\n%s", llm_content)
+            self.logger.info(
+                "[comfyui_agent] prompt builder LLM output:\n%s", llm_content
+            )
         llm_failed = bool(llm_error and not str(llm_content or "").strip())
         llm_content = await self._danbooru_resolver.resolve(
             llm_content=llm_content,
@@ -372,7 +404,9 @@ class PromptPipeline:
             )
             constraint_plan = parse_constraint_plan(constraint_raw)
         except Exception as constraint_exc:
-            self.logger.warning("[comfyui_agent] prompt constraint planner failed: %s", constraint_exc)
+            self.logger.warning(
+                "[comfyui_agent] prompt constraint planner failed: %s", constraint_exc
+            )
         built = build_final_prompt(
             user_prompt=prompt,
             llm_content=llm_content,
@@ -382,7 +416,12 @@ class PromptPipeline:
         )
         content_tag_count = len(split_tags(built.content_tags))
         short_content_retry = False
-        if not llm_failed and not built.raw_mode and not built.constraint_mode and content_tag_count < 60:
+        if (
+            not llm_failed
+            and not built.raw_mode
+            and not built.constraint_mode
+            and content_tag_count < 60
+        ):
             retry_prompt = (
                 llm_prompt
                 + "\n-----------\n"
@@ -417,9 +456,12 @@ class PromptPipeline:
                     content_tag_count = retry_tag_count
                     short_content_retry = True
             except Exception as retry_exc:
-                self.logger.warning("[comfyui_agent] prompt builder short-content retry failed: %s", retry_exc)
+                self.logger.warning(
+                    "[comfyui_agent] prompt builder short-content retry failed: %s",
+                    retry_exc,
+                )
         self.logger.info(
-            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s constraint=%s required_core_tags=%s content_tags=%s content_chars=%s final_chars=%s final_head=%s",
+            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s constraint=%s weighted_style=%s required_core_tags=%s content_tags=%s content_chars=%s final_chars=%s final_head=%s",
             built.raw_mode,
             bool(search_context),
             research_plan.use_deep_thinking,
@@ -428,6 +470,7 @@ class PromptPipeline:
             built.used_fixed_character,
             built.used_default_style,
             built.constraint_mode,
+            ",".join(built.weighted_style_tags) or "none",
             ",".join(built.required_core_tags) or "none",
             content_tag_count,
             len(built.content_tags),
@@ -446,6 +489,7 @@ class PromptPipeline:
                 "sensual_mode": built.used_sensual_mode,
                 "default_style": built.used_default_style,
                 "constraint_mode": built.constraint_mode,
+                "weighted_style_tags": list(built.weighted_style_tags),
                 "constraint_tags": list(built.constraint_tags),
                 "removed_constraint_tags": list(built.removed_constraint_tags),
                 "constraint_reason": built.constraint_reason,
@@ -468,7 +512,9 @@ class PromptPipeline:
             }
         )
         if self._bool("debug_prompt_enabled", False):
-            self.logger.info("[comfyui_agent] prompt builder final prompt:\n%s", built.final_prompt)
+            self.logger.info(
+                "[comfyui_agent] prompt builder final prompt:\n%s", built.final_prompt
+            )
             summary.update(
                 {
                     "llm_prompt": llm_prompt,
