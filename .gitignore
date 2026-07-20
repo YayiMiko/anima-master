@@ -10,3 +10,4 @@ build/
 outputs/
 *.log
 config.local.toml
+/data/

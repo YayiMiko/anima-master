@@ -102,6 +102,9 @@
         "artist_presets",
         "active_artist_preset",
         "default_artist_tags",
+        "style_presets",
+        "active_style_preset",
+        "style_tags",
         "sensual_mode_enabled",
         "sensual_mode_markers"
       ]

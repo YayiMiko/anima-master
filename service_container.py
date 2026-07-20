@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from astrbot.core.utils.astrbot_path import get_astrbot_root
 
@@ -11,6 +12,7 @@ try:
     from .command_actions import CommandActionHandler
     from .danbooru_resolver import DanbooruResolver
     from .generation_task import GenerationTaskRunner
+    from .generation_verifier import GenerationVerifier
     from .image_inputs import ImageInputResolver
     from .llm_tool_bridge import LLMToolBridge
     from .message_context import MessageContextBuilder
@@ -23,6 +25,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
     from command_actions import CommandActionHandler
     from danbooru_resolver import DanbooruResolver
     from generation_task import GenerationTaskRunner
+    from generation_verifier import GenerationVerifier
     from image_inputs import ImageInputResolver
     from llm_tool_bridge import LLMToolBridge
     from message_context import MessageContextBuilder
@@ -86,6 +89,7 @@ class AnimaServices:
     prompt_researcher: PromptResearcher
     prompt_pipeline: PromptPipeline
     generation_task: GenerationTaskRunner
+    generation_verifier: GenerationVerifier
     action_handler: CommandActionHandler
     llm_tool_bridge: LLMToolBridge
 
@@ -259,6 +263,15 @@ def build_services(
         get_bool=get_bool,
         shorten=shorten,
     )
+    generation_verifier = GenerationVerifier(
+        context=context,
+        task_recorder=task_recorder,
+        generate_payload=generation_task.generate_payload,
+        logger=logger,
+        get_bool=get_bool,
+        get_int=get_int,
+        get_str=get_str,
+    )
     llm_tool_bridge = LLMToolBridge(
         run_tool=runtime.run_tool,
         generate=generate,
@@ -278,6 +291,7 @@ def build_services(
         prompt_researcher=prompt_researcher,
         prompt_pipeline=prompt_pipeline,
         generation_task=generation_task,
+        generation_verifier=generation_verifier,
         action_handler=action_handler,
         llm_tool_bridge=llm_tool_bridge,
     )

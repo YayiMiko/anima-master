@@ -7,6 +7,7 @@ try:
         DEFAULT_CHARACTER_TAGS,
         DEFAULT_QUALITY_TAGS,
         active_artist_tags,
+        active_style_tags,
         apply_config_preset,
         selected_fixed_character,
         strip_raw_prefix,
@@ -20,6 +21,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
         DEFAULT_CHARACTER_TAGS,
         DEFAULT_QUALITY_TAGS,
         active_artist_tags,
+        active_style_tags,
         apply_config_preset,
         selected_fixed_character,
         strip_raw_prefix,
@@ -77,7 +79,8 @@ def build_final_prompt(
     fixed_character = selected_fixed_character(user_prompt, config)
     use_character = fixed_character is not None
     artist = active_artist_tags(config)
-    use_style = wants_default_style(user_prompt, bool(artist.strip()))
+    style_tags = active_style_tags(config).strip()
+    use_style = wants_default_style(user_prompt, bool(artist.strip() or style_tags))
     use_sensual = wants_sensual_mode(user_prompt, config)
     quality = str(config.get("quality_prefix") or DEFAULT_QUALITY_TAGS)
     character_name = ""
@@ -88,7 +91,7 @@ def build_final_prompt(
     if use_character and not character.strip():
         use_character = False
         character_name = ""
-    if use_style and not artist.strip():
+    if use_style and not (artist.strip() or style_tags):
         use_style = False
     prompt_lower = str(user_prompt or "").lower()
     allow_multi_character = any(
@@ -127,7 +130,10 @@ def build_final_prompt(
     if use_character:
         parts.append(character)
     if use_style:
-        parts.append(artist)
+        if artist.strip():
+            parts.append(artist)
+        if style_tags:
+            parts.append(style_tags)
     parts.append(content or user_prompt)
     return PromptBuildResult(
         final_prompt=join_prompt_parts(parts),

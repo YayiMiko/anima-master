@@ -259,6 +259,22 @@ def _apply_custom_workflow_inputs(
             continue
         if class_type == "SaveImage" and "filename_prefix" in inputs:
             inputs["filename_prefix"] = "astrbot/anm"
+        if class_type == "EmptyLatentImage":
+            if "width" in inputs:
+                inputs["width"] = width
+            if "height" in inputs:
+                inputs["height"] = height
+        if class_type in {"KSampler", "KSamplerAdvanced"}:
+            for input_name, value in (
+                ("steps", steps),
+                ("cfg", cfg),
+            ):
+                if input_name in inputs:
+                    inputs[input_name] = value
+            for input_name in ("sampler_name", "scheduler"):
+                configured = str(config.get(input_name) or "").strip()
+                if configured and input_name in inputs:
+                    inputs[input_name] = configured
         if "seed" in inputs:
             inputs["seed"] = seed
         if "noise_seed" in inputs:

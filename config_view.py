@@ -7,17 +7,21 @@ try:
     from .prompt_presets import (
         active_artist_preset_name,
         active_artist_tags,
+        active_style_tags,
         apply_config_preset,
         artist_presets,
         fixed_character_tags,
+        style_presets,
     )
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from prompt_presets import (
         active_artist_preset_name,
         active_artist_tags,
+        active_style_tags,
         apply_config_preset,
         artist_presets,
         fixed_character_tags,
+        style_presets,
     )
 
 
@@ -111,6 +115,9 @@ def build_config_debug_lines(
     active_artist = active_artist_preset_name(prompt_config)
     prompt_template = _str(config, "prompt_builder_template", "").strip()
     artist_tags = active_artist_tags(prompt_config).strip()
+    style_tags = active_style_tags(prompt_config).strip()
+    style_names = sorted(style_presets(prompt_config).keys())
+    active_style = str(prompt_config.get("active_style_preset") or "").strip()
     lines = [
         "Anima 调试状态：",
         f"- 提示词优化：{_bool(config, 'prompt_optimize_enabled', True)}",
@@ -133,4 +140,10 @@ def build_config_debug_lines(
         f"- 调试开关：prompt={_bool(config, 'debug_prompt_enabled', False)}，reference={_bool(config, 'debug_image_reference_enabled', False)}，send={_bool(config, 'debug_send_payload_enabled', False)}",
         f"- 上次任务：{task_path if task_exists else '暂无'}",
     ]
+    lines.extend(
+        [
+            f"- Active style: {active_style or ('configured' if style_tags else 'not configured')}",
+            f"- Saved styles: {', '.join(style_names) if style_names else 'none'}",
+        ]
+    )
     return lines

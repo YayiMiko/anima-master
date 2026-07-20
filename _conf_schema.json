@@ -470,6 +470,28 @@
         "hint": "通常不用填；只有未启用画师组时才会读取这里。示例：@artist_a, @artist_b,",
         "collapsed": true
       },
+      "style_tags": {
+        "description": "画风",
+        "type": "string",
+        "default": "",
+        "hint": "填写媒介、上色和渲染 tags；会拼接在当前画师组之后。默认留空。示例：anime coloring, cel shading, glossy highlights,",
+        "collapsed": true
+      },
+      "style_presets": {
+        "description": "已保存的画风",
+        "type": "list",
+        "default": [],
+        "hint": "每行一个画风，格式：名称=tags。可以在下方选择启用的画风。示例：手游高精立绘=anime coloring, cel shading, glossy highlights,",
+        "items": {
+          "type": "string"
+        }
+      },
+      "active_style_preset": {
+        "description": "启用的画风",
+        "type": "string",
+        "default": "",
+        "hint": "必须与已保存的画风名称完全一致；留空时使用“画风”字段。示例：手游高精立绘"
+      },
       "sensual_mode_enabled": {
         "description": "涩气表现力优化",
         "type": "bool",
