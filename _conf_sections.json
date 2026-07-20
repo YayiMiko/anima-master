@@ -6,7 +6,8 @@
       "hint": "用于恢复默认配置，或快速应用千代预设。",
       "items": [
         "reset_to_defaults",
-        "chiyo_preset_enabled"
+        "chiyo_preset_enabled",
+        "star_knight_preset_enabled"
       ]
     },
     {

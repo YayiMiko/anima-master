@@ -9,6 +9,7 @@
 
   // 启用后，会把千代画师组写入 default_artist_tags，并把“狐莉”加入 fixed_characters。
   "chiyo_preset_enabled": false,
+  "star_knight_preset_enabled": false,
 
   // AstrBot 能访问到的 ComfyUI 地址。
   "comfyui_base_url": "http://127.0.0.1:8188",
