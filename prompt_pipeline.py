@@ -275,6 +275,9 @@ class PromptPipeline:
             return PromptPipelineResult(prompt, summary)
 
         prompt_config = apply_config_preset(dict(self.config))
+        star_knight_style = active_style_preset_name(prompt_config).startswith(
+            "闪耀星骑士"
+        )
         fixed_character = selected_fixed_character(prompt, prompt_config)
         fixed_character_name = fixed_character[0] if fixed_character else ""
         use_fixed_character = fixed_character is not None
@@ -360,7 +363,7 @@ class PromptPipeline:
                 "优先输出角色身份、发型脸部、服装主结构、大型装备、主色和材质，再补充动作与少量光影。\n"
                 "保持高端二次元手游全身立绘：清晰轮廓、干净线稿、平涂与柔和渐变阴影结合、精致材质高光。不要主动添加复杂背景、摄影镜头或互相冲突的颜色。\n"
                 "画师组已经提供风格参考，不要在内容 tags 中重复画师名；具体内容控制在约 35-60 个高信息密度 tags。"
-                if active_style_preset_name(prompt_config).startswith("闪耀星骑士")
+                if star_knight_style
                 else ""
             ),
         )
@@ -440,17 +443,22 @@ class PromptPipeline:
         )
         content_tag_count = len(split_tags(built.content_tags))
         short_content_retry = False
+        minimum_content_tags = 35 if star_knight_style else 60
         if (
             not llm_failed
             and not built.raw_mode
             and not built.constraint_mode
-            and content_tag_count < 60
+            and content_tag_count < minimum_content_tags
         ):
             retry_prompt = (
                 llm_prompt
                 + "\n-----------\n"
                 + "上一次输出的具体内容 tags 太短。请重新输出更完整的英文 Danbooru tags："
-                + "目标 70-120 个具体内容 tags，重点扩写服装结构、材质、纹样、饰品、姿态、表情、手部动作和可见细节。"
+                + (
+                    "目标 35-60 个高信息密度的具体内容 tags，重点补足服装主结构、材质、大型装备、主色和可见细节。"
+                    if star_knight_style
+                    else "目标 70-120 个具体内容 tags，重点扩写服装结构、材质、纹样、饰品、姿态、表情、手部动作和可见细节。"
+                )
                 + "不要输出质量词、画师词、解释或 Markdown。"
             )
             try:
