@@ -18,6 +18,7 @@
         "workflow",
         "custom_workflow_enabled",
         "custom_workflow_path",
+        "custom_workflow_override_parameters",
         "timeout",
         "poll_interval",
         "auto_start",

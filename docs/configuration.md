@@ -39,6 +39,8 @@ vae_name = ComfyUI 中的 VAE 文件名
 - `timeout`：等待生成完成的最长时间。
 - `poll_interval`：查询 ComfyUI 生成状态的间隔。
 
+`custom_workflow_override_parameters` 默认关闭。关闭时保留自定义工作流中的尺寸、采样步数、CFG、采样器和调度器；Turbo 工作流应保持关闭。需要统一使用插件出图参数时再开启。
+
 `127.0.0.1` 指 AstrBot 所在机器。跨机器部署时，请填写局域网或 Tailscale 地址。
 
 ## 出图
