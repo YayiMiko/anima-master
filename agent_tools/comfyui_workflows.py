@@ -259,12 +259,13 @@ def _apply_custom_workflow_inputs(
             continue
         if class_type == "SaveImage" and "filename_prefix" in inputs:
             inputs["filename_prefix"] = "astrbot/anm"
-        if class_type == "EmptyLatentImage":
+        override_parameters = bool(config.get("custom_workflow_override_parameters", False))
+        if override_parameters and class_type == "EmptyLatentImage":
             if "width" in inputs:
                 inputs["width"] = width
             if "height" in inputs:
                 inputs["height"] = height
-        if class_type in {"KSampler", "KSamplerAdvanced"}:
+        if override_parameters and class_type in {"KSampler", "KSamplerAdvanced"}:
             for input_name, value in (
                 ("steps", steps),
                 ("cfg", cfg),

@@ -40,6 +40,7 @@ def test_custom_workflow_applies_generation_parameters(tmp_path: Path) -> None:
     result = custom_t2i_workflow(
         {
             "custom_workflow_path": str(path),
+            "custom_workflow_override_parameters": True,
             "sampler_name": "er_sde",
             "scheduler": "sgm_uniform",
         },

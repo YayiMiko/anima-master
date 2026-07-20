@@ -43,6 +43,7 @@
   "cfg": 5.0,
   "sampler_name": "er_sde",
   "scheduler": "normal",
+  "custom_workflow_override_parameters": false,
 
   // 模型文件名。只填 ComfyUI 下拉框里显示的文件名，不填完整路径。
   "unet_name": "anima_baseV10.safetensors",
