@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 class LLMToolBridge:
@@ -32,6 +33,10 @@ class LLMToolBridge:
         self._remove_bg = remove_bg
         self._spell = spell
         self._reverse = reverse
+
+    def capability_names(self) -> set[str]:
+        """Return the stable capability names implemented by this bridge."""
+        return {"status", "generate", "edit", "upscale", "remove_bg", "spell", "reverse"}
 
     async def status(self, event: Any) -> str:
         """Return a compact status string for LLM tool use.

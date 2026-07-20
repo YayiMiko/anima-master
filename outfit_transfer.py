@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 try:
     from .tag_cleaner import normalize_tag_key, split_tags
@@ -222,6 +222,32 @@ class OutfitTransferPlan:
     source_from_reference: bool = False
     source_from_search: bool = False
     directive_prompt: str = ""
+
+
+@dataclass(frozen=True)
+class OutfitTransferContext:
+    """Prompt context containing outfit tags without source identity features."""
+
+    enabled: bool = False
+    outfit_summary_source: str = ""
+    outfit_summary: str = ""
+    forbidden_identity_features: tuple[str, ...] = ()
+
+
+def build_outfit_transfer_context(
+    plan: OutfitTransferPlan, *, prompt: str
+) -> OutfitTransferContext:
+    """Build outfit-only context from an outfit transfer directive."""
+    if not plan.enabled:
+        return OutfitTransferContext()
+    reference_tags = extract_reference_tag_text(prompt)
+    summary = filter_outfit_tags(reference_tags)
+    return OutfitTransferContext(
+        enabled=True,
+        outfit_summary_source="reference_filter" if summary else "directive",
+        outfit_summary=summary,
+        forbidden_identity_features=("hair", "eyes", "face", "ears", "tail"),
+    )
 
 
 def detect_outfit_transfer(prompt: str, fixed_character_name: str = "") -> OutfitTransferPlan:

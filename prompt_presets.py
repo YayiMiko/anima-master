@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-
 DEFAULT_QUALITY_TAGS = "masterpiece, best quality, score_7, safe,"
-DEFAULT_NEGATIVE_PROMPT = "worst quality, low quality, score_1, score_2, score_3, artist name"
+DEFAULT_NEGATIVE_PROMPT = (
+    "worst quality, low quality, score_1, score_2, score_3, artist name"
+)
 DEFAULT_CHARACTER_TAGS = ""
 FIXED_CHARACTER_TAGS: dict[str, str] = {}
 DEFAULT_ARTIST_TAGS = ""
@@ -17,8 +18,7 @@ CHIYO_CHARACTER_TAGS = (
     "(heterochromia, ice blue eye and amber eye), fang, black choker,"
 )
 CHIYO_ARTIST_TAGS = (
-    "@yukisiannn, @kani biimu, @ixy, @shnva, "
-    "@shiromochi sakura, @stmast,"
+    "@yukisiannn, @kani biimu, @ixy, @shnva, @shiromochi sakura, @stmast,"
 )
 CHIYO_ARTIST_PRESET_NAME = "\u5343\u4ee3\u98ce\u683c"
 CHIYO_ARTIST_LEGACY_PRESET_NAMES = ("\u5343\u4ee3\u753b\u98ce",)
@@ -119,7 +119,9 @@ def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
 
     result["chiyo_preset_enabled"] = True
     result["preset_profile"] = "chiyo"
-    result["default_artist_tags"] = merge_tag_text(result.get("default_artist_tags"), CHIYO_ARTIST_TAGS)
+    result["default_artist_tags"] = merge_tag_text(
+        result.get("default_artist_tags"), CHIYO_ARTIST_TAGS
+    )
     presets = _normalize_chiyo_artist_presets(artist_presets(result))
     presets.setdefault(CHIYO_ARTIST_PRESET_NAME, CHIYO_ARTIST_TAGS)
     result["artist_presets"] = presets
@@ -161,9 +163,7 @@ def maybe_materialize_chiyo_preset(
         )
         presets = _normalize_chiyo_artist_presets(artist_presets(updated))
         presets.setdefault(CHIYO_ARTIST_PRESET_NAME, CHIYO_ARTIST_TAGS)
-        updated["artist_presets"] = [
-            f"{name}={tags}" for name, tags in presets.items()
-        ]
+        updated["artist_presets"] = [f"{name}={tags}" for name, tags in presets.items()]
         active_artist = str(updated.get("active_artist_preset") or "").strip()
         if active_artist in CHIYO_ARTIST_LEGACY_PRESET_NAMES:
             updated["active_artist_preset"] = CHIYO_ARTIST_PRESET_NAME
@@ -232,9 +232,14 @@ def artist_presets(config: dict[str, Any]) -> dict[str, str]:
             text = str(item or "").strip()
             if not text:
                 continue
-            separator = "=" if "=" in text else ":"
-            if separator not in text:
+            candidates = [
+                (text.find(separator), separator)
+                for separator in ("=", "＝", "：", ":")
+                if separator in text
+            ]
+            if not candidates:
                 continue
+            _, separator = min(candidates)
             name, tags = text.split(separator, 1)
             name_text = name.strip()
             tags_text = tags.strip()
@@ -260,6 +265,54 @@ def active_artist_tags(config: dict[str, Any]) -> str:
     return str(config.get("default_artist_tags") or DEFAULT_ARTIST_TAGS)
 
 
+def style_presets(config: dict[str, Any]) -> dict[str, str]:
+    """Return configured style tag presets keyed by preset name."""
+    presets: dict[str, str] = {}
+    configured = config.get("style_presets")
+    if isinstance(configured, dict):
+        for name, tags in configured.items():
+            name_text = str(name or "").strip()
+            tags_text = str(tags or "").strip()
+            if name_text and tags_text:
+                presets[name_text] = tags_text
+    elif isinstance(configured, list):
+        for item in configured:
+            text = str(item or "").strip()
+            if not text:
+                continue
+            candidates = [
+                (text.find(separator), separator)
+                for separator in ("=", "＝", "：", ":")
+                if separator in text
+            ]
+            if not candidates:
+                continue
+            _, separator = min(candidates)
+            name, tags = text.split(separator, 1)
+            name_text = name.strip()
+            tags_text = tags.strip()
+            if name_text and tags_text:
+                presets[name_text] = tags_text
+    return presets
+
+
+def active_style_preset_name(config: dict[str, Any]) -> str:
+    """Return the configured active style preset name, if valid."""
+    name = str(config.get("active_style_preset") or "").strip()
+    if name and name in style_presets(config):
+        return name
+    return ""
+
+
+def active_style_tags(config: dict[str, Any]) -> str:
+    """Return style tags currently used for prompt composition."""
+    presets = style_presets(config)
+    name = str(config.get("active_style_preset") or "").strip()
+    if name and name in presets:
+        return presets[name]
+    return str(config.get("style_tags") or "")
+
+
 def fixed_character_tags(config: dict[str, Any]) -> dict[str, str]:
     """Return built-in and user-configured fixed character tags."""
     characters = {name: str(tags) for name, tags in FIXED_CHARACTER_TAGS.items()}
@@ -275,9 +328,14 @@ def fixed_character_tags(config: dict[str, Any]) -> dict[str, str]:
             text = str(item or "").strip()
             if not text:
                 continue
-            separator = "=" if "=" in text else ":"
-            if separator not in text:
+            candidates = [
+                (text.find(separator), separator)
+                for separator in ("=", "＝", "：", ":")
+                if separator in text
+            ]
+            if not candidates:
                 continue
+            _, separator = min(candidates)
             name, tags = text.split(separator, 1)
             name_text = name.strip()
             tags_text = tags.strip()
@@ -286,7 +344,9 @@ def fixed_character_tags(config: dict[str, Any]) -> dict[str, str]:
     return characters
 
 
-def selected_fixed_character(prompt: str, config: dict[str, Any]) -> tuple[str, str] | None:
+def selected_fixed_character(
+    prompt: str, config: dict[str, Any]
+) -> tuple[str, str] | None:
     """Return the explicitly requested fixed character, if any."""
     text = str(prompt or "")
     text_lower = text.lower()
@@ -334,3 +394,11 @@ def wants_sensual_mode(prompt: str, config: dict[str, Any]) -> bool:
     if isinstance(configured, list) and configured:
         markers = tuple(str(item).lower() for item in configured if str(item).strip())
     return any(marker.lower() in text for marker in markers)
+
+
+def looks_like_danbooru_tags(text: str) -> bool:
+    """Return whether text resembles a comma-separated Danbooru tag stream."""
+    values = [part.strip() for part in str(text or "").split(",") if part.strip()]
+    if len(values) < 2:
+        return False
+    return all(" " in value or "_" in value or value.isascii() for value in values)

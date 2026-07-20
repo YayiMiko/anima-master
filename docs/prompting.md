@@ -32,9 +32,11 @@
 
 没有提到固定角色名时，插件不会自动套用角色。
 
-## 画师 tags
+## 画师与画风 tags
 
-填写 `default_artist_tags` 后，插件会把这些画师 tags 拼接到正面提示词中。
+启用画师组后，插件会先拼接当前画师组 tags；当前启用的画风组会继续拼接在画师组之后，用于填写媒介、上色和渲染 tags。画风组通过 `style_presets` 保存，并用 `active_style_preset` 切换。
+
+`default_artist_tags` 仅在没有启用画师组时作为备用画师 tags 使用。
 
 如果某次不想使用画师 tags，可以在指令里写：
 

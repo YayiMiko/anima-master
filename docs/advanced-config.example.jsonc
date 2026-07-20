@@ -87,6 +87,9 @@
   // 默认画师 / 画风 tags。用户说“不用我的风格 / 不要画师词”时会绕开。
   "default_artist_tags": "",
 
+  // 画风 tags，会拼接在当前画师组之后。
+  "style_tags": "",
+
   // 开启后，命中相关关键词时会让 LLM 自行写得更有边界表现力。
   "sensual_mode_enabled": true,
   "sensual_mode_markers": [

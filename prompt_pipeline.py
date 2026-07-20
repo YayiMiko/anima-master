@@ -20,6 +20,7 @@ try:
     from .prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
     from .prompt_presets import (
         apply_config_preset,
+        looks_like_danbooru_tags,
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
@@ -43,6 +44,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
     from prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
     from prompt_presets import (
         apply_config_preset,
+        looks_like_danbooru_tags,
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
@@ -106,6 +108,17 @@ class PromptPipeline:
         self._float = get_float
         self._str = get_str
         self._shorten = shorten
+
+    def _try_direct_prompt_path(self, prompt: str, trace: Any) -> str | None:
+        """Return prompt unchanged for disabled optimization or tag-like input."""
+        text = str(prompt or "").strip()
+        if not self._bool("prompt_optimize_enabled", True):
+            trace.mark_skipped("prompt_optimize_disabled", text)
+            return text
+        if looks_like_danbooru_tags(text):
+            trace.mark_raw("danbooru_tags_detected", text, danbooru_fast_path=True)
+            return text
+        return None
 
     async def _current_chat_provider_id(self, event: Any) -> str:
         configured = self._str("prompt_builder_provider_id", "").strip()

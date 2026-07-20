@@ -1,20 +1,33 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 try:
+    from .command_catalog import COMMAND_ENTRIES
     from .command_router import help_text
     from .config_defaults import persist_flat_config_key
     from .deployment_diagnostics import compact_status_text, diagnostic_text
-    from .prompt_presets import active_artist_preset_name, artist_presets, fixed_character_tags, merge_tag_text
+    from .prompt_presets import (
+        active_artist_preset_name,
+        artist_presets,
+        fixed_character_tags,
+        merge_tag_text,
+    )
     from .tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
+    from command_catalog import COMMAND_ENTRIES
     from command_router import help_text
     from config_defaults import persist_flat_config_key
     from deployment_diagnostics import compact_status_text, diagnostic_text
-    from prompt_presets import active_artist_preset_name, artist_presets, fixed_character_tags, merge_tag_text
+    from prompt_presets import (
+        active_artist_preset_name,
+        artist_presets,
+        fixed_character_tags,
+        merge_tag_text,
+    )
     from tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
 
 
@@ -36,12 +49,12 @@ class CommandActionHandler:
         send_payload: Callable[[Any, dict[str, Any]], Any],
         generate: Callable[..., Any],
         event_image_input: Callable[[Any], Any],
-        image_input_summary: Callable[[], dict[str, Any]],
         build_prompt: Callable[..., Any],
         format_spell_payload: Callable[[dict[str, Any]], str],
         get_bool: Callable[[str, bool], bool],
         shorten: Callable[[str, int], str],
         config_store: Any = None,
+        image_input_summary: Callable[[], dict[str, Any]] | None = None,
     ):
         """Store dependencies for command-side action handling.
 
@@ -71,11 +84,15 @@ class CommandActionHandler:
         self._send_payload = send_payload
         self._generate = generate
         self._event_image_input = event_image_input
-        self._image_input_summary = image_input_summary
+        self._image_input_summary = image_input_summary or (lambda: {})
         self._build_prompt = build_prompt
         self._format_spell_payload = format_spell_payload
         self._bool = get_bool
         self._shorten = shorten
+
+    def action_names(self) -> set[str]:
+        """Return all command actions understood by this handler."""
+        return {entry.action for entry in COMMAND_ENTRIES}
 
     def _persist_config_key(self, key: str, value: Any) -> None:
         self.config[key] = value
@@ -93,7 +110,7 @@ class CommandActionHandler:
     def _parse_name_tags(self, text: str) -> tuple[str, str] | None:
         raw = str(text or "").strip()
         candidates: list[tuple[int, str]] = []
-        for separator in ("=", "：", ":"):
+        for separator in ("=", "＝", "：", ":"):
             index = raw.find(separator)
             if index >= 0:
                 candidates.append((index, separator))
@@ -132,7 +149,9 @@ class CommandActionHandler:
         name, tags = parsed
         return self._save_artist_preset(name, tags)
 
-    def _persist_artist_presets(self, presets: dict[str, str], active: str | None = None) -> None:
+    def _persist_artist_presets(
+        self, presets: dict[str, str], active: str | None = None
+    ) -> None:
         lines = [f"{name}={tags}" for name, tags in presets.items()]
         self._persist_config_key("artist_presets", lines)
         if active is not None:
@@ -193,7 +212,9 @@ class CommandActionHandler:
         active = active_artist_preset_name(self.config)
         default_tags = str(self.config.get("default_artist_tags") or "").strip()
         lines = ["画师组："]
-        lines.append(f"- 默认画师 tags：{'已配置' if default_tags else '未配置'}{'（当前）' if not active else ''}")
+        lines.append(
+            f"- 默认画师 tags：{'已配置' if default_tags else '未配置'}{'（当前）' if not active else ''}"
+        )
         if not presets:
             lines.append("- 已保存的画师组：无")
         else:
@@ -221,16 +242,23 @@ class CommandActionHandler:
         presets.pop(name, None)
         active = active_artist_preset_name(self.config)
         self._persist_artist_presets(presets, active="" if active == name else active)
-        return f"已删除画师组“{name}”。" + (" 当前已切回默认画师 tags。" if active == name else "")
+        return f"已删除画师组“{name}”。" + (
+            " 当前已切回默认画师 tags。" if active == name else ""
+        )
 
     def add_fixed_character(self, prompt: str) -> str:
         parsed = self._parse_name_tags(prompt)
         if not parsed:
-            return "请使用“名称=tags”的格式。例：/anm 添加角色 狐莉=1girl, solo, fox girl,"
+            return (
+                "请使用“名称=tags”的格式。例：/anm 添加角色 狐莉=1girl, solo, fox girl,"
+            )
         name, tags = parsed
         characters = fixed_character_tags(self.config)
         characters[name] = tags
-        lines = [f"{character_name}={character_tags}" for character_name, character_tags in characters.items()]
+        lines = [
+            f"{character_name}={character_tags}"
+            for character_name, character_tags in characters.items()
+        ]
         self._persist_config_key("fixed_characters", lines)
         return f"已保存角色“{name}”：\n" + self._shorten(tags, 1000)
 
@@ -275,7 +303,9 @@ class CommandActionHandler:
         image_input = await self._event_image_input(event)
         if self._bool("prompt_optimize_img2img_enabled", False):
             prompt = await self._build_prompt(event, prompt, mode="img2img")
-        payload = await self._run_tool(["edit", "--prompt", prompt, "--input", image_input or "latest"])
+        payload = await self._run_tool(
+            ["edit", "--prompt", prompt, "--input", image_input or "latest"]
+        )
         return await self._send_payload(event, payload)
 
     async def spell(self, event: Any) -> str:

@@ -76,7 +76,10 @@ vae_name = ComfyUI 中的 VAE 文件名
 ## 角色与画风
 
 - `fixed_characters`：固定角色预设。
-- `default_artist_tags`：默认画师组。
+- `default_artist_tags`：未启用画师组时使用的备用画师 tags。
+- `style_tags`（画风）：独立于画师组的画风 tags，拼接在当前画师组之后。
+- `style_presets`：已保存的画风列表。
+- `active_style_preset`：当前启用的画风；留空时使用 `style_tags`。
 - `sensual_mode_enabled`：涩气表现力优化。
 - `sensual_mode_markers`：触发涩气表现力优化的关键词。
 

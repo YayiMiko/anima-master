@@ -10,12 +10,22 @@ from astrbot.core.star.filter.command import GreedyStr
 
 try:
     from .command_router import parse_hard_route
-    from .config_defaults import flatten_config, group_config, maybe_migrate_to_grouped_config, maybe_reset_to_defaults
+    from .config_defaults import (
+        flatten_config,
+        group_config,
+        maybe_migrate_to_grouped_config,
+        maybe_reset_to_defaults,
+    )
     from .prompt_presets import apply_config_preset, maybe_materialize_chiyo_preset
     from .service_container import build_services
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from command_router import parse_hard_route
-    from config_defaults import flatten_config, group_config, maybe_migrate_to_grouped_config, maybe_reset_to_defaults
+    from config_defaults import (
+        flatten_config,
+        group_config,
+        maybe_migrate_to_grouped_config,
+        maybe_reset_to_defaults,
+    )
     from prompt_presets import apply_config_preset, maybe_materialize_chiyo_preset
     from service_container import build_services
 
@@ -149,7 +159,7 @@ class ComfyUIAgentPlugin(Star):
         cfg: float | None = None,
         negative_prompt: str | None = None,
     ) -> dict[str, Any]:
-        return await self._generation_task.generate_payload(
+        payload = await self._generation_task.generate_payload(
             event,
             prompt,
             width=width,
@@ -158,6 +168,17 @@ class ComfyUIAgentPlugin(Star):
             cfg=cfg,
             negative_prompt=negative_prompt,
         )
+        verified = await self._services.generation_verifier.verify_and_maybe_retry(
+            event,
+            payload,
+            user_request=prompt,
+            width=width,
+            height=height,
+            steps=steps,
+            cfg=cfg,
+            negative_prompt=negative_prompt,
+        )
+        return verified.payload
 
     async def _generate(
         self,
