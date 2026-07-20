@@ -142,8 +142,8 @@ def build_config_debug_lines(
     ]
     lines.extend(
         [
-            f"- Active style: {active_style or ('configured' if style_tags else 'not configured')}",
-            f"- Saved styles: {', '.join(style_names) if style_names else 'none'}",
+            f"- 当前画风：{active_style or ('已配置' if style_tags else '未配置')}",
+            f"- 已保存画风：{', '.join(style_names) if style_names else '无'}",
         ]
     )
     return lines
