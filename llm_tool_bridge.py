@@ -49,18 +49,18 @@ class LLMToolBridge:
         """
         payload = await self._run_tool(["status"])
         if not payload.get("ok"):
-            return f"ComfyUI status failed: {payload.get('error')}"
+            return f"ComfyUI 状态检查失败：{payload.get('error')}"
         return (
-            "ComfyUI status: "
-            f"base_url={payload.get('base_url')}, "
-            f"workflow={payload.get('workflow')}, "
-            f"allowed_sizes={payload.get('allowed_sizes')}, "
-            f"version={payload.get('comfyui_version')}, "
-            f"gpu={payload.get('gpu')}, "
-            f"vram_free_mb={payload.get('vram_free_mb')}, "
-            f"unet_available={payload.get('unet_available')}, "
-            f"clip_available={payload.get('clip_available')}, "
-            f"vae_available={payload.get('vae_available')}"
+            "ComfyUI 状态："
+            f"地址={payload.get('base_url')}，"
+            f"工作流={payload.get('workflow')}，"
+            f"允许尺寸={payload.get('allowed_sizes')}，"
+            f"版本={payload.get('comfyui_version')}，"
+            f"GPU={payload.get('gpu')}，"
+            f"可用显存={payload.get('vram_free_mb')}，"
+            f"UNET 可用={payload.get('unet_available')}，"
+            f"CLIP 可用={payload.get('clip_available')}，"
+            f"VAE 可用={payload.get('vae_available')}"
         )
 
     async def generate(

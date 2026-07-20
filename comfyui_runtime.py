@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
 import sys
-from typing import Any, Callable
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
 import astrbot.api.message_components as Comp
 
@@ -194,7 +195,7 @@ class ComfyUIRuntime:
             message = "ComfyUI 完成了任务，但没有拿到可发送的图片。"
             payload["delivery"] = no_output_delivery(message)
             await event.send(event.plain_result(message))
-            return "ComfyUI operation finished with no output image."
+            return "ComfyUI 已完成任务，但没有产出可发送的图片。"
 
         if self._bool("send_result_to_chat", True):
             for output in outputs[: self._int("max_send_images", 1)]:
