@@ -5,13 +5,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from PIL import Image
-
 from comfyui_command_runner import run_cli_action
 from comfyui_inputs import ComfyUIImageResolver
-from comfyui_operations import edit_payload, generate_payload, remove_bg_payload, upscale_payload
+from comfyui_operations import (
+    edit_payload,
+    generate_payload,
+    remove_bg_payload,
+    upscale_payload,
+)
 from comfyui_sizes import allowed_sizes
 from comfyui_status import build_status_payload
+from PIL import Image
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -35,7 +39,7 @@ IMAGE_RESOLVER = ComfyUIImageResolver(WORKSPACE)
 DEFAULT_CONFIG = {
     "comfyui_base_url": "http://127.0.0.1:8188",
     "workflow": "anima_t2i",
-    "custom_workflow_enabled": True,
+    "custom_workflow_enabled": False,
     "custom_workflow_path": "",
     "timeout": 300,
     "poll_interval": 2,
@@ -133,7 +137,10 @@ def result(payload: dict[str, Any]) -> None:
 
 def status(args) -> None:
     config = load_config()
-    size_options = [f"{width}x{height}" for width, height in allowed_sizes(config, DEFAULT_CONFIG["allowed_sizes"])]
+    size_options = [
+        f"{width}x{height}"
+        for width, height in allowed_sizes(config, DEFAULT_CONFIG["allowed_sizes"])
+    ]
     result(build_status_payload(config, size_options))
 
 
@@ -145,7 +152,9 @@ def recent(args) -> None:
             "path": str(path),
             "relative_path": str(path.relative_to(WORKSPACE)),
             "size": path.stat().st_size,
-            "modified": datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec="seconds"),
+            "modified": datetime.fromtimestamp(path.stat().st_mtime).isoformat(
+                timespec="seconds"
+            ),
         }
         try:
             with Image.open(path) as img:
@@ -165,7 +174,13 @@ def generate(args) -> None:
         result({"ok": False, "error": "missing_prompt", "message": "缺少提示词"})
         return
 
-    result(run_cli_action(lambda: generate_payload(config, DEFAULT_CONFIG, IMAGE_OUTPUTS, args, prompt)))
+    result(
+        run_cli_action(
+            lambda: generate_payload(
+                config, DEFAULT_CONFIG, IMAGE_OUTPUTS, args, prompt
+            )
+        )
+    )
 
 
 def edit(args) -> None:
@@ -175,19 +190,31 @@ def edit(args) -> None:
         result({"ok": False, "error": "missing_prompt", "message": "缺少提示词"})
         return
 
-    result(run_cli_action(lambda: edit_payload(config, IMAGE_OUTPUTS, resolve_image, args, prompt)))
+    result(
+        run_cli_action(
+            lambda: edit_payload(config, IMAGE_OUTPUTS, resolve_image, args, prompt)
+        )
+    )
 
 
 def upscale(args) -> None:
     config = load_config()
 
-    result(run_cli_action(lambda: upscale_payload(config, IMAGE_OUTPUTS, resolve_image, args)))
+    result(
+        run_cli_action(
+            lambda: upscale_payload(config, IMAGE_OUTPUTS, resolve_image, args)
+        )
+    )
 
 
 def remove_bg(args) -> None:
     config = load_config()
 
-    result(run_cli_action(lambda: remove_bg_payload(config, IMAGE_OUTPUTS, resolve_image, args)))
+    result(
+        run_cli_action(
+            lambda: remove_bg_payload(config, IMAGE_OUTPUTS, resolve_image, args)
+        )
+    )
 
 
 def main() -> None:

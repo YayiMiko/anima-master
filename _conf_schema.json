@@ -42,7 +42,7 @@
       "custom_workflow_enabled": {
         "description": "使用自定义 ComfyUI 工作流",
         "type": "bool",
-        "default": true,
+        "default": false,
         "hint": "开启后使用下方填写的 ComfyUI API 工作流 JSON。关闭后使用插件内置工作流。"
       },
       "custom_workflow_path": {
@@ -51,6 +51,15 @@
         "default": "",
         "hint": "填写 AstrBot 能读取到的 ComfyUI API 工作流 JSON 路径。服务器部署时这是服务器路径，不是本机 Windows 路径；也可以填写相对插件目录的路径。留空时不启用。示例：workflows/anima_api.json",
         "collapsed": false,
+        "condition": {
+          "custom_workflow_enabled": true
+        }
+      },
+      "custom_workflow_override_parameters": {
+        "description": "用插件参数覆盖自定义工作流参数",
+        "type": "bool",
+        "default": false,
+        "hint": "默认关闭，保留自定义工作流中的尺寸、采样步数、CFG、采样器和调度器。开启后才使用插件出图参数覆盖这些节点。",
         "condition": {
           "custom_workflow_enabled": true
         }
@@ -293,16 +302,6 @@
           "prompt_optimize_enabled": true
         }
       },
-      "prompt_builder_max_content_tags": {
-        "description": "内容 tags 数量上限",
-        "type": "int",
-        "default": 120,
-        "hint": "示例：120",
-        "collapsed": true,
-        "condition": {
-          "prompt_optimize_enabled": true
-        }
-      },
       "prompt_builder_web_search_enabled": {
         "description": "关键词触发联网搜索",
         "type": "bool",
@@ -370,7 +369,7 @@
       "prompt_builder_template": {
         "description": "自然语言优化模板",
         "type": "string",
-        "default": "你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。\n\n请先在内部判断用户输入类型：\n1. 如果用户输入很短、只是一两个短句，请主动进行审美补全，重点补出主体外观、服装结构、材质、配色、装饰物、动作和表情，让角色本身完整而精致。\n2. 如果用户输入很具体，请优先精确遵守用户要求，不要擅自改主题、角色身份、服装方向或构图重点。\n3. 如果用户输入已经像完整 Danbooru tags，请尽量保持原意，只做必要的补全和规范化。\n\n画面设计原则：\n- 默认只生成一个可见主体。除非用户明确要求多人，不要添加 multiple girls、crowd、background characters、twins、clone、extra girl 等内容。\n- 根据主题使用 solo、1girl 或 1boy；如果性别不明确，请选择最符合用户描述的主体。\n- 短输入时不要只输出三五个泛化 tags；至少补足主体、服装、姿态、表情和可见细节。\n- 具体内容段默认应当足够厚实，常规输出 70-120 个内容 tags；如果前缀已经包含质量词、固定角色和画师词，具体内容段的长度建议接近前缀长度的 2 倍左右。\n- 请把主题拆成多层可见细节：主体类型、体型/年龄感、发型变化、服装主件、内外层、领口、袖型、腰部结构、裙摆/裤装、鞋袜、材质、纹样、金属件、饰品、手部动作、肢体姿态、表情、视线、道具和少量画面稳定 tags。\n- 服装要具体，包含款式、层次、材质、颜色、装饰、配件和细节。不要只输出 generic white dress、gold trim、ribbon 这类泛化词。\n- 镜头、背景、光影和氛围不是默认补全项。只有用户提到镜头、构图、背景、场景、光影、氛围、插画感等相关要求时，才生成这些 tags；否则最多使用 white background、simple background 这类极简背景。\n- 默认审美为可爱、明亮、精致、干净，适合二次元角色展示；用户要求涩气、阴暗、华丽或其它风格时，以用户要求为准。\n- 部分中文概念直译可能不是有效 tag，请转译为可见的 Danbooru 视觉元素。例如：苗族少女可以转成 ornate silver headdress、silver jewelry、embroidered dress。\n\n角色和参考规则：\n{character_rule}\n如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。\n即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。\n{search_block}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n输出要求：\n- 只输出英文 Danbooru tags，用英文逗号分隔。\n- 不要输出解释、标题、Markdown、编号或中文。\n- 不要输出质量词，例如 masterpiece、best quality、worst quality、low quality、score_7。\n- 不要输出画师词，例如 @artist。\n- 不要重复固定角色已经提供的固有发色、瞳色、种族和固定配饰。\n- 不要为了凑长度重复同义 tags；长度应来自更多具体、可见、可生成的细节。\n\n用户主题：\n{theme}",
+        "default": "我是一名 AI 画师，请根据以下主题设计大师级提示词。输出应为适用于 Anima 模型的英文 Danbooru tags，而不是自然语言描述。\n\n请先在内部拆解画面，再将结果汇总为一行、使用英文逗号分隔的 tags。不要输出分析过程、标题、Markdown、编号或中文。\n\n内容规则：\n- 为画面设计细致的服饰 tags、动作 tags、神态 tags，并根据主题补充必要的环境、背景、氛围、构图、镜头、光影和特效 tags。\n- 不要输出角色自身已有的固定设定，例如发色、瞳色、年龄、种族和固定配饰；固定角色词会由程序另行拼接。\n- 不要输出 masterpiece、best quality 等前置质量词，也不要输出画师词。\n- 用户明确提出的主题、动作、服装和画面重点必须优先保留，不要为了扩写而改变主题。\n\n细节密度：\n- 服饰是重点。完整服饰部分通常应包含至少 18 个有效 tags，并可根据服装复杂度继续增加；每一件画面中清晰可见的主要服装，应从款式、剪裁、层次、领口、袖型、腰部、下装、材质、配色、纹样、镶边、扣件、饰品、鞋袜和暴露方式中选取适用细节，每件尽量写出 5-10 个具体短 tag。\n- 动作与姿态在适用时通常至少写 8 个 tags，并可根据动作复杂度继续增加，覆盖整体姿势、身体朝向、四肢位置、手部动作、持有物、重心和运动趋势；不要只用 dynamic pose 之类的泛化词代替具体动作。\n- 神态在适用时通常至少写 4 个 tags，并可根据表达复杂度继续增加，覆盖视线、眼部状态、嘴部状态、情绪和头部角度；不同神态不要互相冲突。\n- 环境、背景、氛围、构图、镜头、光影和特效按主题需要补充，不设总量上限，但只选择真正帮助主题的内容。\n- 常规至少输出 55 个互不重复、可见、可生成的内容 tags，可按主题复杂度继续增加，不设数量上限。画面元素单薄时，应优先补充服装结构、动作细节、道具互动、轮廓光和少量设计元素，而不是堆叠同义词。\n\n表达规则：\n- 优先使用确实能表达可见画面元素的 Danbooru tags。部分概念直译可能没有有效词条，应拆解为具体形状、材质、纹样、颜色、装饰和视觉感受。例如“苗族少女”可以转化为 ornate silver headdress、silver jewelry、embroidered dress 等可见元素。\n- 背景保持简约、有设计感。通常只使用 2-6 个背景相关 tags，可根据主题选择 white background、simple background、character sheet、subtle geometric background、floating particles 等少量元素，不要同时堆叠多个地点、复杂建筑和互相冲突的光源。\n- 没有特殊要求时，整体采用可爱、自然、精致的角色表现。可爱主要体现在服装设计、姿态和神态，不要擅自幼化角色。\n\n角色和动态上下文：\n{character_rule}\n{search_block}\n{outfit_transfer_rule}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n这次，请为我生成以下主题的提示词：\n{theme}",
         "hint": "决定插件如何把中文需求改写成 tags；普通用户不需要修改。详见 docs/prompting.md。",
         "collapsed": true,
         "condition": {
@@ -484,15 +483,6 @@
         "hint": "每行一个画风，格式：名称=tags。可以在下方选择启用的画风。示例：手游高精立绘=anime coloring, cel shading, glossy highlights,",
         "items": {
           "type": "string"
-        }
-      },
-      "custom_workflow_override_parameters": {
-        "description": "用插件参数覆盖自定义工作流参数",
-        "type": "bool",
-        "default": false,
-        "hint": "默认关闭，保留自定义工作流中的尺寸、采样步数、CFG、采样器和调度器。开启后才使用插件出图参数覆盖这些节点。",
-        "condition": {
-          "custom_workflow_enabled": true
         }
       },
       "active_style_preset": {
