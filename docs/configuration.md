@@ -36,6 +36,8 @@ vae_name = ComfyUI 中的 VAE 文件名
 
 - `comfyui_base_url`：AstrBot 能访问到的 ComfyUI 地址。
 - `workflow`：工作流预设，默认使用 `anima_t2i`。
+- `custom_workflow_enabled`：是否改用自定义 ComfyUI API 工作流；普通版默认关闭。
+- `custom_workflow_path`：自定义工作流 JSON 路径；Turbo 留档示例见 `variants/turbo/`。
 - `timeout`：等待生成完成的最长时间。
 - `poll_interval`：查询 ComfyUI 生成状态的间隔。
 
@@ -61,7 +63,6 @@ vae_name = ComfyUI 中的 VAE 文件名
 - `prompt_optimize_enabled`：是否让聊天模型优化自然语言提示词。
 - `prompt_builder_provider_id`：指定用于优化提示词的模型。留空时使用当前会话主模型。
 - `prompt_builder_max_tokens`：提示词优化模型最大输出长度。
-- `prompt_builder_max_content_tags`：具体内容 tags 数量上限。
 - `prompt_builder_template`：主提示词模板。
 
 通常不需要一开始就改 `prompt_builder_template`。如果想改变插件如何理解中文需求，再调整它。

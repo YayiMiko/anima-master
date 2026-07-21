@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 
-
 QUALITY_BLOCKLIST = {
     "masterpiece",
     "best quality",
@@ -23,8 +22,6 @@ CHARACTER_BLOCKLIST = {
     "1 girl",
     "1girl",
     "solo",
-    "cute",
-    "kawaii",
 }
 
 CHARACTER_IDENTITY_EXACT_BLOCKLIST = {
@@ -105,12 +102,20 @@ CHARACTER_IDENTITY_EXACT_BLOCKLIST = {
 }
 
 CHARACTER_IDENTITY_PATTERNS = (
-    re.compile(r"\b(?:black|brown|blonde|white|silver|blue|red|pink|purple|green|grey|gray|orange|gold|golden|light|dark|ice blue|silver white)\s+hair\b"),
-    re.compile(r"\b(?:black|brown|blue|red|pink|purple|green|grey|gray|gold|golden|light|dark|ice blue|amber)\s+eyes?\b"),
-    re.compile(r"\b(?:hair|bangs|twintails?|braids?|ponytail|sidelocks?|ahoge|hair bun|hair over one eye)\b"),
+    re.compile(
+        r"\b(?:black|brown|blonde|white|silver|blue|red|pink|purple|green|grey|gray|orange|gold|golden|light|dark|ice blue|silver white)\s+hair\b"
+    ),
+    re.compile(
+        r"\b(?:black|brown|blue|red|pink|purple|green|grey|gray|gold|golden|light|dark|ice blue|amber)\s+eyes?\b"
+    ),
+    re.compile(
+        r"\b(?:hair|bangs|twintails?|braids?|ponytail|sidelocks?|ahoge|hair bun|hair over one eye)\b"
+    ),
     re.compile(r"\b(?:ears?|tail|wings?|horns?|halo|fangs?|heterochromia)\b"),
     re.compile(r"\b(?:vampire|angel|demon|fox girl|cat girl|animal girl)\b"),
-    re.compile(r"\b(?:loli|shota|teenager|young adult|adult|mature|aged down|age regression)\b"),
+    re.compile(
+        r"\b(?:loli|shota|teenager|young adult|adult|mature|aged down|age regression)\b"
+    ),
 )
 
 MULTI_CHARACTER_BLOCKLIST = {
@@ -149,7 +154,12 @@ def split_tags(text: str) -> list[str]:
     cleaned = re.sub(r"```.*?```", lambda m: m.group(0).strip("`"), cleaned, flags=re.S)
     cleaned = cleaned.replace("，", ",").replace("、", ",").replace(";", ",")
     cleaned = cleaned.replace("\n", ",")
-    cleaned = re.sub(r"^(?:positive|prompt|tags|提示词|正向提示词)\s*[:：]", "", cleaned.strip(), flags=re.I)
+    cleaned = re.sub(
+        r"^(?:positive|prompt|tags|提示词|正向提示词)\s*[:：]",
+        "",
+        cleaned.strip(),
+        flags=re.I,
+    )
     parts = [part.strip(" \t\r\n,.;:：") for part in cleaned.split(",")]
     return [part for part in parts if part]
 
@@ -157,7 +167,12 @@ def split_tags(text: str) -> list[str]:
 def normalize_tag_key(tag: str) -> str:
     """Normalize a tag for duplicate and blocklist checks."""
     value = str(tag or "").strip().lower()
-    if value.startswith("(") and value.endswith(")") and value.count("(") == 1 and value.count(")") == 1:
+    if (
+        value.startswith("(")
+        and value.endswith(")")
+        and value.count("(") == 1
+        and value.count(")") == 1
+    ):
         value = value[1:-1].strip()
     value = re.sub(r":\s*[\d.]+$", "", value)
     value = re.sub(r"\s+", " ", value)
@@ -232,7 +247,6 @@ def is_character_identity_tag(key: str) -> bool:
 
 def clean_content_tags(
     text: str,
-    max_tags: int = 120,
     strip_character_tags: bool = True,
     protected_core_tags: tuple[str, ...] = (),
     allow_multi_character: bool = False,
@@ -267,8 +281,6 @@ def clean_content_tags(
             continue
         seen.add(key)
         cleaned.append(tag)
-        if len(cleaned) >= max_tags:
-            break
     return ", ".join(cleaned)
 
 

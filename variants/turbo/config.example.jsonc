@@ -1,0 +1,8 @@
+{
+  // Turbo 只作为未启用变体留档。路径相对于插件根目录。
+  "custom_workflow_enabled": true,
+  "custom_workflow_path": "variants/turbo/workflows/comfyui_00051_api.json",
+
+  // 必须保持 false，才能使用工作流内的 10 步、CFG 1、euler/simple。
+  "custom_workflow_override_parameters": false
+}
