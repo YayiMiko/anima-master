@@ -22,19 +22,6 @@ CHIYO_ARTIST_TAGS = (
 )
 CHIYO_ARTIST_PRESET_NAME = "\u5343\u4ee3\u98ce\u683c"
 CHIYO_ARTIST_LEGACY_PRESET_NAMES = ("\u5343\u4ee3\u753b\u98ce",)
-STAR_KNIGHT_PRESET_ALIASES = {"star_knight", "闪耀星骑士", "闪耀星骑士预设"}
-STAR_KNIGHT_ARTIST_PRESETS = {
-    "闪耀星骑士主组": "@kithera, @かんなぎれい, @fuepo,",
-    "闪耀星骑士柔光组": "@音棲目るいこ, @天祢るな, @えみゃコーラ,",
-    "闪耀星骑士幻想组": "@湯浅彬, @N蔵, @トモセシュンサク,",
-}
-STAR_KNIGHT_STYLE_PRESETS = {
-    "闪耀星骑士基础": "high-end anime game illustration, polished character artwork, clean lineart, crisp contours, clean cel shading, soft gradient shadows, delicate facial features, elegant anime girl, highly detailed costume, sharp silhouette, controlled highlights, glossy material rendering,",
-    "闪耀星骑士梦幻偶像": "dreamy fantasy costume, pastel palette, layered frills, lace, flower ornaments, translucent fabric, soft glow, delicate jewelry, sweet elegant girl,",
-    "闪耀星骑士暗黑魔法": "dark fantasy costume, black and violet palette, magical ornaments, leather details, thighhighs, glowing runes, elegant sensual design, dramatic color contrast,",
-    "闪耀星骑士科技魔女": "fantasy technology, black and gold palette, ornate mechanical accessories, luminous core, hard-surface props, sharp silhouette, polished armor details,",
-    "闪耀星骑士东方幻想": "ornate eastern fantasy costume, layered sleeves, decorative knots, floral ornaments, patterned fabric, gold embroidery, flowing fabric, elegant traditional motifs,",
-}
 SENSUAL_MARKERS = (
     "ɬ",
     "色气",
@@ -127,21 +114,6 @@ def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
     result = dict(config or {})
     for key in LEGACY_HIDDEN_STYLE_KEYS:
         result.pop(key, None)
-    if _is_star_knight_enabled(result):
-        result["star_knight_preset_enabled"] = True
-        result["preset_profile"] = "star_knight"
-        artists = artist_presets(result)
-        for name, tags in STAR_KNIGHT_ARTIST_PRESETS.items():
-            artists.setdefault(name, tags)
-        result["artist_presets"] = artists
-        if not str(result.get("active_artist_preset") or "").strip():
-            result["active_artist_preset"] = "闪耀星骑士主组"
-        styles = style_presets(result)
-        for name, tags in STAR_KNIGHT_STYLE_PRESETS.items():
-            styles.setdefault(name, tags)
-        result["style_presets"] = styles
-        if not str(result.get("active_style_preset") or "").strip():
-            result["active_style_preset"] = "闪耀星骑士基础"
     if not _is_chiyo_enabled(result):
         return result
 
@@ -183,21 +155,6 @@ def maybe_materialize_chiyo_preset(
     updated = dict(current)
     for key in LEGACY_HIDDEN_STYLE_KEYS:
         updated.pop(key, None)
-    if _is_star_knight_enabled(current):
-        updated["star_knight_preset_enabled"] = True
-        updated["preset_profile"] = "star_knight"
-        artists = artist_presets(updated)
-        for name, tags in STAR_KNIGHT_ARTIST_PRESETS.items():
-            artists.setdefault(name, tags)
-        updated["artist_presets"] = [f"{name}={tags}" for name, tags in artists.items()]
-        if not str(updated.get("active_artist_preset") or "").strip():
-            updated["active_artist_preset"] = "闪耀星骑士主组"
-        styles = style_presets(updated)
-        for name, tags in STAR_KNIGHT_STYLE_PRESETS.items():
-            styles.setdefault(name, tags)
-        updated["style_presets"] = [f"{name}={tags}" for name, tags in styles.items()]
-        if not str(updated.get("active_style_preset") or "").strip():
-            updated["active_style_preset"] = "闪耀星骑士基础"
 
     if _is_chiyo_enabled(current):
         updated["default_artist_tags"] = merge_tag_text(
@@ -245,13 +202,6 @@ def _is_chiyo_enabled(config: dict[str, Any]) -> bool:
         return bool(config.get("chiyo_preset_enabled"))
     preset = str(config.get("preset_profile") or "").strip()
     return preset.lower() in CHIYO_PRESET_ALIASES or preset in CHIYO_PRESET_ALIASES
-
-
-def _is_star_knight_enabled(config: dict[str, Any]) -> bool:
-    if "star_knight_preset_enabled" in config:
-        return bool(config.get("star_knight_preset_enabled"))
-    preset = str(config.get("preset_profile") or "").strip()
-    return preset.lower() in STAR_KNIGHT_PRESET_ALIASES or preset in STAR_KNIGHT_PRESET_ALIASES
 
 
 def _normalize_chiyo_artist_presets(presets: dict[str, str]) -> dict[str, str]:

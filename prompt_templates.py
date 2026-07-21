@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 
+
 DEFAULT_LLM_PROMPT_TEMPLATE = """你是 Anima 模型的 Danbooru tags 设计助手。你的任务不是直译用户输入，而是把用户需求设计成完整、好看、可生成的二次元画面 tags。
 
 请先在内部判断用户输入类型：
@@ -21,7 +22,6 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是 Anima 模型的 Danbooru tags 设计助�
 - 部分中文概念直译可能不是有效 tag，请转译为可见的 Danbooru 视觉元素。例如：苗族少女可以转成 ornate silver headdress、silver jewelry、embroidered dress。
 
 角色和参考规则：
-{style_block}
 {character_rule}
 如果用户要求“某角色风格的衣服/动作/姿态”，请拆解该参考对象的标志性配色、服装结构、装饰物、材质感、姿态和构图，再转换成可独立生效的 Danbooru tags。
 即使知道角色的 Danbooru 角色 tag，也要继续输出可独立生效的外观 tags；对新角色、冷门角色、2025 年 9 月之后出现的角色尤其如此，因为底模可能不认识单独角色 tag。
@@ -57,7 +57,6 @@ def build_llm_prompt(
     mode: str = "txt2img",
     prompt_builder_template: str = "",
     outfit_transfer_rule: str = "",
-    style_block: str = "",
 ) -> str:
     """Build the prompt sent to the chat LLM for Danbooru tag generation."""
     theme = str(theme or "").strip()
@@ -126,7 +125,6 @@ def build_llm_prompt(
         "style_block": "",
         "sensual_rule": sensual_rule,
     }
-    values["style_block"] = str(style_block or "").strip()
     try:
         return template.format(**values)
     except Exception:

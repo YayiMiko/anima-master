@@ -11,7 +11,6 @@ from command_actions import CommandActionHandler  # noqa: E402
 from prompt_builder import build_final_prompt  # noqa: E402
 from prompt_presets import (  # noqa: E402
     active_style_tags,
-    apply_config_preset,
     artist_presets,
     fixed_character_tags,
     style_presets,
@@ -81,12 +80,3 @@ def test_style_tags_work_without_artist_group() -> None:
 
     assert result.used_default_style is True
     assert "anime coloring" in result.final_prompt
-
-
-def test_star_knight_preset_adds_artist_and_style_variants() -> None:
-    config = apply_config_preset({"star_knight_preset_enabled": True})
-
-    assert config["active_artist_preset"] == "闪耀星骑士主组"
-    assert config["active_style_preset"] == "闪耀星骑士基础"
-    assert "闪耀星骑士科技魔女" in style_presets(config)
-    assert "@kithera" in artist_presets(config)["闪耀星骑士主组"]

@@ -15,12 +15,6 @@
         "type": "bool",
         "default": false,
         "hint": "开启后补入“千代风格”画师组，并把“狐莉”加入角色列表；狐莉只会在明确提到时使用。"
-      },
-      "star_knight_preset_enabled": {
-        "description": "一键启用闪耀星骑士风格",
-        "type": "bool",
-        "default": false,
-        "hint": "启用后添加闪耀星骑士画师组与四个画风子预设，并默认使用均衡主组和基础画风。"
       }
     }
   },

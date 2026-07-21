@@ -19,7 +19,6 @@ try:
     )
     from .prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
     from .prompt_presets import (
-        active_style_preset_name,
         apply_config_preset,
         looks_like_danbooru_tags,
         selected_fixed_character,
@@ -44,7 +43,6 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
     )
     from prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
     from prompt_presets import (
-        active_style_preset_name,
         apply_config_preset,
         looks_like_danbooru_tags,
         selected_fixed_character,
@@ -353,15 +351,6 @@ class PromptPipeline:
             prompt_builder_template=self._str("prompt_builder_template", ""),
             outfit_transfer_rule=build_outfit_transfer_block(
                 outfit_plan, outfit_summary
-            ),
-            style_block=(
-                "-----------\n"
-                "当前启用闪耀星骑士角色立绘风格。请先在内部从梦幻偶像、暗黑魔法、科技魔女、东方幻想中选择最符合用户主题的一个子风格；只保留一个主方向。\n"
-                "优先输出角色身份、发型脸部、服装主结构、大型装备、主色和材质，再补充动作与少量光影。\n"
-                "保持高端二次元手游全身立绘：清晰轮廓、干净线稿、平涂与柔和渐变阴影结合、精致材质高光。不要主动添加复杂背景、摄影镜头或互相冲突的颜色。\n"
-                "画师组已经提供风格参考，不要在内容 tags 中重复画师名；具体内容控制在约 35-60 个高信息密度 tags。"
-                if active_style_preset_name(prompt_config).startswith("闪耀星骑士")
-                else ""
             ),
         )
         if self._bool("debug_prompt_enabled", False):
