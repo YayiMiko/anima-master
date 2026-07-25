@@ -10,11 +10,21 @@
         "default": false,
         "hint": "打开后保存配置并重载插件，即会恢复默认值；恢复后此开关会自动关闭。"
       },
-      "chiyo_preset_enabled": {
-        "description": "一键启用千代预设",
-        "type": "bool",
-        "default": false,
-        "hint": "开启后补入“千代风格”画师组，并把“狐莉”加入角色列表；狐莉只会在明确提到时使用。"
+      "chiyo_preset": {
+        "description": "千代预设",
+        "type": "string",
+        "default": "",
+        "options": [
+          "",
+          "base",
+          "aesthetic"
+        ],
+        "labels": [
+          "未启用",
+          "千代base",
+          "千代aesthetic"
+        ],
+        "hint": "选择后补入“千代base”画师组，并把“狐莉”加入角色列表；狐莉只会在明确提到时使用。千代base 使用 anima_baseV10 与 CFG 5；千代aesthetic 改用 anima_aestheticV11、CFG 3，且不加质量词和负面词，其余与 base 一致。切换后需保存配置并重载插件。"
       }
     }
   },
@@ -302,6 +312,16 @@
           "prompt_optimize_enabled": true
         }
       },
+      "prompt_builder_max_content_tags": {
+        "description": "内容 Tag 数量上限",
+        "type": "int",
+        "default": 80,
+        "hint": "只限制 LLM 生成的内容段，不计质量词、固定角色、画师组和画风。建议保持 80。",
+        "collapsed": true,
+        "condition": {
+          "prompt_optimize_enabled": true
+        }
+      },
       "prompt_builder_web_search_enabled": {
         "description": "关键词触发联网搜索",
         "type": "bool",
@@ -369,7 +389,7 @@
       "prompt_builder_template": {
         "description": "自然语言优化模板",
         "type": "string",
-        "default": "我是一名 AI 画师，请根据以下主题设计大师级提示词。输出应为适用于 Anima 模型的英文 Danbooru tags，而不是自然语言描述。\n\n请先在内部拆解画面，再将结果汇总为一行、使用英文逗号分隔的 tags。不要输出分析过程、标题、Markdown、编号或中文。\n\n内容规则：\n- 为画面设计细致的服饰 tags、动作 tags、神态 tags，并根据主题补充必要的环境、背景、氛围、构图、镜头、光影和特效 tags。\n- 不要输出角色自身已有的固定设定，例如发色、瞳色、年龄、种族和固定配饰；固定角色词会由程序另行拼接。\n- 不要输出 masterpiece、best quality 等前置质量词，也不要输出画师词。\n- 用户明确提出的主题、动作、服装和画面重点必须优先保留，不要为了扩写而改变主题。\n\n细节密度：\n- 服饰是重点。完整服饰部分通常应包含至少 18 个有效 tags，并可根据服装复杂度继续增加；每一件画面中清晰可见的主要服装，应从款式、剪裁、层次、领口、袖型、腰部、下装、材质、配色、纹样、镶边、扣件、饰品、鞋袜和暴露方式中选取适用细节，每件尽量写出 5-10 个具体短 tag。\n- 动作与姿态在适用时通常至少写 8 个 tags，并可根据动作复杂度继续增加，覆盖整体姿势、身体朝向、四肢位置、手部动作、持有物、重心和运动趋势；不要只用 dynamic pose 之类的泛化词代替具体动作。\n- 神态在适用时通常至少写 4 个 tags，并可根据表达复杂度继续增加，覆盖视线、眼部状态、嘴部状态、情绪和头部角度；不同神态不要互相冲突。\n- 环境、背景、氛围、构图、镜头、光影和特效按主题需要补充，不设总量上限，但只选择真正帮助主题的内容。\n- 常规至少输出 55 个互不重复、可见、可生成的内容 tags，可按主题复杂度继续增加，不设数量上限。画面元素单薄时，应优先补充服装结构、动作细节、道具互动、轮廓光和少量设计元素，而不是堆叠同义词。\n\n表达规则：\n- 优先使用确实能表达可见画面元素的 Danbooru tags。部分概念直译可能没有有效词条，应拆解为具体形状、材质、纹样、颜色、装饰和视觉感受。例如“苗族少女”可以转化为 ornate silver headdress、silver jewelry、embroidered dress 等可见元素。\n- 背景保持简约、有设计感。通常只使用 2-6 个背景相关 tags，可根据主题选择 white background、simple background、character sheet、subtle geometric background、floating particles 等少量元素，不要同时堆叠多个地点、复杂建筑和互相冲突的光源。\n- 没有特殊要求时，整体采用可爱、自然、精致的角色表现。可爱主要体现在服装设计、姿态和神态，不要擅自幼化角色。\n\n角色和动态上下文：\n{character_rule}\n{search_block}\n{outfit_transfer_rule}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n这次，请为我生成以下主题的提示词：\n{theme}",
+        "default": "我是一名 AI 画师，请根据以下主题设计大师级提示词。输出应为适用于 Anima 模型的英文 Danbooru tags，而不是自然语言描述。\n\n请先在内部拆解画面，再将结果汇总为一行、使用英文逗号分隔的 tags。不要输出分析过程、标题、Markdown、编号或中文。\n\n内容规则：\n- 为画面设计细致的服饰 tags、动作 tags、神态 tags，并根据主题补充必要的环境、背景、氛围、构图、镜头、光影和特效 tags。\n- 不要输出角色自身已有的固定设定，例如发色、瞳色、年龄、种族和固定配饰；固定角色词会由程序另行拼接。\n- 不要输出 masterpiece、best quality 等前置质量词，也不要输出画师词。\n- 用户明确提出的主题、动作、服装和画面重点必须优先保留，不要为了扩写而改变主题。\n\n细节密度：\n- 服饰是重点。完整服饰部分通常应包含至少 18 个有效 tags，并可根据服装复杂度继续增加；每一件画面中清晰可见的主要服装，应从款式、剪裁、层次、领口、袖型、腰部、下装、材质、配色、纹样、镶边、扣件、饰品、鞋袜和暴露方式中选取适用细节，每件尽量写出 5-10 个具体短 tag。\n- 动作与姿态在适用时通常至少写 8 个 tags，并可根据动作复杂度继续增加，覆盖整体姿势、身体朝向、四肢位置、手部动作、持有物、重心和运动趋势；不要只用 dynamic pose 之类的泛化词代替具体动作。\n- 神态在适用时通常至少写 4 个 tags，并可根据表达复杂度继续增加，覆盖视线、眼部状态、嘴部状态、情绪和头部角度；不同神态不要互相冲突。\n- 环境、背景、氛围、构图、镜头、光影和特效按主题需要补充，不设总量上限，但只选择真正帮助主题的内容。\n- 常规输出 65-75 个互不重复、可见、可生成的内容 tags，最多不得超过 80 个。画面元素单薄时，应优先补充服装结构、动作细节、道具互动、轮廓光和少量设计元素，而不是堆叠同义词。\n\n表达规则：\n- 优先使用确实能表达可见画面元素的 Danbooru tags。部分概念直译可能没有有效词条，应拆解为具体形状、材质、纹样、颜色、装饰和视觉感受。例如“苗族少女”可以转化为 ornate silver headdress、silver jewelry、embroidered dress 等可见元素。\n- 背景保持简约、有设计感。通常只使用 2-6 个背景相关 tags，可根据主题选择 white background、simple background、character sheet、subtle geometric background、floating particles 等少量元素，不要同时堆叠多个地点、复杂建筑和互相冲突的光源。\n- 没有特殊要求时，整体采用可爱、自然、精致的角色表现。可爱主要体现在服装设计、姿态和神态，不要擅自幼化角色。\n- 输出前先删除互相冲突的构图、光影、天气和画风 tags，并合并含义高度相近的氛围词。Tag 按以下优先级排列：用户明确要求、主体动作与关键物件、服装、神态、构图、背景、光影与特效、氛围与画风。越重要的内容越靠前。\n\n角色和动态上下文：\n{character_rule}\n{search_block}\n{outfit_transfer_rule}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n这次，请为我生成以下主题的提示词：\n{theme}",
         "hint": "决定插件如何把中文需求改写成 tags；普通用户不需要修改。详见 docs/prompting.md。",
         "collapsed": true,
         "condition": {
@@ -450,7 +470,7 @@
         "description": "已保存的画师组",
         "type": "list",
         "default": [],
-        "hint": "每行一个画师组，格式：名称=tags。推荐在聊天里用 /anm 创建画师组 名称=tags 添加。示例：千代风格=@artist_a, @artist_b,",
+        "hint": "每行一个画师组，格式：名称=tags。推荐在聊天里用 /anm 创建画师组 名称=tags 添加。示例：千代base=@artist_a, @artist_b,",
         "collapsed": true,
         "items": {
           "type": "string"
@@ -460,7 +480,7 @@
         "description": "启用的画师组",
         "type": "string",
         "default": "",
-        "hint": "必须与已保存的画师组名称完全一致。推荐在聊天里用 /anm 切换画师组 名称；手填时注意不要多空格。优先级高于默认画师 tags。示例：千代风格"
+        "hint": "必须与已保存的画师组名称完全一致。推荐在聊天里用 /anm 切换画师组 名称；手填时注意不要多空格。优先级高于默认画师 tags。示例：千代base"
       },
       "default_artist_tags": {
         "description": "备用画师 tags",

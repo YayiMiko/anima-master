@@ -20,8 +20,64 @@ CHIYO_CHARACTER_TAGS = (
 CHIYO_ARTIST_TAGS = (
     "@yukisiannn, @kani biimu, @ixy, @shnva, @shiromochi sakura, @stmast,"
 )
-CHIYO_ARTIST_PRESET_NAME = "\u5343\u4ee3\u98ce\u683c"
-CHIYO_ARTIST_LEGACY_PRESET_NAMES = ("\u5343\u4ee3\u753b\u98ce",)
+# Artist preset name. Renamed from "\u5343\u4ee3\u98ce\u683c" to "\u5343\u4ee3base" when the Chiyo
+# family gained multiple profiles; the old names stay in the legacy tuple so
+# existing configs keep resolving to the current preset.
+CHIYO_ARTIST_PRESET_NAME = "\u5343\u4ee3base"
+CHIYO_ARTIST_LEGACY_PRESET_NAMES = (
+    "\u5343\u4ee3\u98ce\u683c",
+    "\u5343\u4ee3\u753b\u98ce",
+)
+
+# Chiyo preset profiles. "base" keeps the long-standing behaviour; other
+# profiles only declare what they change on top of it.
+CHIYO_PROFILE_BASE = "base"
+CHIYO_PROFILE_AESTHETIC = "aesthetic"
+# Disabled is represented by the empty string so truthiness means "a profile is
+# active". Keep this empty, or `_is_chiyo_enabled` would report off as enabled.
+CHIYO_PROFILE_OFF = ""
+CHIYO_DEFAULT_PROFILE = CHIYO_PROFILE_BASE
+
+# Config values accepted for each profile, so hand-edited configs keep working.
+CHIYO_PROFILE_ALIASES: dict[str, str] = {
+    "base": CHIYO_PROFILE_BASE,
+    "chiyo": CHIYO_PROFILE_BASE,
+    "\u5343\u4ee3base": CHIYO_PROFILE_BASE,
+    "\u5343\u4ee3\u98ce\u683c": CHIYO_PROFILE_BASE,
+    "\u5343\u4ee3\u753b\u98ce": CHIYO_PROFILE_BASE,
+    "aesthetic": CHIYO_PROFILE_AESTHETIC,
+    "\u5343\u4ee3aesthetic": CHIYO_PROFILE_AESTHETIC,
+    "off": CHIYO_PROFILE_OFF,
+    "none": CHIYO_PROFILE_OFF,
+    "": CHIYO_PROFILE_OFF,
+}
+
+# Per-profile config overrides applied by `apply_config_preset`.
+#
+# `quality_prefix` needs the companion `preset_suppress_quality` flag because
+# prompt_builder.py falls back to DEFAULT_QUALITY_TAGS on an empty string.
+# `negative_prompt` needs no such flag: the subprocess reads it with
+# `config.get("negative_prompt", default)`, which returns the empty string
+# when the key is present, so persisting "" is enough to disable it.
+CHIYO_PROFILES: dict[str, dict[str, Any]] = {
+    CHIYO_PROFILE_BASE: {
+        "unet_name": "anima_baseV10.safetensors",
+        "cfg": 5.0,
+        "preset_suppress_quality": False,
+    },
+    CHIYO_PROFILE_AESTHETIC: {
+        "unet_name": "anima_aestheticV11.safetensors",
+        "cfg": 3.0,
+        "quality_prefix": "",
+        "negative_prompt": "",
+        "preset_suppress_quality": True,
+    },
+}
+CHIYO_PROFILE_DISPLAY_NAMES: dict[str, str] = {
+    CHIYO_PROFILE_BASE: "\u5343\u4ee3base",
+    CHIYO_PROFILE_AESTHETIC: "\u5343\u4ee3aesthetic",
+    CHIYO_PROFILE_OFF: "\u672a\u542f\u7528",
+}
 SENSUAL_MARKERS = (
     "ɬ",
     "色气",
@@ -114,11 +170,19 @@ def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
     result = dict(config or {})
     for key in LEGACY_HIDDEN_STYLE_KEYS:
         result.pop(key, None)
-    if not _is_chiyo_enabled(result):
+    profile = resolve_chiyo_profile(result)
+    result.pop("chiyo_preset_enabled", None)
+    result.pop("preset_profile", None)
+    result.pop("preset_suppress_quality", None)
+    result["chiyo_preset"] = profile
+    if not profile:
         return result
 
-    result["chiyo_preset_enabled"] = True
-    result["preset_profile"] = "chiyo"
+    # Profile overrides win over the incoming config on purpose: keys such as
+    # `unet_name` and `cfg` always carry a schema default, so a
+    # "keep the user value" merge would make the override dead code.
+    for key, value in CHIYO_PROFILES.get(profile, {}).items():
+        result[key] = value
     result["default_artist_tags"] = merge_tag_text(
         result.get("default_artist_tags"), CHIYO_ARTIST_TAGS
     )
@@ -155,6 +219,12 @@ def maybe_materialize_chiyo_preset(
     updated = dict(current)
     for key in LEGACY_HIDDEN_STYLE_KEYS:
         updated.pop(key, None)
+
+    profile = resolve_chiyo_profile(current)
+    updated["chiyo_preset"] = profile
+    updated.pop("chiyo_preset_enabled", None)
+    updated.pop("preset_profile", None)
+    updated.pop("preset_suppress_quality", None)
 
     if _is_chiyo_enabled(current):
         updated["default_artist_tags"] = merge_tag_text(
@@ -197,11 +267,59 @@ def merge_tag_text(existing: Any, addition: str) -> str:
     return ", ".join(tags) + ("," if tags else "")
 
 
-def _is_chiyo_enabled(config: dict[str, Any]) -> bool:
+def resolve_chiyo_profile(config: dict[str, Any]) -> str:
+    """Return the selected Chiyo profile id, or an empty string when disabled.
+
+    Accepts the current `chiyo_preset` selector, the legacy
+    `chiyo_preset_enabled` boolean, and legacy `preset_profile` aliases so old
+    configs keep working after the single-switch design was replaced by a
+    multi-profile selector.
+
+    Args:
+        config: Plugin configuration mapping.
+
+    Returns:
+        A key of `CHIYO_PROFILES` (currently `base` or `aesthetic`), or `""`
+        when no Chiyo profile is active.
+    """
+    selector = str(config.get("chiyo_preset") or "").strip()
+    if selector:
+        resolved = CHIYO_PROFILE_ALIASES.get(selector.lower())
+        if resolved is not None:
+            return resolved
+        if selector in CHIYO_PROFILE_ALIASES:
+            return CHIYO_PROFILE_ALIASES[selector]
+        if selector.lower() in CHIYO_PROFILES:
+            return selector.lower()
+        # Unknown non-empty selector: treat as disabled rather than guessing.
+        return ""
     if "chiyo_preset_enabled" in config:
-        return bool(config.get("chiyo_preset_enabled"))
+        return CHIYO_DEFAULT_PROFILE if config.get("chiyo_preset_enabled") else ""
     preset = str(config.get("preset_profile") or "").strip()
-    return preset.lower() in CHIYO_PRESET_ALIASES or preset in CHIYO_PRESET_ALIASES
+    if not preset:
+        return ""
+    return CHIYO_PROFILE_ALIASES.get(
+        preset.lower(), CHIYO_PROFILE_ALIASES.get(preset, "")
+    )
+
+
+def chiyo_profile_display_name(config: dict[str, Any]) -> str:
+    """Return the human-readable name of the active Chiyo profile.
+
+    Args:
+        config: Plugin configuration mapping.
+
+    Returns:
+        A display label such as `千代base`, `千代aesthetic`, or `未启用`.
+    """
+    profile = resolve_chiyo_profile(config)
+    return CHIYO_PROFILE_DISPLAY_NAMES.get(
+        profile, CHIYO_PROFILE_DISPLAY_NAMES[CHIYO_PROFILE_OFF]
+    )
+
+
+def _is_chiyo_enabled(config: dict[str, Any]) -> bool:
+    return bool(resolve_chiyo_profile(config))
 
 
 def _normalize_chiyo_artist_presets(presets: dict[str, str]) -> dict[str, str]:

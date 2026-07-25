@@ -16,7 +16,11 @@ try:
         maybe_migrate_to_grouped_config,
         maybe_reset_to_defaults,
     )
-    from .prompt_presets import apply_config_preset, maybe_materialize_chiyo_preset
+    from .prompt_presets import (
+        apply_config_preset,
+        maybe_materialize_chiyo_preset,
+        resolve_chiyo_profile,
+    )
     from .service_container import build_services
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from command_router import parse_hard_route
@@ -26,7 +30,11 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
         maybe_migrate_to_grouped_config,
         maybe_reset_to_defaults,
     )
-    from prompt_presets import apply_config_preset, maybe_materialize_chiyo_preset
+    from prompt_presets import (
+        apply_config_preset,
+        maybe_materialize_chiyo_preset,
+        resolve_chiyo_profile,
+    )
     from service_container import build_services
 
 
@@ -46,7 +54,9 @@ class ComfyUIAgentPlugin(Star):
             None,
             base_config=raw_or_reset,
         )
-        if config is not None and group_config(raw_config, schema_path) != dict(config or {}):
+        if config is not None and group_config(raw_config, schema_path) != dict(
+            config or {}
+        ):
             config.save_config(replace_config=group_config(raw_config, schema_path))
         self.config = apply_config_preset(raw_config)
         self._danbooru_tag_cache: dict[str, list[Any]] = {}
@@ -85,8 +95,8 @@ class ComfyUIAgentPlugin(Star):
             edit_tool_changed = self.context.deactivate_llm_tool("comfyui_edit")
         remove_bg_tool_changed = self.context.deactivate_llm_tool("comfyui_remove_bg")
         logger.info(
-            "[comfyui_agent] chiyo_preset_enabled=%s img2img_enabled=%s edit_tool_changed=%s remove_bg_tool_changed=%s base_url=%s workflow=%s",
-            self._bool("chiyo_preset_enabled", False),
+            "[comfyui_agent] chiyo_preset=%s img2img_enabled=%s edit_tool_changed=%s remove_bg_tool_changed=%s base_url=%s workflow=%s",
+            resolve_chiyo_profile(self.config) or "off",
             img2img_enabled,
             edit_tool_changed,
             remove_bg_tool_changed,
@@ -146,7 +156,9 @@ class ComfyUIAgentPlugin(Star):
     async def _ensure_comfyui_ready(self, event: AstrMessageEvent) -> dict[str, Any]:
         return await self._runtime.ensure_ready(event)
 
-    async def _send_payload(self, event: AstrMessageEvent, payload: dict[str, Any]) -> str:
+    async def _send_payload(
+        self, event: AstrMessageEvent, payload: dict[str, Any]
+    ) -> str:
         return await self._runtime.send_payload(event, payload)
 
     async def _generate_payload(
@@ -221,7 +233,9 @@ class ComfyUIAgentPlugin(Star):
     def _status_text(self, payload: dict[str, Any]) -> str:
         return self._action_handler.status_text(payload)
 
-    async def _handle_action(self, event: AstrMessageEvent, action: str, prompt: str) -> str | None:
+    async def _handle_action(
+        self, event: AstrMessageEvent, action: str, prompt: str
+    ) -> str | None:
         return await self._action_handler.handle_action(event, action, prompt)
 
     @filter.command_group("anm", alias={"comfyui", "anima"})
@@ -236,12 +250,18 @@ class ComfyUIAgentPlugin(Star):
         if not route:
             return
         if not self._is_allowed(event):
-            await event.send(event.plain_result("ComfyUI 助手已关闭，或当前用户没有使用权限。"))
+            await event.send(
+                event.plain_result("ComfyUI 助手已关闭，或当前用户没有使用权限。")
+            )
             event.stop_event()
             return
 
         action, prompt = route
-        logger.info("[comfyui_agent] hard route action=%s sender=%s", action, event.get_sender_id())
+        logger.info(
+            "[comfyui_agent] hard route action=%s sender=%s",
+            action,
+            event.get_sender_id(),
+        )
         event.stop_event()
 
         message = await self._handle_action(event, action, prompt)
@@ -266,26 +286,36 @@ class ComfyUIAgentPlugin(Star):
     @comfyui_group.command("generate", alias={"生图", "画图"})
     async def cmd_generate(self, event: AstrMessageEvent, prompt: GreedyStr):
         event.stop_event()
-        message = await self._handle_action(event, "generate", str(prompt or "").strip())
+        message = await self._handle_action(
+            event, "generate", str(prompt or "").strip()
+        )
         if message:
             yield event.plain_result(message)
 
     @comfyui_group.command("edit", alias={"改图", "图生图", "风格化", "重绘"})
     async def cmd_edit(self, event: AstrMessageEvent, prompt: GreedyStr):
         event.stop_event()
-        yield event.plain_result(await self._handle_action(event, "edit", str(prompt or "").strip()))
+        yield event.plain_result(
+            await self._handle_action(event, "edit", str(prompt or "").strip())
+        )
 
     @comfyui_group.command("upscale", alias={"放大", "高清", "高清修复"})
     async def cmd_upscale(self, event: AstrMessageEvent):
         event.stop_event()
-        yield event.plain_result(await self._handle_action(event, "disabled_upscale", ""))
+        yield event.plain_result(
+            await self._handle_action(event, "disabled_upscale", "")
+        )
 
     @comfyui_group.command("remove_bg", alias={"抠图", "去背景", "去除背景"})
     async def cmd_remove_bg(self, event: AstrMessageEvent):
         event.stop_event()
-        yield event.plain_result(await self._handle_action(event, "disabled_remove_bg", ""))
+        yield event.plain_result(
+            await self._handle_action(event, "disabled_remove_bg", "")
+        )
 
-    @comfyui_group.command("spell", alias={"解析法术", "法术解析", "读取法术", "提取提示词", "读取提示词"})
+    @comfyui_group.command(
+        "spell", alias={"解析法术", "法术解析", "读取法术", "提取提示词", "读取提示词"}
+    )
     async def cmd_spell(self, event: AstrMessageEvent):
         event.stop_event()
         yield event.plain_result(await self._handle_action(event, "spell", ""))
@@ -303,27 +333,47 @@ class ComfyUIAgentPlugin(Star):
     )
     async def cmd_set_artist_tags(self, event: AstrMessageEvent, prompt: GreedyStr):
         event.stop_event()
-        yield event.plain_result(await self._handle_action(event, "create_artist_preset", str(prompt or "").strip()))
+        yield event.plain_result(
+            await self._handle_action(
+                event, "create_artist_preset", str(prompt or "").strip()
+            )
+        )
 
     @comfyui_group.command("append_artist", alias={"追加画师组"})
     async def cmd_append_artist_tags(self, event: AstrMessageEvent, prompt: GreedyStr):
         event.stop_event()
-        yield event.plain_result(await self._handle_action(event, "append_artist_tags", str(prompt or "").strip()))
+        yield event.plain_result(
+            await self._handle_action(
+                event, "append_artist_tags", str(prompt or "").strip()
+            )
+        )
 
     @comfyui_group.command("use_artist", alias={"切换画师组"})
     async def cmd_use_artist_preset(self, event: AstrMessageEvent, prompt: GreedyStr):
         event.stop_event()
-        yield event.plain_result(await self._handle_action(event, "use_artist_preset", str(prompt or "").strip()))
+        yield event.plain_result(
+            await self._handle_action(
+                event, "use_artist_preset", str(prompt or "").strip()
+            )
+        )
 
     @comfyui_group.command("list_artist", alias={"查看画师组"})
     async def cmd_list_artist_presets(self, event: AstrMessageEvent):
         event.stop_event()
-        yield event.plain_result(await self._handle_action(event, "list_artist_presets", ""))
+        yield event.plain_result(
+            await self._handle_action(event, "list_artist_presets", "")
+        )
 
     @comfyui_group.command("delete_artist", alias={"删除画师组"})
-    async def cmd_delete_artist_preset(self, event: AstrMessageEvent, prompt: GreedyStr):
+    async def cmd_delete_artist_preset(
+        self, event: AstrMessageEvent, prompt: GreedyStr
+    ):
         event.stop_event()
-        yield event.plain_result(await self._handle_action(event, "delete_artist_preset", str(prompt or "").strip()))
+        yield event.plain_result(
+            await self._handle_action(
+                event, "delete_artist_preset", str(prompt or "").strip()
+            )
+        )
 
     @comfyui_group.command(
         "character",
@@ -333,7 +383,11 @@ class ComfyUIAgentPlugin(Star):
     )
     async def cmd_add_fixed_character(self, event: AstrMessageEvent, prompt: GreedyStr):
         event.stop_event()
-        yield event.plain_result(await self._handle_action(event, "add_fixed_character", str(prompt or "").strip()))
+        yield event.plain_result(
+            await self._handle_action(
+                event, "add_fixed_character", str(prompt or "").strip()
+            )
+        )
 
     @filter.llm_tool(name="comfyui_status")
     async def comfyui_status(self, event: AstrMessageEvent) -> str:

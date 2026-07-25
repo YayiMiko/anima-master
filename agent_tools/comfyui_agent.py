@@ -17,6 +17,12 @@ from comfyui_sizes import allowed_sizes
 from comfyui_status import build_status_payload
 from PIL import Image
 
+PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+if str(PLUGIN_ROOT) not in sys.path:
+    sys.path.insert(0, str(PLUGIN_ROOT))
+
+from prompt_presets import apply_config_preset  # noqa: E402
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -93,7 +99,7 @@ def _json_file(path: Path) -> dict[str, Any]:
 def load_config() -> dict[str, Any]:
     config = dict(DEFAULT_CONFIG)
     config.update(_flatten_config(_json_file(CONFIG)))
-    return config
+    return apply_config_preset(config)
 
 
 def _flatten_config(config: dict[str, Any]) -> dict[str, Any]:

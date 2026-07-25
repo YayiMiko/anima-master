@@ -10,6 +10,7 @@ try:
         active_style_tags,
         apply_config_preset,
         artist_presets,
+        chiyo_profile_display_name,
         fixed_character_tags,
         style_presets,
     )
@@ -20,6 +21,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
         active_style_tags,
         apply_config_preset,
         artist_presets,
+        chiyo_profile_display_name,
         fixed_character_tags,
         style_presets,
     )
@@ -28,7 +30,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
 CONFIG_FIELD_GROUPS: dict[str, tuple[str, ...]] = {
     "basic": (
         "prompt_optimize_enabled",
-        "chiyo_preset_enabled",
+        "chiyo_preset",
         "admin_only",
         "allowed_sender_ids",
     ),
@@ -122,7 +124,7 @@ def build_config_debug_lines(
         "Anima 调试状态：",
         f"- 提示词优化：{_bool(config, 'prompt_optimize_enabled', True)}",
         f"- 自定义 Prompt 模板：{bool(prompt_template)}",
-        f"- 千代预设：{_bool(config, 'chiyo_preset_enabled', False)}",
+        f"- 千代预设：{chiyo_profile_display_name(prompt_config)}",
         f"- 画师 tags：{'已配置' if artist_tags else '未配置'}",
         f"- 当前画师组：{active_artist or '默认画师 tags'}",
         f"- 已保存的画师组：{', '.join(presets) if presets else '无'}",

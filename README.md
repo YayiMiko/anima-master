@@ -79,7 +79,7 @@ vae_name = 你的 VAE 文件名
 - `docs/advanced-config.example.jsonc`
 - `data/config/astrbot_plugin_anima_master_config.example.jsonc`（本机注释模板）
 
-如果你想快速体验千代风格，可以打开“一键启用千代预设”。它会加入并自动补回“千代风格”画师组，并把“狐莉”加入角色列表。狐莉不会自动套用，只有当指令里明确提到“狐莉”时才会使用。若想永久删除千代风格，请先关闭千代预设。
+如果你想快速体验千代风格，可以在“千代预设”中选择“千代base”或“千代aesthetic”。两者都会加入“千代base”画师组，并把“狐莉”加入角色列表；aesthetic 另外使用 `anima_aestheticV11`、CFG 3，且不注入固定正负面词。狐莉不会自动套用，只有当指令里明确提到“狐莉”时才会使用。选择“未启用”后会恢复原有模型、参数和提示词配置。
 
 ## 详细说明
 

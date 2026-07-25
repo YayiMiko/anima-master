@@ -10,17 +10,36 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from prompt_presets import DEFAULT_QUALITY_TAGS  # noqa: E402
-from prompt_templates import DEFAULT_LLM_PROMPT_TEMPLATE  # noqa: E402
+from prompt_templates import (  # noqa: E402
+    DEFAULT_LLM_PROMPT_TEMPLATE,
+    build_llm_prompt,
+)
 
 
 def test_normal_variant_is_the_public_default() -> None:
     schema = json.loads((PLUGIN_DIR / "_conf_schema.json").read_text(encoding="utf-8"))
+    sections = json.loads(
+        (PLUGIN_DIR / "_conf_sections.json").read_text(encoding="utf-8")
+    )
     connection = schema["anima_master_comfyui_connection"]["items"]
     style = schema["anima_master_style"]["items"]
+    listed_items = [
+        item for section in sections["sections"] for item in section.get("items", [])
+    ]
+    schema_items = [
+        item
+        for section in schema.values()
+        if isinstance(section, dict) and section.get("type") == "object"
+        for item in section.get("items", {})
+    ]
 
     assert connection["custom_workflow_enabled"]["default"] is False
     assert connection["custom_workflow_override_parameters"]["default"] is False
     assert "custom_workflow_override_parameters" not in style
+    assert sorted(listed_items) == sorted(schema_items)
+    assert len(listed_items) == len(set(listed_items))
+    assert "chiyo_preset" in listed_items
+    assert "chiyo_preset_enabled" not in listed_items
     assert (
         schema["anima_master_default_prompt"]["items"]["quality_prefix"]["default"]
         == DEFAULT_QUALITY_TAGS
@@ -28,6 +47,12 @@ def test_normal_variant_is_the_public_default() -> None:
     assert (
         schema["anima_master_prompting"]["items"]["prompt_builder_template"]["default"]
         == DEFAULT_LLM_PROMPT_TEMPLATE
+    )
+    assert (
+        schema["anima_master_prompting"]["items"]["prompt_builder_max_content_tags"][
+            "default"
+        ]
+        == 80
     )
 
 
@@ -40,6 +65,22 @@ def test_advanced_example_uses_the_builtin_template() -> None:
     assert match is not None
     assert '"custom_workflow_enabled": false' in example
     assert json.loads(match.group(1)) == DEFAULT_LLM_PROMPT_TEMPLATE
+
+
+def test_previous_90_tag_template_migrates_to_current_limit() -> None:
+    previous_template = DEFAULT_LLM_PROMPT_TEMPLATE.replace(
+        "常规输出 65-75 个互不重复、可见、可生成的内容 tags，最多不得超过 80 个。",
+        "常规输出 70-80 个互不重复、可见、可生成的内容 tags，最多不得超过 90 个。",
+    )
+
+    result = build_llm_prompt(
+        "测试主题",
+        prompt_builder_template=previous_template,
+    )
+
+    assert "常规输出 65-75 个" in result
+    assert "最多不得超过 80 个" in result
+    assert "最多不得超过 90 个" not in result
 
 
 def test_turbo_variant_archive_contains_expected_workflow() -> None:

@@ -3,9 +3,23 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .prompt_presets import active_artist_preset_name, active_artist_tags, apply_config_preset, artist_presets, fixed_character_tags
+    from .prompt_presets import (
+        active_artist_preset_name,
+        active_artist_tags,
+        apply_config_preset,
+        artist_presets,
+        chiyo_profile_display_name,
+        fixed_character_tags,
+    )
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
-    from prompt_presets import active_artist_preset_name, active_artist_tags, apply_config_preset, artist_presets, fixed_character_tags
+    from prompt_presets import (
+        active_artist_preset_name,
+        active_artist_tags,
+        apply_config_preset,
+        artist_presets,
+        chiyo_profile_display_name,
+        fixed_character_tags,
+    )
 
 
 def _bool(config: dict[str, Any], key: str, default: bool) -> bool:
@@ -51,7 +65,9 @@ class TaskRecorder:
                 encoding="utf-8",
             )
         except Exception as exc:
-            self._logger.warning("[comfyui_agent] failed to write last task summary: %s", exc)
+            self._logger.warning(
+                "[comfyui_agent] failed to write last task summary: %s", exc
+            )
 
     def read(self) -> dict[str, Any]:
         """Read the latest non-secret Anima task summary.
@@ -66,7 +82,9 @@ class TaskRecorder:
             data = json.loads(self.path.read_text(encoding="utf-8"))
             return data if isinstance(data, dict) else {}
         except Exception as exc:
-            self._logger.warning("[comfyui_agent] failed to read last task summary: %s", exc)
+            self._logger.warning(
+                "[comfyui_agent] failed to read last task summary: %s", exc
+            )
             return {}
 
     def build_generation_start(
@@ -187,7 +205,9 @@ class TaskRecorder:
             task["reference"]["context_applied"] = applied
             task["reference"]["context"] = dict(reference_context_summary)
 
-    def mark_prompt_built(self, task: dict[str, Any], prompt_summary: dict[str, Any]) -> None:
+    def mark_prompt_built(
+        self, task: dict[str, Any], prompt_summary: dict[str, Any]
+    ) -> None:
         """Record prompt build summary on a task.
 
         Args:
@@ -251,7 +271,7 @@ class TaskRecorder:
             "Anima 调试状态：",
             f"- 提示词优化：{_bool(config, 'prompt_optimize_enabled', True)}",
             f"- 自定义 Prompt 模板：{bool(prompt_template)}",
-            f"- 千代预设：{_bool(config, 'chiyo_preset_enabled', False)}",
+            f"- 千代预设：{chiyo_profile_display_name(config)}",
             f"- 画师 tags：{'已配置' if artist_tags else '未配置'}",
             f"- 当前画师组：{active_artist or '默认画师 tags'}",
             f"- 已保存的画师组：{', '.join(presets) if presets else '无'}",

@@ -28,9 +28,18 @@ vae_name = ComfyUI 中的 VAE 文件名
 ## 预设
 
 - `reset_to_defaults`：一键恢复默认配置。打开并保存后，仅在下一次插件加载时执行一次，完成后会自动关闭。
-- `chiyo_preset_enabled`：一键启用千代预设。
+- `chiyo_preset`：选择千代预设。可选 `未启用` / `千代base` / `千代aesthetic`（配置值分别为空、`base`、`aesthetic`）。
 
-关闭时使用当前配置。开启后会把千代画师组写入画师 tags，并把狐莉加入固定角色。狐莉不是默认角色，只有指令里明确提到“狐莉”时才会使用。
+未启用时使用当前配置。选择任一千代预设后，都会把千代画师组写入画师 tags，并把狐莉加入固定角色。狐莉不是默认角色，只有指令里明确提到“狐莉”时才会使用。
+
+各预设差异：
+
+| 预设 | UNet | CFG | 质量词 / 负面词 |
+| --- | --- | --- | --- |
+| 千代base | `anima_baseV10.safetensors` | 5 | 使用当前配置的质量词与负面词 |
+| 千代aesthetic | `anima_aestheticV11.safetensors` | 3 | 都不注入 |
+
+`steps`、`sampler_name`、`scheduler`、CLIP 与 VAE 两个预设一致。预设只在运行时覆盖对应配置项，不会破坏原有基础配置；选择“未启用”后会恢复原值。切换后需保存配置并重载插件。旧配置里的 `chiyo_preset_enabled` 与旧画师组名“千代风格”“千代画风”仍可识别，并会迁移到千代base。
 
 ## ComfyUI 连接
 
@@ -63,6 +72,7 @@ vae_name = ComfyUI 中的 VAE 文件名
 - `prompt_optimize_enabled`：是否让聊天模型优化自然语言提示词。
 - `prompt_builder_provider_id`：指定用于优化提示词的模型。留空时使用当前会话主模型。
 - `prompt_builder_max_tokens`：提示词优化模型最大输出长度。
+- `prompt_builder_max_content_tags`：LLM 内容段的 Tag 上限，默认 80；不计算质量词、固定角色、画师组和画风。
 - `prompt_builder_template`：主提示词模板。
 
 通常不需要一开始就改 `prompt_builder_template`。如果想改变插件如何理解中文需求，再调整它。

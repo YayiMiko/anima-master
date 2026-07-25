@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+DEFAULT_MAX_CONTENT_TAGS = 80
+
 QUALITY_BLOCKLIST = {
     "masterpiece",
     "best quality",
@@ -247,6 +249,7 @@ def is_character_identity_tag(key: str) -> bool:
 
 def clean_content_tags(
     text: str,
+    max_tags: int = DEFAULT_MAX_CONTENT_TAGS,
     strip_character_tags: bool = True,
     protected_core_tags: tuple[str, ...] = (),
     allow_multi_character: bool = False,
@@ -281,6 +284,8 @@ def clean_content_tags(
             continue
         seen.add(key)
         cleaned.append(tag)
+        if len(cleaned) >= max_tags:
+            break
     return ", ".join(cleaned)
 
 

@@ -7,7 +7,7 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from config_view import CONFIG_FIELD_GROUPS, build_config_debug_lines
+from config_view import CONFIG_FIELD_GROUPS, build_config_debug_lines  # noqa: E402
 
 
 def test_config_debug_lines_show_core_user_state(tmp_path: Path):
@@ -35,8 +35,8 @@ def test_config_debug_lines_show_core_user_state(tmp_path: Path):
     )
     text = "\n".join(lines)
 
-    assert "千代预设：True" in text
-    assert "当前画师组：千代风格" in text
+    assert "千代预设：千代base" in text
+    assert "当前画师组：千代base" in text
     assert "角色：" in text and "狐莉" in text
     assert "ComfyUI：http://127.0.0.1:8188" in text
     assert "工作流：my_workflow" in text

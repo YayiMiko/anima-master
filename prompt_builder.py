@@ -13,7 +13,11 @@ try:
         wants_default_style,
         wants_sensual_mode,
     )
-    from .tag_cleaner import clean_content_tags, join_prompt_parts
+    from .tag_cleaner import (
+        DEFAULT_MAX_CONTENT_TAGS,
+        clean_content_tags,
+        join_prompt_parts,
+    )
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
     from prompt_presets import (
         DEFAULT_CHARACTER_TAGS,
@@ -26,7 +30,11 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
         wants_default_style,
         wants_sensual_mode,
     )
-    from tag_cleaner import clean_content_tags, join_prompt_parts
+    from tag_cleaner import (
+        DEFAULT_MAX_CONTENT_TAGS,
+        clean_content_tags,
+        join_prompt_parts,
+    )
 
 
 @dataclass(frozen=True)
@@ -69,7 +77,12 @@ def build_final_prompt(
     style_tags = active_style_tags(config).strip()
     use_style = wants_default_style(user_prompt, bool(artist.strip() or style_tags))
     use_sensual = wants_sensual_mode(user_prompt, config)
-    quality = str(config.get("quality_prefix") or DEFAULT_QUALITY_TAGS)
+    # `preset_suppress_quality` lets a preset ask for no quality prefix at all.
+    # Without it an empty `quality_prefix` would fall back to the default tags.
+    if config.get("preset_suppress_quality"):
+        quality = ""
+    else:
+        quality = str(config.get("quality_prefix") or DEFAULT_QUALITY_TAGS)
     character_name = ""
     if fixed_character is not None:
         character_name, character = fixed_character
@@ -81,6 +94,14 @@ def build_final_prompt(
     if use_style and not (artist.strip() or style_tags):
         use_style = False
     prompt_lower = str(user_prompt or "").lower()
+    try:
+        max_content_tags = int(
+            config.get("prompt_builder_max_content_tags", DEFAULT_MAX_CONTENT_TAGS)
+        )
+    except (TypeError, ValueError):
+        max_content_tags = DEFAULT_MAX_CONTENT_TAGS
+    if max_content_tags <= 0:
+        max_content_tags = DEFAULT_MAX_CONTENT_TAGS
     allow_multi_character = any(
         marker in prompt_lower
         for marker in (
@@ -102,6 +123,7 @@ def build_final_prompt(
     )
     content = clean_content_tags(
         llm_content or user_prompt,
+        max_tags=max_content_tags,
         strip_character_tags=use_character,
         protected_core_tags=required_core_tags,
         allow_multi_character=allow_multi_character,

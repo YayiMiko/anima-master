@@ -50,13 +50,42 @@ def test_explicit_multi_character_request_keeps_multi_character_tags() -> None:
     assert "holding hands" in result.content_tags
 
 
-def test_content_cleaning_has_no_tag_count_limit() -> None:
+def test_content_cleaning_uses_default_content_tag_limit() -> None:
     tags = ", ".join(f"visual detail {index}" for index in range(150))
 
     result = build_final_prompt(
-        user_prompt="无上限测试",
+        user_prompt="上限测试",
         llm_content=tags,
         config=_config(),
     )
 
-    assert len(result.content_tags.split(", ")) == 150
+    assert len(result.content_tags.split(", ")) == 80
+    assert len(result.final_prompt.split(", ")) == 83
+    assert "@configured artist" in result.final_prompt
+
+
+def test_content_tag_limit_can_be_configured() -> None:
+    tags = ", ".join(f"visual detail {index}" for index in range(20))
+    config = _config()
+    config["prompt_builder_max_content_tags"] = 12
+
+    result = build_final_prompt(
+        user_prompt="自定义上限测试",
+        llm_content=tags,
+        config=config,
+    )
+
+    assert len(result.content_tags.split(", ")) == 12
+
+
+def test_raw_mode_does_not_apply_content_tag_limit() -> None:
+    tags = ", ".join(f"raw detail {index}" for index in range(120))
+
+    result = build_final_prompt(
+        user_prompt=f"raw {tags}",
+        llm_content="ignored",
+        config=_config(),
+    )
+
+    assert result.raw_mode is True
+    assert len(result.content_tags.split(", ")) == 120
