@@ -4,8 +4,39 @@ import json
 from pathlib import Path
 from typing import Any
 
+try:
+    from .prompt_templates import (
+        DEFAULT_LLM_PROMPT_TEMPLATE,
+        is_legacy_builtin_template,
+    )
+except Exception:  # pragma: no cover - fallback for direct script-style imports.
+    from prompt_templates import DEFAULT_LLM_PROMPT_TEMPLATE, is_legacy_builtin_template
+
 
 RESET_TO_DEFAULTS_KEY = "reset_to_defaults"
+
+
+def migrate_prompt_defaults(config: Any) -> dict[str, Any]:
+    """Replace previous built-in prompt defaults with the current defaults.
+
+    Args:
+        config: Flat plugin configuration mapping.
+
+    Returns:
+        Configuration copy with only legacy built-in prompt fields migrated.
+    """
+    result = dict(config or {})
+    configured_template = str(result.get("prompt_builder_template") or "").strip()
+    if configured_template and not is_legacy_builtin_template(configured_template):
+        return result
+    result["prompt_builder_template"] = DEFAULT_LLM_PROMPT_TEMPLATE
+    try:
+        old_limit = int(result.get("prompt_builder_max_content_tags", 80))
+    except (TypeError, ValueError):
+        old_limit = 80
+    if old_limit in {80, 90}:
+        result["prompt_builder_max_content_tags"] = 65
+    return result
 
 
 def flatten_config(config: Any) -> dict[str, Any]:
@@ -57,7 +88,9 @@ def maybe_migrate_to_grouped_config(config: Any, schema_path: Path) -> dict[str,
     return grouped
 
 
-def persist_flat_config_key(config: Any, schema_path: Path, key: str, value: Any) -> None:
+def persist_flat_config_key(
+    config: Any, schema_path: Path, key: str, value: Any
+) -> None:
     """Persist a flat config key into the grouped config store."""
     if not isinstance(config, dict):
         return

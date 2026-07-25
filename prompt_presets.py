@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 DEFAULT_QUALITY_TAGS = "masterpiece, best quality, score_7, safe,"
@@ -20,8 +22,106 @@ CHIYO_CHARACTER_TAGS = (
 CHIYO_ARTIST_TAGS = (
     "@yukisiannn, @kani biimu, @ixy, @shnva, @shiromochi sakura, @stmast,"
 )
-CHIYO_ARTIST_PRESET_NAME = "\u5343\u4ee3\u98ce\u683c"
-CHIYO_ARTIST_LEGACY_PRESET_NAMES = ("\u5343\u4ee3\u753b\u98ce",)
+CHIYO_TURBO_ARTIST_TAGS = (
+    "@yukisiannn, @kani biimu, @ixy, @shnva, @shiromochi sakura, @stmast, "
+    "anime coloring, official art, clean lineart, delicate lineart, "
+    "soft cel shading, subtle gradient shading, refined details, "
+    "delicate facial features, detailed eyes, crisp silhouette,"
+)
+# Artist preset name. Renamed from "\u5343\u4ee3\u98ce\u683c" to "\u5343\u4ee3base" when the Chiyo
+# family gained multiple profiles; the old names stay in the legacy tuple so
+# existing configs keep resolving to the current preset.
+CHIYO_ARTIST_PRESET_NAME = "\u5343\u4ee3base"
+CHIYO_TURBO_ARTIST_PRESET_NAME = "\u5343\u4ee3turbo"
+CHIYO_ARTIST_LEGACY_PRESET_NAMES = (
+    "\u5343\u4ee3\u98ce\u683c",
+    "\u5343\u4ee3\u753b\u98ce",
+)
+
+# Chiyo preset profiles. "base" keeps the long-standing behaviour; other
+# profiles only declare what they change on top of it.
+CHIYO_PROFILE_BASE = "base"
+CHIYO_PROFILE_AESTHETIC = "aesthetic"
+CHIYO_PROFILE_TURBO = "turbo"
+# Disabled is represented by the empty string so truthiness means "a profile is
+# active". Keep this empty, or `_is_chiyo_enabled` would report off as enabled.
+CHIYO_PROFILE_OFF = ""
+CHIYO_DEFAULT_PROFILE = CHIYO_PROFILE_BASE
+CHIYO_BASE_CONFIG_SNAPSHOT_KEY = "chiyo_preset_base_snapshot"
+CHIYO_VISIBLE_OVERRIDE_KEYS = (
+    "unet_name",
+    "clip_name",
+    "vae_name",
+    "steps",
+    "cfg",
+    "sampler_name",
+    "scheduler",
+    "quality_prefix",
+    "negative_prompt",
+    "custom_workflow_enabled",
+    "custom_workflow_path",
+    "custom_workflow_override_parameters",
+)
+
+# Config values accepted for each profile, so hand-edited configs keep working.
+CHIYO_PROFILE_ALIASES: dict[str, str] = {
+    "base": CHIYO_PROFILE_BASE,
+    "chiyo": CHIYO_PROFILE_BASE,
+    "\u5343\u4ee3base": CHIYO_PROFILE_BASE,
+    "\u5343\u4ee3\u98ce\u683c": CHIYO_PROFILE_BASE,
+    "\u5343\u4ee3\u753b\u98ce": CHIYO_PROFILE_BASE,
+    "aesthetic": CHIYO_PROFILE_AESTHETIC,
+    "\u5343\u4ee3aesthetic": CHIYO_PROFILE_AESTHETIC,
+    "turbo": CHIYO_PROFILE_TURBO,
+    "chiyo turbo": CHIYO_PROFILE_TURBO,
+    "chiyo_turbo": CHIYO_PROFILE_TURBO,
+    "\u5343\u4ee3turbo": CHIYO_PROFILE_TURBO,
+    "off": CHIYO_PROFILE_OFF,
+    "none": CHIYO_PROFILE_OFF,
+    "": CHIYO_PROFILE_OFF,
+}
+
+# Per-profile config overrides applied by `apply_config_preset`.
+#
+# `quality_prefix` needs the companion `preset_suppress_quality` flag because
+# prompt_builder.py falls back to DEFAULT_QUALITY_TAGS on an empty string.
+# `negative_prompt` needs no such flag: the subprocess reads it with
+# `config.get("negative_prompt", default)`, which returns the empty string
+# when the key is present, so persisting "" is enough to disable it.
+CHIYO_PROFILES: dict[str, dict[str, Any]] = {
+    CHIYO_PROFILE_BASE: {
+        "unet_name": "anima_baseV10.safetensors",
+        "cfg": 5.0,
+        "preset_suppress_quality": False,
+    },
+    CHIYO_PROFILE_AESTHETIC: {
+        "unet_name": "anima_aestheticV11.safetensors",
+        "cfg": 3.0,
+        "quality_prefix": "",
+        "negative_prompt": "",
+        "preset_suppress_quality": True,
+    },
+    CHIYO_PROFILE_TURBO: {
+        "unet_name": "anima_baseV10.safetensors",
+        "clip_name": "qwen_3_06b_base.safetensors",
+        "vae_name": "qwen_image_vae.safetensors",
+        "steps": 10,
+        "cfg": 1.0,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "custom_workflow_enabled": True,
+        "custom_workflow_path": ("variants/turbo/workflows/comfyui_00051_api.json"),
+        "custom_workflow_override_parameters": False,
+        "low_cfg_harness_enabled": True,
+        "preset_suppress_quality": False,
+    },
+}
+CHIYO_PROFILE_DISPLAY_NAMES: dict[str, str] = {
+    CHIYO_PROFILE_BASE: "\u5343\u4ee3base",
+    CHIYO_PROFILE_AESTHETIC: "\u5343\u4ee3aesthetic",
+    CHIYO_PROFILE_TURBO: "\u5343\u4ee3turbo",
+    CHIYO_PROFILE_OFF: "\u672a\u542f\u7528",
+}
 SENSUAL_MARKERS = (
     "ɬ",
     "色气",
@@ -112,24 +212,48 @@ NO_CHARACTER_MARKERS = (
 def apply_config_preset(config: dict[str, Any]) -> dict[str, Any]:
     """Return a config copy with an optional user-facing preset applied."""
     result = dict(config or {})
+    result.pop(CHIYO_BASE_CONFIG_SNAPSHOT_KEY, None)
     for key in LEGACY_HIDDEN_STYLE_KEYS:
         result.pop(key, None)
-    if not _is_chiyo_enabled(result):
+    profile = resolve_chiyo_profile(result)
+    result.pop("chiyo_preset_enabled", None)
+    result.pop("preset_profile", None)
+    result.pop("preset_suppress_quality", None)
+    result["chiyo_preset"] = profile
+    if not profile:
         return result
 
-    result["chiyo_preset_enabled"] = True
-    result["preset_profile"] = "chiyo"
+    # Profile overrides win over the incoming config on purpose: keys such as
+    # `unet_name` and `cfg` always carry a schema default, so a
+    # "keep the user value" merge would make the override dead code.
+    for key, value in CHIYO_PROFILES.get(profile, {}).items():
+        result[key] = value
+    preset_artist_name = (
+        CHIYO_TURBO_ARTIST_PRESET_NAME
+        if profile == CHIYO_PROFILE_TURBO
+        else CHIYO_ARTIST_PRESET_NAME
+    )
+    preset_artist_tags = (
+        CHIYO_TURBO_ARTIST_TAGS if profile == CHIYO_PROFILE_TURBO else CHIYO_ARTIST_TAGS
+    )
     result["default_artist_tags"] = merge_tag_text(
-        result.get("default_artist_tags"), CHIYO_ARTIST_TAGS
+        result.get("default_artist_tags"), preset_artist_tags
     )
     presets = _normalize_chiyo_artist_presets(artist_presets(result))
     presets.setdefault(CHIYO_ARTIST_PRESET_NAME, CHIYO_ARTIST_TAGS)
+    if profile == CHIYO_PROFILE_TURBO:
+        presets.setdefault(CHIYO_TURBO_ARTIST_PRESET_NAME, CHIYO_TURBO_ARTIST_TAGS)
     result["artist_presets"] = presets
     active_artist = str(result.get("active_artist_preset") or "").strip()
     if active_artist in CHIYO_ARTIST_LEGACY_PRESET_NAMES:
-        result["active_artist_preset"] = CHIYO_ARTIST_PRESET_NAME
+        result["active_artist_preset"] = preset_artist_name
+    elif active_artist in {
+        CHIYO_ARTIST_PRESET_NAME,
+        CHIYO_TURBO_ARTIST_PRESET_NAME,
+    }:
+        result["active_artist_preset"] = preset_artist_name
     elif not active_artist:
-        result["active_artist_preset"] = CHIYO_ARTIST_PRESET_NAME
+        result["active_artist_preset"] = preset_artist_name
     fixed_characters = fixed_character_tags(result)
     fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
     result["fixed_characters"] = fixed_characters
@@ -140,12 +264,14 @@ def maybe_materialize_chiyo_preset(
     config: Any,
     *,
     base_config: dict[str, Any] | None = None,
+    snapshot_path: Path | None = None,
 ) -> dict[str, Any]:
     """Persist visible Chiyo preset fields back into plugin config when enabled.
 
     Args:
         config: Original AstrBot config object or plain dict.
         base_config: Effective config snapshot that should drive this load cycle.
+        snapshot_path: Plugin-data JSON file used to preserve base field values.
 
     Returns:
         The normalized visible config used for the current plugin load.
@@ -156,19 +282,92 @@ def maybe_materialize_chiyo_preset(
     for key in LEGACY_HIDDEN_STYLE_KEYS:
         updated.pop(key, None)
 
+    profile = resolve_chiyo_profile(current)
+    updated["chiyo_preset"] = profile
+    updated.pop("chiyo_preset_enabled", None)
+    updated.pop("preset_profile", None)
+    updated.pop("preset_suppress_quality", None)
+
+    snapshot_value = current.get(CHIYO_BASE_CONFIG_SNAPSHOT_KEY)
+    snapshot = dict(snapshot_value) if isinstance(snapshot_value, dict) else {}
+    if not snapshot and snapshot_path is not None and snapshot_path.exists():
+        try:
+            loaded_snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            if isinstance(loaded_snapshot, dict):
+                snapshot = loaded_snapshot
+        except (OSError, ValueError, TypeError):
+            snapshot = {}
+    updated.pop(CHIYO_BASE_CONFIG_SNAPSHOT_KEY, None)
+    if profile:
+        if not snapshot:
+            snapshot = {
+                key: current[key]
+                for key in CHIYO_VISIBLE_OVERRIDE_KEYS
+                if key in current
+            }
+        if snapshot_path is None:
+            updated[CHIYO_BASE_CONFIG_SNAPSHOT_KEY] = snapshot
+        else:
+            snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            temporary_path = snapshot_path.with_suffix(snapshot_path.suffix + ".tmp")
+            temporary_path.write_text(
+                json.dumps(snapshot, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            temporary_path.replace(snapshot_path)
+        for key in CHIYO_VISIBLE_OVERRIDE_KEYS:
+            if key in snapshot:
+                updated[key] = snapshot[key]
+        for key, value in CHIYO_PROFILES.get(profile, {}).items():
+            if key in CHIYO_VISIBLE_OVERRIDE_KEYS:
+                updated[key] = value
+    elif isinstance(snapshot_value, dict):
+        for key in CHIYO_VISIBLE_OVERRIDE_KEYS:
+            if key in snapshot:
+                updated[key] = snapshot[key]
+        updated.pop(CHIYO_BASE_CONFIG_SNAPSHOT_KEY, None)
+        if snapshot_path is not None:
+            snapshot_path.unlink(missing_ok=True)
+    elif snapshot:
+        for key in CHIYO_VISIBLE_OVERRIDE_KEYS:
+            if key in snapshot:
+                updated[key] = snapshot[key]
+        if snapshot_path is not None:
+            snapshot_path.unlink(missing_ok=True)
+
     if _is_chiyo_enabled(current):
+        preset_artist_name = (
+            CHIYO_TURBO_ARTIST_PRESET_NAME
+            if profile == CHIYO_PROFILE_TURBO
+            else CHIYO_ARTIST_PRESET_NAME
+        )
+        preset_artist_tags = (
+            CHIYO_TURBO_ARTIST_TAGS
+            if profile == CHIYO_PROFILE_TURBO
+            else CHIYO_ARTIST_TAGS
+        )
         updated["default_artist_tags"] = merge_tag_text(
             updated.get("default_artist_tags"),
-            CHIYO_ARTIST_TAGS,
+            preset_artist_tags,
         )
         presets = _normalize_chiyo_artist_presets(artist_presets(updated))
         presets.setdefault(CHIYO_ARTIST_PRESET_NAME, CHIYO_ARTIST_TAGS)
+        if profile == CHIYO_PROFILE_TURBO:
+            presets.setdefault(
+                CHIYO_TURBO_ARTIST_PRESET_NAME,
+                CHIYO_TURBO_ARTIST_TAGS,
+            )
         updated["artist_presets"] = [f"{name}={tags}" for name, tags in presets.items()]
         active_artist = str(updated.get("active_artist_preset") or "").strip()
         if active_artist in CHIYO_ARTIST_LEGACY_PRESET_NAMES:
-            updated["active_artist_preset"] = CHIYO_ARTIST_PRESET_NAME
+            updated["active_artist_preset"] = preset_artist_name
+        elif active_artist in {
+            CHIYO_ARTIST_PRESET_NAME,
+            CHIYO_TURBO_ARTIST_PRESET_NAME,
+        }:
+            updated["active_artist_preset"] = preset_artist_name
         elif not active_artist:
-            updated["active_artist_preset"] = CHIYO_ARTIST_PRESET_NAME
+            updated["active_artist_preset"] = preset_artist_name
         fixed_characters = fixed_character_tags(updated)
         fixed_characters.setdefault(CHIYO_CHARACTER_NAME, CHIYO_CHARACTER_TAGS)
         updated["fixed_characters"] = [
@@ -197,11 +396,60 @@ def merge_tag_text(existing: Any, addition: str) -> str:
     return ", ".join(tags) + ("," if tags else "")
 
 
-def _is_chiyo_enabled(config: dict[str, Any]) -> bool:
+def resolve_chiyo_profile(config: dict[str, Any]) -> str:
+    """Return the selected Chiyo profile id, or an empty string when disabled.
+
+    Accepts the current `chiyo_preset` selector, the legacy
+    `chiyo_preset_enabled` boolean, and legacy `preset_profile` aliases so old
+    configs keep working after the single-switch design was replaced by a
+    multi-profile selector.
+
+    Args:
+        config: Plugin configuration mapping.
+
+    Returns:
+        A key of `CHIYO_PROFILES` (`base`, `aesthetic`, or `turbo`), or `""`
+        when no Chiyo profile is active.
+    """
+    selector = str(config.get("chiyo_preset") or "").strip()
+    if selector:
+        resolved = CHIYO_PROFILE_ALIASES.get(selector.lower())
+        if resolved is not None:
+            return resolved
+        if selector in CHIYO_PROFILE_ALIASES:
+            return CHIYO_PROFILE_ALIASES[selector]
+        if selector.lower() in CHIYO_PROFILES:
+            return selector.lower()
+        # Unknown non-empty selector: treat as disabled rather than guessing.
+        return ""
     if "chiyo_preset_enabled" in config:
-        return bool(config.get("chiyo_preset_enabled"))
+        return CHIYO_DEFAULT_PROFILE if config.get("chiyo_preset_enabled") else ""
     preset = str(config.get("preset_profile") or "").strip()
-    return preset.lower() in CHIYO_PRESET_ALIASES or preset in CHIYO_PRESET_ALIASES
+    if not preset:
+        return ""
+    return CHIYO_PROFILE_ALIASES.get(
+        preset.lower(), CHIYO_PROFILE_ALIASES.get(preset, "")
+    )
+
+
+def chiyo_profile_display_name(config: dict[str, Any]) -> str:
+    """Return the human-readable name of the active Chiyo profile.
+
+    Args:
+        config: Plugin configuration mapping.
+
+    Returns:
+        A display label such as `千代base`, `千代aesthetic`, `千代turbo`, or
+        `未启用`.
+    """
+    profile = resolve_chiyo_profile(config)
+    return CHIYO_PROFILE_DISPLAY_NAMES.get(
+        profile, CHIYO_PROFILE_DISPLAY_NAMES[CHIYO_PROFILE_OFF]
+    )
+
+
+def _is_chiyo_enabled(config: dict[str, Any]) -> bool:
+    return bool(resolve_chiyo_profile(config))
 
 
 def _normalize_chiyo_artist_presets(presets: dict[str, str]) -> dict[str, str]:
@@ -401,4 +649,7 @@ def looks_like_danbooru_tags(text: str) -> bool:
     values = [part.strip() for part in str(text or "").split(",") if part.strip()]
     if len(values) < 2:
         return False
-    return all(" " in value or "_" in value or value.isascii() for value in values)
+    tag_like_count = sum(value.isascii() for value in values)
+    if tag_like_count == len(values):
+        return True
+    return len(values) >= 6 and tag_like_count / len(values) >= 0.8

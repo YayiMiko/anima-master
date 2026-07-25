@@ -28,16 +28,28 @@ vae_name = ComfyUI 中的 VAE 文件名
 ## 预设
 
 - `reset_to_defaults`：一键恢复默认配置。打开并保存后，仅在下一次插件加载时执行一次，完成后会自动关闭。
-- `chiyo_preset_enabled`：一键启用千代预设。
+- `chiyo_preset`：选择千代预设。可选 `未启用` / `千代base` / `千代aesthetic` / `千代turbo`（配置值分别为空、`base`、`aesthetic`、`turbo`）。
 
-关闭时使用当前配置。开启后会把千代画师组写入画师 tags，并把狐莉加入固定角色。狐莉不是默认角色，只有指令里明确提到“狐莉”时才会使用。
+未启用时使用当前配置。选择任一千代预设后，都会把对应的千代画师组写入画师 tags，并把狐莉加入固定角色。狐莉不是默认角色，只有指令里明确提到“狐莉”时才会使用。
+
+各预设差异：
+
+| 预设 | UNet | CFG | 质量词 / 负面词 |
+| --- | --- | --- | --- |
+| 千代base | `anima_baseV10.safetensors` | 5 | 使用当前配置的质量词与负面词 |
+| 千代aesthetic | `anima_aestheticV11.safetensors` | 3 | 都不注入 |
+| 千代turbo | `anima_baseV10.safetensors` + `anima-turbo-lora-v0.2.safetensors` | 1 | 使用当前配置的质量词与负面词 |
+
+千代turbo 使用 `variants/turbo/workflows/comfyui_00051_api.json`，固定为 10 步、`euler`、`simple`，并启用面向 CFG 1 的二次 LLM 约束规划。该规划会前置明确要求、删除冲突或稀释 Tag、为明确要求的画风加权，并可把内容段进一步限制在 20–80 个 Tag；存在明确约束时不会触发普通的长度重试。
+
+首次启用预设时，插件会在插件数据目录保存模型、生成参数、正负面提示词和自定义工作流字段的基础快照，再把预设值回写到配置页；内部快照不会显示为配置项。保存并重载插件后刷新页面即可看到实际值。切换预设时会从同一份基础快照重新计算，选择“未启用”则恢复启用前的值。旧配置里的 `chiyo_preset_enabled` 与旧画师组名“千代风格”“千代画风”仍可识别，并会迁移到千代base。已有的“千代turbo”和“千代turbo2”画师组会保留；千代turbo 预设优先使用同名画师组，不会覆盖用户保存的内容。
 
 ## ComfyUI 连接
 
 - `comfyui_base_url`：AstrBot 能访问到的 ComfyUI 地址。
 - `workflow`：工作流预设，默认使用 `anima_t2i`。
 - `custom_workflow_enabled`：是否改用自定义 ComfyUI API 工作流；普通版默认关闭。
-- `custom_workflow_path`：自定义工作流 JSON 路径；Turbo 留档示例见 `variants/turbo/`。
+- `custom_workflow_path`：自定义工作流 JSON 路径；千代turbo 会自动使用 `variants/turbo/` 中的工作流。
 - `timeout`：等待生成完成的最长时间。
 - `poll_interval`：查询 ComfyUI 生成状态的间隔。
 
@@ -63,6 +75,7 @@ vae_name = ComfyUI 中的 VAE 文件名
 - `prompt_optimize_enabled`：是否让聊天模型优化自然语言提示词。
 - `prompt_builder_provider_id`：指定用于优化提示词的模型。留空时使用当前会话主模型。
 - `prompt_builder_max_tokens`：提示词优化模型最大输出长度。
+- `prompt_builder_max_content_tags`：LLM 内容段的硬上限，默认 65；不计算质量词、固定角色、画师组和画风。自然语言主题通常以 40–55 个内容 Tag 为目标，复杂服装或构图约 60 个；已经是 Tag 串的输入不设最低数量。
 - `prompt_builder_template`：主提示词模板。
 
 通常不需要一开始就改 `prompt_builder_template`。如果想改变插件如何理解中文需求，再调整它。

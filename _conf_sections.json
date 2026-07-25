@@ -6,7 +6,7 @@
       "hint": "用于恢复默认配置，或快速应用千代预设。",
       "items": [
         "reset_to_defaults",
-        "chiyo_preset_enabled"
+        "chiyo_preset"
       ]
     },
     {
@@ -72,6 +72,7 @@
         "prompt_optimize_enabled",
         "prompt_builder_provider_id",
         "prompt_builder_max_tokens",
+        "prompt_builder_max_content_tags",
         "prompt_builder_web_search_enabled",
         "prompt_builder_search_max_results",
         "prompt_builder_search_depth",

@@ -7,7 +7,7 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from config_view import CONFIG_FIELD_GROUPS, build_config_debug_lines
+from config_view import CONFIG_FIELD_GROUPS, build_config_debug_lines  # noqa: E402
 
 
 def test_config_debug_lines_show_core_user_state(tmp_path: Path):
@@ -35,8 +35,8 @@ def test_config_debug_lines_show_core_user_state(tmp_path: Path):
     )
     text = "\n".join(lines)
 
-    assert "千代预设：True" in text
-    assert "当前画师组：千代风格" in text
+    assert "千代预设：千代base" in text
+    assert "当前画师组：千代base" in text
     assert "角色：" in text and "狐莉" in text
     assert "ComfyUI：http://127.0.0.1:8188" in text
     assert "工作流：my_workflow" in text
@@ -50,3 +50,17 @@ def test_config_field_groups_cover_debug_and_comfyui_sections():
     assert "workflow" in CONFIG_FIELD_GROUPS["comfyui"]
     assert "enable_verify" in CONFIG_FIELD_GROUPS["verify_debug"]
     assert "debug_prompt_enabled" in CONFIG_FIELD_GROUPS["verify_debug"]
+
+
+def test_config_debug_lines_show_effective_turbo_profile(tmp_path: Path):
+    lines = build_config_debug_lines(
+        {"chiyo_preset": "turbo"},
+        task_path=tmp_path / "last_task.json",
+        task_exists=False,
+    )
+    text = "\n".join(lines)
+
+    assert "千代预设：千代turbo" in text
+    assert "低 CFG 提示词约束：True" in text
+    assert "工作流：variants/turbo/workflows/comfyui_00051_api.json" in text
+    assert "UNET=anima_baseV10.safetensors" in text

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from comfyui_inputs import ComfyUIImageResolver
+from image_metadata_reader import coerce_text, image_metadata, image_summary
 from image_prompt_extractors import (
     extract_comfyui_graph,
     extract_json_generation,
@@ -11,13 +12,13 @@ from image_prompt_extractors import (
     json_loads_maybe,
     split_webui_parameters,
 )
-from image_metadata_reader import coerce_text, image_metadata, image_summary
 
 
 def _find_astrbot_root() -> Path:
-    for parent in Path(__file__).resolve().parents:
-        if (parent / "main.py").exists() and (parent / "data").is_dir():
-            return parent
+    candidates = (Path.cwd().resolve(), *Path(__file__).resolve().parents)
+    for candidate in candidates:
+        if (candidate / "astrbot").is_dir() and (candidate / "data").is_dir():
+            return candidate
     return Path(__file__).resolve().parents[1]
 
 
@@ -99,7 +100,9 @@ def inspect_image(path: Path, *, include_raw: bool = False) -> dict[str, Any]:
 
     for key in ("prompt", "workflow"):
         graph = _json_loads_maybe(metadata.get(key))
-        if isinstance(graph, dict) and any(isinstance(v, dict) and "class_type" in v for v in graph.values()):
+        if isinstance(graph, dict) and any(
+            isinstance(v, dict) and "class_type" in v for v in graph.values()
+        ):
             extracted = _extract_comfyui_graph(graph)
             payload.update(
                 {
@@ -140,7 +143,9 @@ def inspect_image(path: Path, *, include_raw: bool = False) -> dict[str, Any]:
                         "positive_prompt": extracted.get("positive_prompt", ""),
                         "negative_prompt": extracted.get("negative_prompt", ""),
                         "parameters": extracted.get("parameters", {}),
-                        "full_generation_info": extracted.get("full_generation_info", {}),
+                        "full_generation_info": extracted.get(
+                            "full_generation_info", {}
+                        ),
                     }
                 )
                 if include_raw:
@@ -155,7 +160,9 @@ def inspect_image(path: Path, *, include_raw: bool = False) -> dict[str, Any]:
                         "positive_prompt": extracted.get("positive_prompt", ""),
                         "negative_prompt": extracted.get("negative_prompt", ""),
                         "parameters": extracted.get("parameters", {}),
-                        "full_generation_info": extracted.get("full_generation_info", ""),
+                        "full_generation_info": extracted.get(
+                            "full_generation_info", ""
+                        ),
                     }
                 )
                 if include_raw:
@@ -206,7 +213,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="从图片元数据中提取生成提示词")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    for name, func in (("inspect", cmd_inspect), ("positive", cmd_positive), ("negative", cmd_negative)):
+    for name, func in (
+        ("inspect", cmd_inspect),
+        ("positive", cmd_positive),
+        ("negative", cmd_negative),
+    ):
         p = sub.add_parser(name)
         p.add_argument("--input", default="latest")
         p.add_argument("--allow-outside", action="store_true")

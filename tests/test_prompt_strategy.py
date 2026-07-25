@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -7,10 +8,10 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from prompt_pipeline import PromptPipeline
-from prompt_presets import looks_like_danbooru_tags
-from prompt_trace import PromptBuildTrace
-from task_summary import (
+from prompt_pipeline import PromptPipeline  # noqa: E402
+from prompt_presets import looks_like_danbooru_tags  # noqa: E402
+from prompt_trace import PromptBuildTrace  # noqa: E402
+from task_summary import (  # noqa: E402
     apply_verification_summary,
     build_last_task_debug_lines,
     build_strategy_summary,
@@ -53,6 +54,30 @@ def test_danbooru_tag_fast_path_detection_accepts_tag_lists():
 
 def test_danbooru_tag_fast_path_detection_rejects_short_chinese_requests():
     assert not looks_like_danbooru_tags("画一个白裙子的女孩，简单背景")
+
+
+def test_danbooru_tag_fast_path_accepts_one_chinese_character_name():
+    assert looks_like_danbooru_tags(
+        "1girl, solo, 狐莉, knee up, standing on one leg, foreshortening, "
+        "pov, from below, holding sword, fighting stance, serious"
+    )
+
+
+def test_mixed_tag_fast_path_composes_fixed_character_without_llm():
+    result = asyncio.run(
+        _pipeline({"chiyo_preset": "aesthetic"}).build(
+            object(),
+            "1girl, solo, 狐莉, knee up, standing on one leg, foreshortening, "
+            "pov, from below, holding sword, point a sword at audience, serious",
+        )
+    )
+
+    assert result.summary["danbooru_fast_path"] is True
+    assert result.summary["fixed_character_name"] == "狐莉"
+    assert "point a sword at audience" in result.final_prompt
+    assert "serious" in result.final_prompt
+    assert "狐莉" not in result.final_prompt
+    assert "smirk" not in result.final_prompt
 
 
 def test_prompt_trace_records_raw_fast_path():

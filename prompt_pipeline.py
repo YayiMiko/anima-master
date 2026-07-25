@@ -17,6 +17,7 @@ try:
     from .prompt_builder import (
         build_final_prompt,
     )
+    from .prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
     from .prompt_presets import (
         apply_config_preset,
         looks_like_danbooru_tags,
@@ -40,6 +41,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
     from prompt_builder import (
         build_final_prompt,
     )
+    from prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
     from prompt_presets import (
         apply_config_preset,
         looks_like_danbooru_tags,
@@ -197,6 +199,32 @@ class PromptPipeline:
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()
 
+    async def _generate_constraint_plan_with_llm(
+        self,
+        *,
+        provider_id: str,
+        plan_prompt: str,
+    ) -> str:
+        """Ask the active provider for a low-CFG constraint plan.
+
+        Args:
+            provider_id: AstrBot provider identifier.
+            plan_prompt: Structured constraint planning prompt.
+
+        Returns:
+            Raw JSON text returned by the provider.
+        """
+        response = await self.context.llm_generate(
+            chat_provider_id=provider_id,
+            prompt=plan_prompt,
+            system_prompt=(
+                "You are a strict JSON planner for anime image prompt constraints. "
+                "Return only valid JSON. Do not output Markdown or explanations."
+            ),
+            max_tokens=450,
+        )
+        return str(getattr(response, "completion_text", "") or "").strip()
+
     async def build(
         self, event: Any, user_prompt: str, mode: str = "txt2img"
     ) -> PromptPipelineResult:
@@ -238,6 +266,48 @@ class PromptPipeline:
             )
             return PromptPipelineResult(raw_prompt, summary)
 
+        prompt_config = apply_config_preset(dict(self.config))
+        fixed_character = selected_fixed_character(prompt, prompt_config)
+        fixed_character_name = fixed_character[0] if fixed_character else ""
+        if looks_like_danbooru_tags(prompt):
+            direct_content = ", ".join(
+                tag
+                for tag in split_tags(prompt)
+                if not fixed_character_name
+                or tag.strip().lower() != fixed_character_name.lower()
+            )
+            built = build_final_prompt(
+                user_prompt=prompt,
+                llm_content=direct_content,
+                config=prompt_config,
+            )
+            content_tag_count = len(split_tags(built.content_tags))
+            self.logger.info(
+                "[comfyui_agent] prompt builder used Danbooru tag fast path character=%s content_tags=%s final_chars=%s",
+                built.character_name or "none",
+                content_tag_count,
+                len(built.final_prompt),
+            )
+            summary.update(
+                {
+                    "raw_mode": False,
+                    "danbooru_fast_path": True,
+                    "skipped_reason": "danbooru_tags_detected",
+                    "fixed_character": built.used_fixed_character,
+                    "fixed_character_name": built.character_name,
+                    "sensual_mode": built.used_sensual_mode,
+                    "default_style": built.used_default_style,
+                    "llm_failed": False,
+                    "llm_error": "",
+                    "llm_content_tag_count": content_tag_count,
+                    "short_content_retry": False,
+                    "llm_content_chars": len(built.content_tags),
+                    "final_prompt_chars": len(built.final_prompt),
+                    "final_prompt_head": self._shorten(built.final_prompt, 600),
+                }
+            )
+            return PromptPipelineResult(built.final_prompt, summary)
+
         provider_id = await self._current_chat_provider_id(event)
         if not provider_id:
             self.logger.warning(
@@ -252,9 +322,6 @@ class PromptPipeline:
             )
             return PromptPipelineResult(prompt, summary)
 
-        prompt_config = apply_config_preset(dict(self.config))
-        fixed_character = selected_fixed_character(prompt, prompt_config)
-        fixed_character_name = fixed_character[0] if fixed_character else ""
         use_fixed_character = fixed_character is not None
         use_sensual_mode = wants_sensual_mode(prompt, prompt_config)
         outfit_plan = detect_outfit_transfer(prompt, fixed_character_name)
@@ -384,20 +451,46 @@ class PromptPipeline:
             user_prompt=prompt,
             fixed_character=use_fixed_character,
         )
+        low_cfg_harness = bool(prompt_config.get("low_cfg_harness_enabled", False))
+        constraint_raw = ""
+        constraint_plan = parse_constraint_plan("")
+        if low_cfg_harness:
+            try:
+                constraint_raw = await self._generate_constraint_plan_with_llm(
+                    provider_id=provider_id,
+                    plan_prompt=build_constraint_plan_prompt(
+                        user_prompt=prompt,
+                        llm_content=llm_content or prompt,
+                        fixed_character_name=fixed_character_name,
+                    ),
+                )
+                constraint_plan = parse_constraint_plan(constraint_raw)
+            except Exception as constraint_exc:
+                self.logger.warning(
+                    "[comfyui_agent] prompt constraint planner failed: %s",
+                    constraint_exc,
+                )
         built = build_final_prompt(
             user_prompt=prompt,
             llm_content=llm_content,
             config=prompt_config,
             required_core_tags=required_core_tags,
+            constraint_plan=constraint_plan,
         )
         content_tag_count = len(split_tags(built.content_tags))
         short_content_retry = False
-        if not llm_failed and not built.raw_mode and content_tag_count < 55:
+        if (
+            not llm_failed
+            and not built.raw_mode
+            and not built.constraint_mode
+            and content_tag_count < 35
+        ):
             retry_prompt = (
                 llm_prompt
                 + "\n-----------\n"
                 + "上一次输出的具体内容 tags 太短。请重新输出更完整的英文 Danbooru tags："
-                + "请补充到至少 55 个具体内容 tags，不设数量上限；重点扩写服装结构、材质、纹样、饰品、姿态、表情、手部动作和可见细节。"
+                + "请补充到 40-55 个具体内容 tags，复杂画面最多不超过 65 个；优先补足主要服装结构、动作关系、明确物件和必要环境。"
+                + "不得替换用户明确的主体、花卉、道具、动作、表情或镜头，也不要添加无关道具和冲突神态。"
                 + "不要输出质量词、画师词、解释或 Markdown。"
             )
             try:
@@ -418,6 +511,7 @@ class PromptPipeline:
                     llm_content=retry_content,
                     config=prompt_config,
                     required_core_tags=required_core_tags,
+                    constraint_plan=constraint_plan,
                 )
                 retry_tag_count = len(split_tags(retry_built.content_tags))
                 if retry_tag_count > content_tag_count:
@@ -431,7 +525,7 @@ class PromptPipeline:
                     retry_exc,
                 )
         self.logger.info(
-            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s required_core_tags=%s content_tags=%s content_chars=%s final_chars=%s final_head=%s",
+            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s low_cfg_harness=%s constraint=%s weighted_style=%s required_core_tags=%s content_tags=%s content_chars=%s final_chars=%s final_head=%s",
             built.raw_mode,
             bool(search_context),
             research_plan.use_deep_thinking,
@@ -439,6 +533,9 @@ class PromptPipeline:
             built.used_sensual_mode,
             built.used_fixed_character,
             built.used_default_style,
+            low_cfg_harness,
+            built.constraint_mode,
+            ",".join(built.weighted_style_tags) or "none",
             ",".join(built.required_core_tags) or "none",
             content_tag_count,
             len(built.content_tags),
@@ -456,6 +553,12 @@ class PromptPipeline:
                 "fixed_character_name": built.character_name,
                 "sensual_mode": built.used_sensual_mode,
                 "default_style": built.used_default_style,
+                "low_cfg_harness": low_cfg_harness,
+                "constraint_mode": built.constraint_mode,
+                "weighted_style_tags": list(built.weighted_style_tags),
+                "constraint_tags": list(built.constraint_tags),
+                "removed_constraint_tags": list(built.removed_constraint_tags),
+                "constraint_reason": built.constraint_reason,
                 "required_core_tags": list(built.required_core_tags),
                 "outfit_transfer": outfit_plan.enabled,
                 "outfit_transfer_source": outfit_plan.source_subject,
@@ -482,6 +585,7 @@ class PromptPipeline:
                 {
                     "llm_prompt": llm_prompt,
                     "outfit_summary": outfit_summary,
+                    "constraint_plan": constraint_raw,
                     "llm_content": llm_content,
                     "final_prompt": built.final_prompt,
                 }
