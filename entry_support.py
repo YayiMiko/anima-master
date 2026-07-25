@@ -6,9 +6,14 @@ from typing import Any
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api.star import Context
+from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
 
 try:
-    from .config_defaults import maybe_reset_to_defaults
+    from .config_defaults import (
+        flatten_config,
+        maybe_reset_to_defaults,
+        migrate_prompt_defaults,
+    )
     from .prompt_presets import (
         apply_config_preset,
         maybe_materialize_chiyo_preset,
@@ -16,7 +21,11 @@ try:
     )
     from .service_container import build_services
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
-    from config_defaults import maybe_reset_to_defaults
+    from config_defaults import (
+        flatten_config,
+        maybe_reset_to_defaults,
+        migrate_prompt_defaults,
+    )
     from prompt_presets import (
         apply_config_preset,
         maybe_materialize_chiyo_preset,
@@ -29,13 +38,23 @@ def initialize_plugin_config(
     config: AstrBotConfig | None, schema_path: Path
 ) -> dict[str, Any]:
     """Normalize and materialize the plugin config before services are built."""
-    raw_or_reset = maybe_reset_to_defaults(
-        config or {},
-        schema_path,
+    chiyo_snapshot_path = (
+        Path(get_astrbot_plugin_data_path())
+        / "astrbot_plugin_anima_master"
+        / "chiyo_preset_base.json"
+    )
+    if bool(flatten_config(config or {}).get("reset_to_defaults", False)):
+        chiyo_snapshot_path.unlink(missing_ok=True)
+    raw_or_reset = migrate_prompt_defaults(
+        maybe_reset_to_defaults(
+            config or {},
+            schema_path,
+        )
     )
     raw_config = maybe_materialize_chiyo_preset(
         config if config is not None else raw_or_reset,
         base_config=raw_or_reset,
+        snapshot_path=chiyo_snapshot_path,
     )
     return apply_config_preset(raw_config)
 

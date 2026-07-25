@@ -110,8 +110,8 @@ def build_config_debug_lines(
     Returns:
         User-facing, non-secret config summary lines.
     """
-    config = dict(config or {})
-    prompt_config = apply_config_preset(config)
+    config = apply_config_preset(dict(config or {}))
+    prompt_config = config
     characters = sorted(fixed_character_tags(prompt_config).keys())
     presets = sorted(artist_presets(prompt_config).keys())
     active_artist = active_artist_preset_name(prompt_config)
@@ -125,6 +125,7 @@ def build_config_debug_lines(
         f"- 提示词优化：{_bool(config, 'prompt_optimize_enabled', True)}",
         f"- 自定义 Prompt 模板：{bool(prompt_template)}",
         f"- 千代预设：{chiyo_profile_display_name(prompt_config)}",
+        f"- 低 CFG 提示词约束：{_bool(config, 'low_cfg_harness_enabled', False)}",
         f"- 画师 tags：{'已配置' if artist_tags else '未配置'}",
         f"- 当前画师组：{active_artist or '默认画师 tags'}",
         f"- 已保存的画师组：{', '.join(presets) if presets else '无'}",
@@ -136,7 +137,7 @@ def build_config_debug_lines(
         f"- 发送到聊天：{_bool(config, 'send_result_to_chat', True)} / 最多 {_int(config, 'max_send_images', 1)} 张",
         f"- 生成后自检：{_bool(config, 'enable_verify', False)} / 分数线 {_int(config, 'verify_pass_score', 7)} / 最多重画 {_int(config, 'max_verify_retry', 1)} 次",
         f"- ComfyUI：{_str(config, 'comfyui_base_url', 'http://127.0.0.1:8188')}",
-        f"- 工作流：{_str(config, 'workflow', 'anima_t2i')}",
+        f"- 工作流：{_str(config, 'custom_workflow_path') if _bool(config, 'custom_workflow_enabled', False) else _str(config, 'workflow', 'anima_t2i')}",
         f"- 默认尺寸：{_int(config, 'width', 1024)}x{_int(config, 'height', 1536)}",
         f"- 模型：UNET={_str(config, 'unet_name', '') or '未配置'}，CLIP={_str(config, 'clip_name', '') or '未配置'}，VAE={_str(config, 'vae_name', '') or '未配置'}",
         f"- 调试开关：prompt={_bool(config, 'debug_prompt_enabled', False)}，reference={_bool(config, 'debug_image_reference_enabled', False)}，send={_bool(config, 'debug_send_payload_enabled', False)}",

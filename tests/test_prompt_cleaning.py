@@ -8,6 +8,7 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from prompt_builder import build_final_prompt  # noqa: E402
+from tag_cleaner import clean_content_tags  # noqa: E402
 
 
 def _config() -> dict:
@@ -59,8 +60,8 @@ def test_content_cleaning_uses_default_content_tag_limit() -> None:
         config=_config(),
     )
 
-    assert len(result.content_tags.split(", ")) == 80
-    assert len(result.final_prompt.split(", ")) == 83
+    assert len(result.content_tags.split(", ")) == 65
+    assert len(result.final_prompt.split(", ")) == 68
     assert "@configured artist" in result.final_prompt
 
 
@@ -89,3 +90,50 @@ def test_raw_mode_does_not_apply_content_tag_limit() -> None:
 
     assert result.raw_mode is True
     assert len(result.content_tags.split(", ")) == 120
+
+
+def test_content_cleaner_removes_high_confidence_semantic_conflicts() -> None:
+    cleaned = clean_content_tags(
+        "{{holding sword}}, Point a sword at the audience, looking away, "
+        "looking at viewer, nude, naked, topless, bottomless, holding nothing, "
+        "mist, morning mist, pear blossoms, punis, sheer fabric, "
+        "translucent fabric",
+        strip_character_tags=False,
+    )
+
+    assert "sword pointed at viewer" in cleaned
+    assert "holding sword" in cleaned
+    assert "looking away" in cleaned
+    assert "looking at viewer" not in cleaned
+    assert "nude" in cleaned
+    assert "naked" not in cleaned
+    assert "topless" not in cleaned
+    assert "bottomless" not in cleaned
+    assert "holding nothing" not in cleaned
+    assert "morning mist" in cleaned
+    assert ", mist," not in f", {cleaned},"
+    assert "pear blossoms" in cleaned
+    assert "penis" in cleaned
+    assert "punis" not in cleaned
+    assert "sheer fabric" in cleaned
+    assert "translucent fabric" not in cleaned
+
+
+def test_content_cleaner_removes_viewer_gaze_when_eyes_are_closed() -> None:
+    cleaned = clean_content_tags(
+        "looking up at viewer, singing, closed eyes, gentle smile",
+        strip_character_tags=False,
+    )
+
+    assert "looking up at viewer" not in cleaned
+    assert cleaned == "singing, closed eyes, gentle smile"
+
+
+def test_fixed_character_cleaning_preserves_explicit_hair_details() -> None:
+    cleaned = clean_content_tags(
+        "white hair, blue eyes, fox girl, lotus hair ornament, floating hair, "
+        "braid, pubic hair",
+        strip_character_tags=True,
+    )
+
+    assert cleaned == "lotus hair ornament, floating hair, braid, pubic hair"

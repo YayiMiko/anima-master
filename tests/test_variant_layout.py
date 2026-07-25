@@ -12,7 +12,6 @@ if str(PLUGIN_DIR) not in sys.path:
 from prompt_presets import DEFAULT_QUALITY_TAGS  # noqa: E402
 from prompt_templates import (  # noqa: E402
     DEFAULT_LLM_PROMPT_TEMPLATE,
-    build_llm_prompt,
 )
 
 
@@ -40,6 +39,13 @@ def test_normal_variant_is_the_public_default() -> None:
     assert len(listed_items) == len(set(listed_items))
     assert "chiyo_preset" in listed_items
     assert "chiyo_preset_enabled" not in listed_items
+    assert connection["custom_workflow_path"]["default"] == ""
+    assert schema["anima_master_basic"]["items"]["chiyo_preset"]["options"] == [
+        "",
+        "base",
+        "aesthetic",
+        "turbo",
+    ]
     assert (
         schema["anima_master_default_prompt"]["items"]["quality_prefix"]["default"]
         == DEFAULT_QUALITY_TAGS
@@ -52,7 +58,7 @@ def test_normal_variant_is_the_public_default() -> None:
         schema["anima_master_prompting"]["items"]["prompt_builder_max_content_tags"][
             "default"
         ]
-        == 80
+        == 65
     )
 
 
@@ -67,20 +73,16 @@ def test_advanced_example_uses_the_builtin_template() -> None:
     assert json.loads(match.group(1)) == DEFAULT_LLM_PROMPT_TEMPLATE
 
 
-def test_previous_90_tag_template_migrates_to_current_limit() -> None:
-    previous_template = DEFAULT_LLM_PROMPT_TEMPLATE.replace(
-        "常规输出 65-75 个互不重复、可见、可生成的内容 tags，最多不得超过 80 个。",
-        "常规输出 70-80 个互不重复、可见、可生成的内容 tags，最多不得超过 90 个。",
-    )
-
-    result = build_llm_prompt(
-        "测试主题",
-        prompt_builder_template=previous_template,
-    )
-
-    assert "常规输出 65-75 个" in result
-    assert "最多不得超过 80 个" in result
-    assert "最多不得超过 90 个" not in result
+def test_builtin_template_uses_aesthetic_density_and_fidelity_rules() -> None:
+    assert "常规输出 40-55 个" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "最多不得超过 65 个" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "pear blossoms 不能改成 cherry blossoms" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "looking away 与 looking at viewer" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "holding sword、sword pointed at viewer" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "white five-petaled flowers" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "不要自行补充靴子、高跟鞋、袜子或腿饰" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "不要用 holding nothing" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "已经是 tags 的输入不设最低数量" in DEFAULT_LLM_PROMPT_TEMPLATE
 
 
 def test_turbo_variant_archive_contains_expected_workflow() -> None:

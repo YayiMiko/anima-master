@@ -2,7 +2,7 @@
 
 Anima 绘图大师是一个 AstrBot 插件，用来把聊天里的自然语言变成适合本地 ComfyUI / Anima 工作流的 Danbooru tags，并把生成结果发回聊天。
 
-> **0.3.2：** 默认恢复为普通版 Anima 工作流，增强提示词细节密度并取消 Tag 数量上限；低 CFG / Turbo 逻辑移入独立留档目录，不再影响当前 CFG 5 主线。
+> **0.3.3：** 新增千代 base、aesthetic 与 turbo 三套可切换预设，完善预设参数恢复；优化 aesthetic / DS4 Flash 的 Tag 数量、主题锚点、冲突清理和 Tag 快路径，并修复服务器连接诊断读取错误配置的问题。
 
 ```text
 /anm 一个女孩，白色裙子，立绘，简单背景
@@ -79,7 +79,7 @@ vae_name = 你的 VAE 文件名
 - `docs/advanced-config.example.jsonc`
 - `data/config/astrbot_plugin_anima_master_config.example.jsonc`（本机注释模板）
 
-如果你想快速体验千代风格，可以在“千代预设”中选择“千代base”或“千代aesthetic”。两者都会加入“千代base”画师组，并把“狐莉”加入角色列表；aesthetic 另外使用 `anima_aestheticV11`、CFG 3，且不注入固定正负面词。狐莉不会自动套用，只有当指令里明确提到“狐莉”时才会使用。选择“未启用”后会恢复原有模型、参数和提示词配置。
+如果你想快速体验千代风格，可以在“千代预设”中选择“千代base”“千代aesthetic”或“千代turbo”。三者都会加入对应的千代画师组，并把“狐莉”加入角色列表；aesthetic 使用 `anima_aestheticV11`、CFG 3，且不注入固定正负面词；turbo 使用 Turbo LoRA 工作流、10 步、CFG 1 和低 CFG 提示词约束。保存并重载插件后，配置页会同步显示实际的模型、参数和提示词；选择“未启用”会恢复启用前的值。狐莉不会自动套用，只有当指令里明确提到“狐莉”时才会使用。
 
 ## 详细说明
 

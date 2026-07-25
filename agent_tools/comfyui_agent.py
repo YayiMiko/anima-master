@@ -28,9 +28,10 @@ if hasattr(sys.stdout, "reconfigure"):
 
 
 def _find_astrbot_root() -> Path:
-    for parent in Path(__file__).resolve().parents:
-        if (parent / "main.py").exists() and (parent / "data").is_dir():
-            return parent
+    candidates = (Path.cwd().resolve(), *Path(__file__).resolve().parents)
+    for candidate in candidates:
+        if (candidate / "astrbot").is_dir() and (candidate / "data").is_dir():
+            return candidate
     return Path(__file__).resolve().parents[1]
 
 

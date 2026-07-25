@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-DEFAULT_MAX_CONTENT_TAGS = 80
+DEFAULT_MAX_CONTENT_TAGS = 65
 
 QUALITY_BLOCKLIST = {
     "masterpiece",
@@ -110,9 +110,6 @@ CHARACTER_IDENTITY_PATTERNS = (
     re.compile(
         r"\b(?:black|brown|blue|red|pink|purple|green|grey|gray|gold|golden|light|dark|ice blue|amber)\s+eyes?\b"
     ),
-    re.compile(
-        r"\b(?:hair|bangs|twintails?|braids?|ponytail|sidelocks?|ahoge|hair bun|hair over one eye)\b"
-    ),
     re.compile(r"\b(?:ears?|tail|wings?|horns?|halo|fangs?|heterochromia)\b"),
     re.compile(r"\b(?:vampire|angel|demon|fox girl|cat girl|animal girl)\b"),
     re.compile(
@@ -142,6 +139,15 @@ MULTI_CHARACTER_BLOCKLIST = {
     "clone",
     "duplicate",
     "twins",
+}
+
+NON_VISUAL_TAGS = {
+    "holding nothing",
+}
+
+EXCLUSIVE_TAG_GROUPS = {
+    "looking at viewer": "gaze_target",
+    "looking away": "gaze_target",
 }
 
 ARTIST_FUNCTION_RE = re.compile(
@@ -229,6 +235,15 @@ def canonical_tag_text(tag: str) -> str:
     key = normalize_tag_key(tag)
     if key == "1 girl":
         return "1girl"
+    if key == "punis":
+        return "penis"
+    if key in {
+        "point a sword at the audience",
+        "point a sword at viewer",
+        "point sword at the audience",
+        "point sword at viewer",
+    }:
+        return "sword pointed at viewer"
     return str(tag or "").strip()
 
 
@@ -284,9 +299,38 @@ def clean_content_tags(
             continue
         seen.add(key)
         cleaned.append(tag)
-        if len(cleaned) >= max_tags:
-            break
-    return ", ".join(cleaned)
+
+    semantic_keys = [
+        normalize_tag_key(_strip_wrapping_brackets(tag)) for tag in cleaned
+    ]
+    full_nudity_key = "nude" if "nude" in semantic_keys else "naked"
+    has_full_nudity = full_nudity_key in semantic_keys
+    has_specific_mist = "morning mist" in semantic_keys
+    has_closed_eyes = any(
+        key in {"closed eyes", "eyes closed"} for key in semantic_keys
+    )
+    has_sheer_fabric = "sheer fabric" in semantic_keys
+    seen_groups: set[str] = set()
+    semantic_cleaned: list[str] = []
+    for tag, key in zip(cleaned, semantic_keys, strict=True):
+        if key in NON_VISUAL_TAGS:
+            continue
+        if has_full_nudity and key in {"nude", "naked", "topless", "bottomless"}:
+            if key != full_nudity_key:
+                continue
+        if has_specific_mist and key == "mist":
+            continue
+        if has_closed_eyes and "looking" in key and "viewer" in key:
+            continue
+        if has_sheer_fabric and key == "translucent fabric":
+            continue
+        group = EXCLUSIVE_TAG_GROUPS.get(key)
+        if group:
+            if group in seen_groups:
+                continue
+            seen_groups.add(group)
+        semantic_cleaned.append(tag)
+    return ", ".join(semantic_cleaned[:max_tags])
 
 
 def join_prompt_parts(parts: list[str]) -> str:

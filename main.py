@@ -7,6 +7,7 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.event.filter import EventMessageType
 from astrbot.api.star import Context, Star
 from astrbot.core.star.filter.command import GreedyStr
+from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
 
 try:
     from .command_router import parse_hard_route
@@ -15,6 +16,7 @@ try:
         group_config,
         maybe_migrate_to_grouped_config,
         maybe_reset_to_defaults,
+        migrate_prompt_defaults,
     )
     from .prompt_presets import (
         apply_config_preset,
@@ -29,6 +31,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
         group_config,
         maybe_migrate_to_grouped_config,
         maybe_reset_to_defaults,
+        migrate_prompt_defaults,
     )
     from prompt_presets import (
         apply_config_preset,
@@ -44,15 +47,25 @@ class ComfyUIAgentPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig | None = None):
         super().__init__(context, config)
         schema_path = Path(__file__).with_name("_conf_schema.json")
+        chiyo_snapshot_path = (
+            Path(get_astrbot_plugin_data_path())
+            / "astrbot_plugin_anima_master"
+            / "chiyo_preset_base.json"
+        )
+        if bool(flatten_config(config or {}).get("reset_to_defaults", False)):
+            chiyo_snapshot_path.unlink(missing_ok=True)
         grouped_or_reset = maybe_migrate_to_grouped_config(config or {}, schema_path)
         raw_or_reset = maybe_reset_to_defaults(
             config or {},
             schema_path,
         )
-        raw_or_reset = flatten_config(raw_or_reset or grouped_or_reset)
+        raw_or_reset = migrate_prompt_defaults(
+            flatten_config(raw_or_reset or grouped_or_reset)
+        )
         raw_config = maybe_materialize_chiyo_preset(
             None,
             base_config=raw_or_reset,
+            snapshot_path=chiyo_snapshot_path,
         )
         if config is not None and group_config(raw_config, schema_path) != dict(
             config or {}
