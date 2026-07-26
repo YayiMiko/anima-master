@@ -477,20 +477,36 @@ class PromptPipeline:
             required_core_tags=required_core_tags,
             constraint_plan=constraint_plan,
         )
+        initial_input_tag_count = len(split_tags(llm_content))
         content_tag_count = len(split_tags(built.content_tags))
+        removed_tag_count = max(0, initial_input_tag_count - content_tag_count)
         short_content_retry = False
+        detail_refill_retry = False
+        detail_refill_reason = ""
         if (
             not llm_failed
             and not built.raw_mode
             and not built.constraint_mode
-            and content_tag_count < 35
+            and not low_cfg_harness
+            and (content_tag_count < 35 or removed_tag_count >= 4)
         ):
+            reasons: list[str] = []
+            if content_tag_count < 35:
+                reasons.append("内容不足")
+            if removed_tag_count >= 4:
+                reasons.append("同义或无效内容较多")
+            detail_refill_reason = "、".join(reasons)
             retry_prompt = (
                 llm_prompt
                 + "\n-----------\n"
-                + "上一次输出的具体内容 tags 太短。请重新输出更完整的英文 Danbooru tags："
-                + "请补充到 40-55 个具体内容 tags，复杂画面最多不超过 65 个；优先补足主要服装结构、动作关系、明确物件和必要环境。"
-                + "不得替换用户明确的主体、花卉、道具、动作、表情或镜头，也不要添加无关道具和冲突神态。"
+                + f"上一次输出需要重新分配细节，原因：{detail_refill_reason}。\n"
+                + f"清理后的可用 tags：{built.content_tags}\n"
+                + "请重写一份完整列表，不要只在末尾追加。合并同义词后，把空出的篇幅用于不同的可见画面槽位："
+                + "主体与关键物件关系、主要动作和手势、相容神态、服装结构、材质纹样与配饰、前景互动元素、简洁背景层次、构图镜头、功能不同的光影、特效。"
+                + "同一语义簇最多保留 1-2 个词；光源、光束、轮廓光、投影和空气粒子可以分别描述，但不要用多个词反复表达单纯的明亮或发光。"
+                + "常规画面使用 40-55 个具体内容 tags，简单表情包或头像可以使用 30-45 个，复杂画面最多不超过 65 个。"
+                + "优先增加人物、服装、手部、物件关系和前景细节，背景只增加少量有区分度的元素。"
+                + "不得替换用户明确的主体、花卉、道具、动作、表情、输出类型或镜头，也不要添加无关道具和冲突神态。"
                 + "不要输出质量词、画师词、解释或 Markdown。"
             )
             try:
@@ -513,15 +529,24 @@ class PromptPipeline:
                     required_core_tags=required_core_tags,
                     constraint_plan=constraint_plan,
                 )
+                retry_input_tag_count = len(split_tags(retry_content))
                 retry_tag_count = len(split_tags(retry_built.content_tags))
-                if retry_tag_count > content_tag_count:
+                retry_removed_tag_count = max(
+                    0, retry_input_tag_count - retry_tag_count
+                )
+                if retry_tag_count >= content_tag_count and (
+                    retry_tag_count > content_tag_count
+                    or retry_removed_tag_count < removed_tag_count
+                ):
                     llm_content = retry_content
                     built = retry_built
                     content_tag_count = retry_tag_count
-                    short_content_retry = True
+                    removed_tag_count = retry_removed_tag_count
+                    short_content_retry = "内容不足" in reasons
+                    detail_refill_retry = True
             except Exception as retry_exc:
                 self.logger.warning(
-                    "[comfyui_agent] prompt builder short-content retry failed: %s",
+                    "[comfyui_agent] prompt builder detail-refill retry failed: %s",
                     retry_exc,
                 )
         self.logger.info(
@@ -569,6 +594,10 @@ class PromptPipeline:
                 "llm_error": self._shorten(llm_error, 300),
                 "llm_content_tag_count": content_tag_count,
                 "short_content_retry": short_content_retry,
+                "detail_refill_attempted": bool(detail_refill_reason),
+                "detail_refill_retry": detail_refill_retry,
+                "detail_refill_reason": detail_refill_reason,
+                "removed_content_tag_count": removed_tag_count,
                 "llm_content_chars": len(built.content_tags),
                 "final_prompt_chars": len(built.final_prompt),
                 "final_prompt_head": self._shorten(built.final_prompt, 600),

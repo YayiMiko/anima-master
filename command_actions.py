@@ -6,8 +6,13 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .agent_tools.comfyui_sizes import allowed_sizes
     from .command_catalog import COMMAND_ENTRIES
-    from .command_router import help_text
+    from .command_router import (
+        DEFAULT_GENERATION_SIZES,
+        help_text,
+        parse_generation_size,
+    )
     from .config_defaults import persist_flat_config_key
     from .deployment_diagnostics import compact_status_text, diagnostic_text
     from .prompt_presets import (
@@ -18,8 +23,13 @@ try:
     )
     from .tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
 except Exception:  # pragma: no cover - fallback for direct script-style imports.
+    from agent_tools.comfyui_sizes import allowed_sizes
     from command_catalog import COMMAND_ENTRIES
-    from command_router import help_text
+    from command_router import (
+        DEFAULT_GENERATION_SIZES,
+        help_text,
+        parse_generation_size,
+    )
     from config_defaults import persist_flat_config_key
     from deployment_diagnostics import compact_status_text, diagnostic_text
     from prompt_presets import (
@@ -375,7 +385,20 @@ class CommandActionHandler:
         if action == "generate":
             if not prompt:
                 return "请在后面写完整 prompt 或 tags。"
-            await self._generate(event, prompt)
+            prompt, size, size_error = parse_generation_size(
+                prompt,
+                allowed_sizes(self.config, DEFAULT_GENERATION_SIZES),
+            )
+            if size_error:
+                return size_error
+            if not prompt:
+                return "请在尺寸后面写完整 prompt 或 tags。"
+            await self._generate(
+                event,
+                prompt,
+                width=size[0] if size else None,
+                height=size[1] if size else None,
+            )
             return None
         if action == "edit":
             if not prompt:

@@ -46,6 +46,83 @@ def _pipeline(config: dict | None = None) -> PromptPipeline:
     )
 
 
+def test_prompt_pipeline_refills_details_after_semantic_deduplication():
+    class _Response:
+        def __init__(self, text: str):
+            self.completion_text = text
+
+    class _Context:
+        def __init__(self):
+            self.outputs = [
+                ", ".join(
+                    [f"scene detail {index}" for index in range(40)]
+                    + [
+                        "light rays",
+                        "sunbeams",
+                        "glowing",
+                        "illuminated",
+                        "bright",
+                        "luminous",
+                        "radiant",
+                        "floating particles",
+                        "light particles",
+                    ]
+                ),
+                ", ".join(f"refined visual detail {index}" for index in range(48)),
+            ]
+
+        async def get_current_chat_provider_id(self, umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            return _Response(self.outputs.pop(0))
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, prompt):
+            return _Plan()
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, prompt):
+            return ()
+
+        async def resolve(self, *, llm_content, user_prompt, fixed_character):
+            return llm_content
+
+    class _Event:
+        unified_msg_origin = "session"
+
+    context = _Context()
+    config = {"chiyo_preset_enabled": False}
+    pipeline = PromptPipeline(
+        context=context,
+        config=config,
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda key, default: bool(config.get(key, default)),
+        get_int=lambda key, default: int(config.get(key, default)),
+        get_float=lambda key, default: float(config.get(key, default)),
+        get_str=lambda key, default: str(config.get(key, default)),
+        shorten=_shorten,
+    )
+
+    result = asyncio.run(pipeline.build(_Event(), "女孩在晨光中伸手"))
+
+    assert result.summary["detail_refill_attempted"] is True
+    assert result.summary["detail_refill_retry"] is True
+    assert result.summary["short_content_retry"] is False
+    assert result.summary["removed_content_tag_count"] == 0
+    assert result.summary["llm_content_tag_count"] == 48
+    assert "refined visual detail 47" in result.final_prompt
+    assert context.outputs == []
+
+
 def test_danbooru_tag_fast_path_detection_accepts_tag_lists():
     assert looks_like_danbooru_tags(
         "masterpiece, best quality, 1girl, solo, white dress, simple background"

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 
 class GenerationTaskRunner:
@@ -91,13 +92,17 @@ class GenerationTaskRunner:
         started_at = datetime.now()
         original_prompt = str(prompt or "").strip()
         reference_requested = self._wants_reference_image(original_prompt)
+        explicit_size = width is not None or height is not None
+        requested_width = width if width is not None else self._int("width", 1024)
+        requested_height = height if height is not None else self._int("height", 1536)
         task = self._task_recorder.build_generation_start(
             event=event,
             started_at=started_at,
             original_prompt=original_prompt,
             reference_requested=reference_requested,
-            width=width or self._int("width", 1024),
-            height=height or self._int("height", 1536),
+            width=requested_width,
+            height=requested_height,
+            explicit_size=explicit_size,
             steps=steps or self._int("steps", 30),
             cfg=cfg or self._float("cfg", 5.0),
             workflow=self._str("workflow", "anima_t2i"),
@@ -110,7 +115,9 @@ class GenerationTaskRunner:
             return payload
         ready = await self._ensure_ready(event)
         if not ready.get("ok"):
-            self._task_recorder.mark_failure(task, ready.get("error") or "comfyui_not_ready")
+            self._task_recorder.mark_failure(
+                task, ready.get("error") or "comfyui_not_ready"
+            )
             self._task_recorder.write(task)
             return ready
         prompt = original_prompt
@@ -145,6 +152,8 @@ class GenerationTaskRunner:
             args.extend(["--width", str(int(width))])
         if height:
             args.extend(["--height", str(int(height))])
+        if explicit_size:
+            args.append("--override-size")
         if steps:
             args.extend(["--steps", str(int(steps))])
         if cfg:

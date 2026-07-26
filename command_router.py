@@ -2,6 +2,30 @@ import re
 
 _ROUTE_PREFIX_RE = re.compile(r"^\s*/?", re.IGNORECASE)
 _SPACES_RE = re.compile(r"\s+")
+_SIZE_VALUE_PATTERN = r"(?P<width>\d{2,5})\s*[xX×*＊✕✖хХ]\s*(?P<height>\d{2,5})"
+_SIZE_ALIASES = {
+    "方图": 1.0,
+    "正方形": 1.0,
+    "竖图": 2 / 3,
+    "竖版": 2 / 3,
+    "横图": 3 / 2,
+    "横版": 3 / 2,
+    "长竖图": 9 / 16,
+    "手机竖屏": 9 / 16,
+    "宽屏": 16 / 9,
+    "超宽图": 16 / 9,
+}
+
+DEFAULT_GENERATION_SIZES = [
+    "832x1216",
+    "896x1152",
+    "1024x1024",
+    "1152x896",
+    "1216x832",
+    "768x1344",
+    "1344x768",
+    "1024x1536",
+]
 
 
 def help_text(img2img_enabled: bool = False) -> str:
@@ -19,6 +43,8 @@ def help_text(img2img_enabled: bool = False) -> str:
         "- /anm 诊断：检查服务器、网络和 ComfyUI 连接",
         "- /anm 调试状态：查看插件关键配置和上次任务摘要",
         "- /anm 生图 <描述>：按描述生成图片",
+        "  可在描述开头写“竖图/横图/方图/宽屏”，或写“1024x1536：描述”",
+        "  也可在末尾写“--尺寸 1216x832”指定本次尺寸",
         "- /anm 无优化 <tags>：跳过 LLM 优化，直接按 tags 生图",
         "- /anm 解析法术：读取图片内嵌的生成信息",
         "- /anm 反推：根据图片内容反推 tags",
@@ -28,8 +54,77 @@ def help_text(img2img_enabled: bool = False) -> str:
     ]
     if img2img_enabled:
         lines.append("- /anm 改图 <要求>：引用图片后整图重绘/风格化")
-    lines.extend(["", "也可以把“anm”换成“comfyui / anima”。", "例：/anm 生图 白色礼服，立绘"])
+    lines.extend(
+        ["", "也可以把“anm”换成“comfyui / anima”。", "例：/anm 生图 白色礼服，立绘"]
+    )
     return "\n".join(lines)
+
+
+def parse_generation_size(
+    text: str, allowed: list[tuple[int, int]]
+) -> tuple[str, tuple[int, int] | None, str | None]:
+    """Extract one per-request generation size from chat prompt text.
+
+    Args:
+        text: Prompt text after the generation command.
+        allowed: Width and height pairs allowed by the active configuration.
+
+    Returns:
+        Cleaned prompt, selected size, and an optional user-facing error.
+    """
+    prompt = str(text or "").strip()
+    size_match = None
+    for pattern in (
+        rf"(?<!\S)--(?:尺寸|分辨率)\s*(?:=|＝|:|：)?\s*{_SIZE_VALUE_PATTERN}",
+        rf"(?:尺寸|分辨率)\s*(?:为|是|=|＝|:|：)?\s*{_SIZE_VALUE_PATTERN}",
+        rf"^\s*{_SIZE_VALUE_PATTERN}\s*[：:,，]",
+    ):
+        size_match = re.search(pattern, prompt, flags=re.IGNORECASE)
+        if size_match:
+            break
+
+    selected: tuple[int, int] | None = None
+    if size_match:
+        selected = int(size_match.group("width")), int(size_match.group("height"))
+    else:
+        aliases = "|".join(
+            re.escape(name) for name in sorted(_SIZE_ALIASES, key=len, reverse=True)
+        )
+        for pattern in (
+            rf"(?<!\S)--(?:尺寸|分辨率)\s*(?:=|＝|:|：)?\s*(?P<alias>{aliases})(?=$|\s|[：:,，])",
+            rf"(?:尺寸|分辨率)\s*(?:为|是|=|＝|:|：)?\s*(?P<alias>{aliases})(?=$|\s|[：:,，])",
+            rf"^\s*(?P<alias>{aliases})(?=$|\s|[：:,，])\s*[：:,，]?",
+        ):
+            size_match = re.search(pattern, prompt, flags=re.IGNORECASE)
+            if size_match:
+                break
+        if size_match and allowed:
+            target_ratio = _SIZE_ALIASES[size_match.group("alias")]
+            selected = min(
+                allowed,
+                key=lambda size: (
+                    abs((size[0] / size[1]) - target_ratio),
+                    abs(size[0] * size[1] - 1024 * 1024),
+                ),
+            )
+
+    if not size_match:
+        return prompt, None, None
+
+    cleaned = (prompt[: size_match.start()] + " " + prompt[size_match.end() :]).strip()
+    cleaned = re.sub(r"^[\s,，;；:：]+|[\s,，;；:：]+$", "", cleaned)
+    cleaned = re.sub(r"([,，;；])\s*[,，;；]+", r"\1", cleaned)
+    cleaned = _SPACES_RE.sub(" ", cleaned)
+    if selected and allowed and selected not in allowed:
+        options = "、".join(f"{width}x{height}" for width, height in allowed)
+        return (
+            cleaned,
+            None,
+            f"尺寸 {selected[0]}x{selected[1]} 不可用。可用尺寸：{options}",
+        )
+    if selected is None:
+        return cleaned, None, "当前没有配置可用尺寸。"
+    return cleaned, selected, None
 
 
 def normalize_route_text(text: str) -> str:

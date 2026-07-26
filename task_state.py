@@ -96,6 +96,7 @@ class TaskRecorder:
         reference_requested: bool,
         width: int,
         height: int,
+        explicit_size: bool,
         steps: int,
         cfg: float,
         workflow: str,
@@ -110,6 +111,7 @@ class TaskRecorder:
             reference_requested: Whether the prompt requested an image reference.
             width: Effective requested width.
             height: Effective requested height.
+            explicit_size: Whether chat or an LLM tool explicitly requested the size.
             steps: Effective requested step count.
             cfg: Effective requested CFG value.
             workflow: Configured workflow type.
@@ -129,6 +131,12 @@ class TaskRecorder:
             "error": "",
             "workflow": workflow,
             "size": {"width": width, "height": height},
+            "requested_size": {
+                "width": width,
+                "height": height,
+                "explicit": explicit_size,
+            },
+            "actual_size": None,
             "parameters": {"steps": steps, "cfg": cfg},
             "reference": {
                 "requested": reference_requested,
@@ -238,6 +246,11 @@ class TaskRecorder:
         task["error"] = payload.get("error") or ""
         task["outputs"] = payload.get("outputs") or []
         task["elapsed_seconds"] = elapsed_seconds
+        if payload.get("width") and payload.get("height"):
+            task["actual_size"] = {
+                "width": int(payload["width"]),
+                "height": int(payload["height"]),
+            }
         if include_payload:
             task["tool_payload"] = payload
 
