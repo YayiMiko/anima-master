@@ -239,6 +239,7 @@ def main() -> None:
     p.add_argument("--prompt", required=True)
     p.add_argument("--width", type=int)
     p.add_argument("--height", type=int)
+    p.add_argument("--override-size", action="store_true")
     p.add_argument("--steps", type=int)
     p.add_argument("--cfg", type=float)
     p.add_argument("--seed", type=int)

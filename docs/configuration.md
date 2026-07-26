@@ -75,7 +75,7 @@ vae_name = ComfyUI 中的 VAE 文件名
 - `prompt_optimize_enabled`：是否让聊天模型优化自然语言提示词。
 - `prompt_builder_provider_id`：指定用于优化提示词的模型。留空时使用当前会话主模型。
 - `prompt_builder_max_tokens`：提示词优化模型最大输出长度。
-- `prompt_builder_max_content_tags`：LLM 内容段的硬上限，默认 65；不计算质量词、固定角色、画师组和画风。自然语言主题通常以 40–55 个内容 Tag 为目标，复杂服装或构图约 60 个；已经是 Tag 串的输入不设最低数量。
+- `prompt_builder_max_content_tags`：LLM 内容段的硬上限，默认 65；不计算质量词、固定角色、画师组和画风。自然语言主题通常以 40–55 个内容 Tag 为目标，简单表情包或头像可以使用 30–45 个，复杂服装或构图约 60 个；已经是 Tag 串的输入不设最低数量。普通模式会在去除较多同义词后尝试一次按缺失画面槽位补全。
 - `prompt_builder_template`：主提示词模板。
 
 通常不需要一开始就改 `prompt_builder_template`。如果想改变插件如何理解中文需求，再调整它。

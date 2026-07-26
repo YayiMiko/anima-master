@@ -148,6 +148,37 @@ NON_VISUAL_TAGS = {
 EXCLUSIVE_TAG_GROUPS = {
     "looking at viewer": "gaze_target",
     "looking away": "gaze_target",
+    "light rays": "light_beams",
+    "sun rays": "light_beams",
+    "sunbeams": "light_beams",
+    "sunlight rays": "light_beams",
+    "glowing": "light_intensity",
+    "illuminated": "light_intensity",
+    "bright": "light_intensity",
+    "luminous": "light_intensity",
+    "radiant": "light_intensity",
+    "backlight": "backlighting",
+    "backlighting": "backlighting",
+    "rim light": "rim_lighting",
+    "rim lighting": "rim_lighting",
+    "soft light": "soft_lighting",
+    "soft lighting": "soft_lighting",
+    "floating particles": "light_particles",
+    "light particles": "light_particles",
+    "glowing particles": "light_particles",
+    "flowing dress": "flowing_dress",
+    "dress flowing": "flowing_dress",
+    "hair blowing": "wind_in_hair",
+    "wind in hair": "wind_in_hair",
+    "sad expression": "sad_expression",
+    "sorrowful expression": "sad_expression",
+    "teary eyes": "tearful_eyes",
+    "watery eyes": "tearful_eyes",
+    "wet eyes": "tearful_eyes",
+}
+
+TAG_GROUP_LIMITS = {
+    "light_intensity": 2,
 }
 
 ARTIST_FUNCTION_RE = re.compile(
@@ -310,7 +341,7 @@ def clean_content_tags(
         key in {"closed eyes", "eyes closed"} for key in semantic_keys
     )
     has_sheer_fabric = "sheer fabric" in semantic_keys
-    seen_groups: set[str] = set()
+    group_counts: dict[str, int] = {}
     semantic_cleaned: list[str] = []
     for tag, key in zip(cleaned, semantic_keys, strict=True):
         if key in NON_VISUAL_TAGS:
@@ -324,11 +355,12 @@ def clean_content_tags(
             continue
         if has_sheer_fabric and key == "translucent fabric":
             continue
-        group = EXCLUSIVE_TAG_GROUPS.get(key)
+        group = EXCLUSIVE_TAG_GROUPS.get(key.replace("_", " "))
         if group:
-            if group in seen_groups:
+            count = group_counts.get(group, 0)
+            if count >= TAG_GROUP_LIMITS.get(group, 1):
                 continue
-            seen_groups.add(group)
+            group_counts[group] = count + 1
         semantic_cleaned.append(tag)
     return ", ".join(semantic_cleaned[:max_tags])
 

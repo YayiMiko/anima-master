@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
-
-from PIL import Image, ImageOps
+from typing import Any
 
 from comfyui_history import ComfyUIHistoryRunner, history_failed
 from comfyui_http import ComfyUIHttpClient
-from comfyui_sizes import generation_size
+from comfyui_sizes import allowed_sizes, generation_size
 from comfyui_workflows import (
     anima_img2img_workflow,
     remove_bg_workflow,
     upscale_workflow,
     workflow,
 )
+from PIL import Image, ImageOps
 
 
 def generate_payload(
@@ -24,18 +24,51 @@ def generate_payload(
     args: Any,
     prompt: str,
 ) -> dict[str, Any]:
+    explicit_size = bool(getattr(args, "override_size", False))
+    if explicit_size and ((args.width is None) != (args.height is None)):
+        return {
+            "ok": False,
+            "error": "unsupported_size",
+            "message": "width and height must be provided together",
+        }
     width = int(args.width or config.get("width", defaults["width"]))
     height = int(args.height or config.get("height", defaults["height"]))
+    configured_sizes = allowed_sizes(config, defaults["allowed_sizes"])
+    if explicit_size and configured_sizes and (width, height) not in configured_sizes:
+        return {
+            "ok": False,
+            "error": "unsupported_size",
+            "requested_size": f"{width}x{height}",
+            "allowed_sizes": [f"{item[0]}x{item[1]}" for item in configured_sizes],
+        }
     width, height = generation_size(config, defaults["allowed_sizes"], width, height)
     steps = int(args.steps or config.get("steps", defaults["steps"]))
     cfg = float(args.cfg or config.get("cfg", defaults["cfg"]))
     seed = int(args.seed if args.seed is not None else random.randint(1, 2**32 - 1))
-    negative_prompt = str(args.negative_prompt or config.get("negative_prompt", defaults["negative_prompt"]))
-    prompt_body = workflow(config, prompt, negative_prompt, width, height, steps, cfg, seed)
+    negative_prompt = str(
+        args.negative_prompt
+        or config.get("negative_prompt", defaults["negative_prompt"])
+    )
+    prompt_body = workflow(
+        config,
+        prompt,
+        negative_prompt,
+        width,
+        height,
+        steps,
+        cfg,
+        seed,
+        override_size=explicit_size,
+    )
     prompt_id, history = _run_prompt(config, image_outputs, prompt_body)
     status_payload = history_failed(history)
     if status_payload:
-        return {"ok": False, "error": "workflow_failed", "prompt_id": prompt_id, "status": status_payload}
+        return {
+            "ok": False,
+            "error": "workflow_failed",
+            "prompt_id": prompt_id,
+            "status": status_payload,
+        }
     outputs, raw_image_count = _save_history_images(config, image_outputs, history)
     return {
         "ok": bool(outputs),
@@ -66,11 +99,18 @@ def edit_payload(
     cfg = float(args.cfg or config.get("cfg", 4.0))
     denoise = float(args.denoise or config.get("edit_denoise", 0.55))
     seed = int(args.seed if args.seed is not None else random.randint(1, 2**32 - 1))
-    prompt_body = anima_img2img_workflow(config, prompt, image_name, width, height, steps, cfg, seed, denoise)
+    prompt_body = anima_img2img_workflow(
+        config, prompt, image_name, width, height, steps, cfg, seed, denoise
+    )
     prompt_id, history = _run_prompt(config, image_outputs, prompt_body)
     status_payload = history_failed(history)
     if status_payload:
-        return {"ok": False, "error": "workflow_failed", "prompt_id": prompt_id, "status": status_payload}
+        return {
+            "ok": False,
+            "error": "workflow_failed",
+            "prompt_id": prompt_id,
+            "status": status_payload,
+        }
     outputs, raw_image_count = _save_history_images(config, image_outputs, history)
     return {
         "ok": bool(outputs),
@@ -103,7 +143,12 @@ def upscale_payload(
     prompt_id, history = _run_prompt(config, image_outputs, prompt_body)
     status_payload = history_failed(history)
     if status_payload:
-        return {"ok": False, "error": "workflow_failed", "prompt_id": prompt_id, "status": status_payload}
+        return {
+            "ok": False,
+            "error": "workflow_failed",
+            "prompt_id": prompt_id,
+            "status": status_payload,
+        }
     outputs, raw_image_count = _save_history_images(config, image_outputs, history)
     return {
         "ok": bool(outputs),
@@ -130,7 +175,12 @@ def remove_bg_payload(
     prompt_id, history = _run_prompt(config, image_outputs, prompt_body)
     status_payload = history_failed(history)
     if status_payload:
-        return {"ok": False, "error": "workflow_failed", "prompt_id": prompt_id, "status": status_payload}
+        return {
+            "ok": False,
+            "error": "workflow_failed",
+            "prompt_id": prompt_id,
+            "status": status_payload,
+        }
     outputs, raw_image_count = _save_history_images(config, image_outputs, history)
     return {
         "ok": bool(outputs),
@@ -144,11 +194,15 @@ def remove_bg_payload(
     }
 
 
-def _run_prompt(config: dict[str, Any], image_outputs: Path, prompt_body: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+def _run_prompt(
+    config: dict[str, Any], image_outputs: Path, prompt_body: dict[str, Any]
+) -> tuple[str, dict[str, Any]]:
     return ComfyUIHistoryRunner(config, image_outputs).run_prompt(prompt_body)
 
 
-def _save_history_images(config: dict[str, Any], image_outputs: Path, history: dict[str, Any]) -> tuple[list[Path], int]:
+def _save_history_images(
+    config: dict[str, Any], image_outputs: Path, history: dict[str, Any]
+) -> tuple[list[Path], int]:
     return ComfyUIHistoryRunner(config, image_outputs).save_history_images(history)
 
 

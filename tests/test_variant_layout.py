@@ -83,6 +83,10 @@ def test_builtin_template_uses_aesthetic_density_and_fidelity_rules() -> None:
     assert "不要自行补充靴子、高跟鞋、袜子或腿饰" in DEFAULT_LLM_PROMPT_TEMPLATE
     assert "不要用 holding nothing" in DEFAULT_LLM_PROMPT_TEMPLATE
     assert "已经是 tags 的输入不设最低数量" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "谁对什么做了什么" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "同一语义簇最多保留 1-2 个词" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "把空出的篇幅用于具体服装结构" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "简单表情包或头像可以使用 30-45 个" in DEFAULT_LLM_PROMPT_TEMPLATE
 
 
 def test_turbo_variant_archive_contains_expected_workflow() -> None:

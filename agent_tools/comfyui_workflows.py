@@ -175,11 +175,36 @@ def workflow(
     steps: int,
     cfg: float,
     seed: int,
+    *,
+    override_size: bool = False,
 ) -> dict[str, Any]:
-    """Build the configured generation workflow graph."""
+    """Build the configured generation workflow graph.
+
+    Args:
+        config: Active helper configuration.
+        prompt: Positive prompt text.
+        negative_prompt: Negative prompt text.
+        width: Effective output width.
+        height: Effective output height.
+        steps: Effective sampling steps.
+        cfg: Effective CFG scale.
+        seed: Generation seed.
+        override_size: Whether this request explicitly selected its canvas size.
+
+    Returns:
+        ComfyUI API workflow graph.
+    """
     if bool(config.get("custom_workflow_enabled", False)):
         return custom_t2i_workflow(
-            config, prompt, negative_prompt, width, height, steps, cfg, seed
+            config,
+            prompt,
+            negative_prompt,
+            width,
+            height,
+            steps,
+            cfg,
+            seed,
+            override_size=override_size,
         )
 
     workflow_name = str(config.get("workflow") or "anima_t2i")
@@ -199,8 +224,25 @@ def custom_t2i_workflow(
     steps: int,
     cfg: float,
     seed: int,
+    *,
+    override_size: bool = False,
 ) -> dict[str, Any]:
-    """Build a text-to-image workflow from a user-provided ComfyUI API JSON."""
+    """Build a text-to-image workflow from a user-provided ComfyUI API JSON.
+
+    Args:
+        config: Active helper configuration.
+        prompt: Positive prompt text.
+        negative_prompt: Negative prompt text.
+        width: Effective output width.
+        height: Effective output height.
+        steps: Effective sampling steps.
+        cfg: Effective CFG scale.
+        seed: Generation seed.
+        override_size: Whether to override only latent canvas dimensions.
+
+    Returns:
+        Customized ComfyUI API workflow graph.
+    """
     path_text = str(config.get("custom_workflow_path") or "").strip()
     if not path_text:
         raise SystemExit("custom_workflow_path_not_configured")
@@ -222,7 +264,16 @@ def custom_t2i_workflow(
 
     workflow_body = copy.deepcopy(body)
     _apply_custom_workflow_inputs(
-        workflow_body, config, prompt, negative_prompt, width, height, steps, cfg, seed
+        workflow_body,
+        config,
+        prompt,
+        negative_prompt,
+        width,
+        height,
+        steps,
+        cfg,
+        seed,
+        override_size=override_size,
     )
     return workflow_body
 
@@ -237,6 +288,8 @@ def _apply_custom_workflow_inputs(
     steps: int,
     cfg: float,
     seed: int,
+    *,
+    override_size: bool = False,
 ) -> None:
     text_nodes = _text_encode_nodes(workflow_body)
     positive_ids = _auto_positive_node_ids(text_nodes)
@@ -259,8 +312,10 @@ def _apply_custom_workflow_inputs(
             continue
         if class_type == "SaveImage" and "filename_prefix" in inputs:
             inputs["filename_prefix"] = "astrbot/anm"
-        override_parameters = bool(config.get("custom_workflow_override_parameters", False))
-        if override_parameters and class_type == "EmptyLatentImage":
+        override_parameters = bool(
+            config.get("custom_workflow_override_parameters", False)
+        )
+        if (override_parameters or override_size) and class_type == "EmptyLatentImage":
             if "width" in inputs:
                 inputs["width"] = width
             if "height" in inputs:

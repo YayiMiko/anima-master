@@ -137,3 +137,19 @@ def test_fixed_character_cleaning_preserves_explicit_hair_details() -> None:
     )
 
     assert cleaned == "lotus hair ornament, floating hair, braid, pubic hair"
+
+
+def test_content_cleaner_limits_synonyms_without_removing_distinct_light_roles() -> (
+    None
+):
+    cleaned = clean_content_tags(
+        "light rays, sunbeams, glowing, illuminated, bright, luminous, radiant, "
+        "backlighting, rim lighting, cast shadows, floating particles, "
+        "light particles, flowing dress, dress flowing, embroidered hem",
+        strip_character_tags=False,
+    )
+
+    assert cleaned == (
+        "light rays, glowing, illuminated, backlighting, rim lighting, "
+        "cast shadows, floating particles, flowing dress, embroidered hem"
+    )

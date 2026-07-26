@@ -7,7 +7,22 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from command_router import help_text, parse_hard_route
+from command_router import (  # noqa: E402
+    help_text,
+    parse_generation_size,
+    parse_hard_route,
+)
+
+ALLOWED_SIZES = [
+    (832, 1216),
+    (896, 1152),
+    (1024, 1024),
+    (1152, 896),
+    (1216, 832),
+    (768, 1344),
+    (1344, 768),
+    (1024, 1536),
+]
 
 
 def test_parse_empty_anm_as_help():
@@ -52,4 +67,49 @@ def test_help_text_uses_catalog_visibility():
     assert "/anm 创建画师组" in text
     assert "/anm 切换画师组" in text
     assert "/anm 添加角色" in text
+    assert "--尺寸 1216x832" in text
     assert "/anm 改图" not in text
+
+
+def test_parse_generation_size_aliases_choose_closest_allowed_ratio():
+    assert parse_generation_size("竖图：狐莉站在梨花树下", ALLOWED_SIZES) == (
+        "狐莉站在梨花树下",
+        (1024, 1536),
+        None,
+    )
+    assert parse_generation_size("宽屏 远景山谷", ALLOWED_SIZES) == (
+        "远景山谷",
+        (1344, 768),
+        None,
+    )
+
+
+def test_parse_generation_size_explicit_forms_remove_control_text():
+    assert parse_generation_size("1024x1536：白色礼服少女", ALLOWED_SIZES) == (
+        "白色礼服少女",
+        (1024, 1536),
+        None,
+    )
+    assert parse_generation_size("少女站在河岸 --尺寸 1216x832", ALLOWED_SIZES) == (
+        "少女站在河岸",
+        (1216, 832),
+        None,
+    )
+
+
+def test_parse_generation_size_rejects_unavailable_explicit_size():
+    prompt, size, error = parse_generation_size(
+        "分辨率 1000x1400，白色礼服少女", ALLOWED_SIZES
+    )
+
+    assert prompt == "白色礼服少女"
+    assert size is None
+    assert error and "1000x1400 不可用" in error
+
+
+def test_parse_generation_size_does_not_consume_alias_prefix():
+    assert parse_generation_size("宽屏幕上的少女", ALLOWED_SIZES) == (
+        "宽屏幕上的少女",
+        None,
+        None,
+    )
