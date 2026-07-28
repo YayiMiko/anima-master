@@ -287,6 +287,7 @@ def test_apply_verification_summary_updates_task_and_strategy():
     assert updated["strategy_summary"]["raw_mode"] is False
     assert updated["strategy_summary"]["verification"] == {
         "enabled": True,
+        "forced_multi_person": False,
         "skipped": False,
         "passed": False,
         "score": 5,
@@ -328,5 +329,5 @@ def test_last_task_debug_lines_use_strategy_summary():
     assert "上次任务摘要" in text
     assert "角色：狐莉" in text
     assert "raw=True" in text
-    assert "自检：enabled=True passed=True retry=0" in text
+    assert "自检：enabled=True 多人强制=False passed=True retry=0" in text
     assert "阶段事件：provider=ok，prompt_llm=ok" in text

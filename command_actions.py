@@ -15,7 +15,9 @@ try:
     )
     from .config_defaults import persist_flat_config_key
     from .deployment_diagnostics import compact_status_text, diagnostic_text
+    from .multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS
     from .prompt_presets import (
+        DEFAULT_NEGATIVE_PROMPT,
         active_artist_preset_name,
         artist_presets,
         fixed_character_tags,
@@ -32,7 +34,9 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     )
     from config_defaults import persist_flat_config_key
     from deployment_diagnostics import compact_status_text, diagnostic_text
+    from multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS
     from prompt_presets import (
+        DEFAULT_NEGATIVE_PROMPT,
         active_artist_preset_name,
         artist_presets,
         fixed_character_tags,
@@ -402,6 +406,43 @@ class CommandActionHandler:
                 prompt,
                 width=size[0] if size else None,
                 height=size[1] if size else None,
+            )
+            return None
+        if action == "multi_person":
+            if not prompt:
+                return (
+                    "请描述至少两个人物。例："
+                    "/anm 多人 左边若叶睦抱着吉他，右边千早爱音牵着她的手"
+                )
+            sizes = allowed_sizes(self.config, DEFAULT_GENERATION_SIZES)
+            prompt, size, size_error = parse_generation_size(prompt, sizes)
+            if size_error:
+                return size_error
+            if not prompt:
+                return "请在尺寸后面描述至少两个人物。"
+            if size is None and sizes:
+                size = min(
+                    sizes,
+                    key=lambda candidate: (
+                        abs((candidate[0] / candidate[1]) - 1.5),
+                        abs(candidate[0] * candidate[1] - 1024 * 1024),
+                    ),
+                )
+            await self._generate(
+                event,
+                prompt,
+                width=size[0] if size else None,
+                height=size[1] if size else None,
+                negative_prompt=join_prompt_parts(
+                    [
+                        str(
+                            self.config.get("negative_prompt")
+                            or DEFAULT_NEGATIVE_PROMPT
+                        ),
+                        ", ".join(MULTI_PERSON_NEGATIVE_TAGS),
+                    ]
+                ),
+                multi_person=True,
             )
             return None
         if action == "edit":

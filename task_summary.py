@@ -26,6 +26,22 @@ def build_strategy_summary(
         "reference_requested": bool(task.get("reference_image_requested")),
         "reference_applied": bool(task.get("reference_context_applied")),
         "raw_mode": bool(prompt_summary.get("raw_mode")),
+        "multi_person_mode": bool(prompt_summary.get("multi_person_mode")),
+        "multi_person_plan_failed": bool(
+            prompt_summary.get("multi_person_plan_failed")
+        ),
+        "planned_character_count": prompt_summary.get("planned_character_count") or 0,
+        "resolved_character_count": prompt_summary.get("resolved_character_count") or 0,
+        "fixed_character_count": prompt_summary.get("fixed_character_count") or 0,
+        "danbooru_resolved_count": prompt_summary.get("danbooru_resolved_count") or 0,
+        "character_slots": list(prompt_summary.get("character_slots") or []),
+        "interaction_count": prompt_summary.get("interaction_count") or 0,
+        "grouped_contact": bool(prompt_summary.get("grouped_contact")),
+        "interaction_aliases_normalized": bool(
+            prompt_summary.get("interaction_aliases_normalized")
+        ),
+        "composition_source": prompt_summary.get("composition_source") or "",
+        "hybrid_prompt": bool(prompt_summary.get("hybrid_prompt")),
         "skipped_reason": prompt_summary.get("skipped_reason") or "",
         "llm_ok": prompt_summary.get(
             "llm_ok",
@@ -52,6 +68,7 @@ def build_verification_brief(verification_summary: dict[str, Any]) -> dict[str, 
     verification_summary = _as_dict(verification_summary)
     return {
         "enabled": bool(verification_summary.get("enabled")),
+        "forced_multi_person": bool(verification_summary.get("forced_multi_person")),
         "skipped": bool(verification_summary.get("skipped")),
         "passed": verification_summary.get("final_passed"),
         "score": verification_summary.get("final_score"),
@@ -123,7 +140,19 @@ def build_last_task_debug_lines(last_task: dict[str, Any]) -> list[str]:
         (
             "- 策略："
             f"raw={strategy_summary.get('raw_mode')} "
+            f"多人={strategy_summary.get('multi_person_mode')} "
             f"服装迁移={strategy_summary.get('outfit_transfer')}"
+        ),
+        (
+            "- 多人："
+            f"规划={strategy_summary.get('planned_character_count', 0)} "
+            f"校正={strategy_summary.get('resolved_character_count', 0)} "
+            f"固定={strategy_summary.get('fixed_character_count', 0)} "
+            f"在线={strategy_summary.get('danbooru_resolved_count', 0)} "
+            f"位置={','.join(strategy_summary.get('character_slots') or []) or '无'} "
+            f"互动={strategy_summary.get('interaction_count', 0)} "
+            f"接触组={strategy_summary.get('grouped_contact', False)} "
+            f"别名归一={strategy_summary.get('interaction_aliases_normalized', False)}"
         ),
         (
             "- 提示词健康："
@@ -133,6 +162,7 @@ def build_last_task_debug_lines(last_task: dict[str, Any]) -> list[str]:
         (
             "- 自检："
             f"enabled={verification_summary.get('enabled', False)} "
+            f"多人强制={verification_summary.get('forced_multi_person', False)} "
             f"passed={verification_brief.get('passed')} "
             f"retry={verification_brief.get('retry_count', 0)}"
         ),

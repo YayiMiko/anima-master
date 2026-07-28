@@ -77,6 +77,7 @@ class GenerationTaskRunner:
         steps: int | None = None,
         cfg: float | None = None,
         negative_prompt: str | None = None,
+        multi_person: bool = False,
     ) -> dict[str, Any]:
         """Run one generation request and persist a task summary.
 
@@ -88,6 +89,7 @@ class GenerationTaskRunner:
             steps: Optional steps override.
             cfg: Optional CFG override.
             negative_prompt: Optional negative prompt override.
+            multi_person: Whether to use structured multi-person prompt planning.
 
         Returns:
             Payload returned by the ComfyUI helper, or an early failure payload.
@@ -158,7 +160,11 @@ class GenerationTaskRunner:
                 applied=prompt != original_prompt,
             )
         prompt = self._augment_quoted_spell(event, prompt)
-        prompt = await self._build_prompt(event, prompt)
+        prompt = await self._build_prompt(
+            event,
+            prompt,
+            multi_person=multi_person,
+        )
         prompt_summary = dict(self._prompt_summary())
         self._task_recorder.mark_prompt_built(task, prompt_summary)
         args = ["generate", "--prompt", prompt]

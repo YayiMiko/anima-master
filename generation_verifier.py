@@ -64,6 +64,7 @@ class GenerationVerifier:
         steps: int | None,
         cfg: float | None,
         negative_prompt: str | None,
+        multi_person: bool = False,
     ) -> VerificationOutcome:
         """Verify the generated image; retry with a fix hint if needed.
 
@@ -75,7 +76,8 @@ class GenerationVerifier:
             Final payload to send and the last verification verdict, if any.
         """
         outcome = VerificationOutcome(payload=payload)
-        if not self._bool("enable_verify", False):
+        configured_verify = self._bool("enable_verify", False)
+        if not configured_verify and not multi_person:
             return outcome
 
         pass_score = self._int("verify_pass_score", 7)
@@ -86,6 +88,7 @@ class GenerationVerifier:
             "max_retry": max_retry,
             "retry_count": 0,
             "attempts": [],
+            "forced_multi_person": bool(multi_person and not configured_verify),
         }
         initial_task = self._task_recorder.read(payload.get("task_id"))
         final_uses_initial_task = True
@@ -109,7 +112,10 @@ class GenerationVerifier:
             self._record_summary(summary, payload, base_task=initial_task)
             return outcome
 
-        llm_call = self._make_verify_llm_call(provider_id)
+        llm_call = self._make_verify_llm_call(
+            provider_id,
+            multi_person=multi_person,
+        )
         verdict = await anima_verify.verify_image(
             llm_call,
             outputs[-1],
@@ -146,6 +152,7 @@ class GenerationVerifier:
                 steps=steps,
                 cfg=cfg,
                 negative_prompt=negative_prompt,
+                multi_person=multi_person,
             )
             if not retry_payload.get("ok"):
                 summary["retry_failed"] = (
@@ -206,14 +213,28 @@ class GenerationVerifier:
         except Exception:  # noqa: BLE001 - config lookup is best-effort.
             return ""
 
-    def _make_verify_llm_call(self, provider_id: str):
+    def _make_verify_llm_call(
+        self,
+        provider_id: str,
+        *,
+        multi_person: bool = False,
+    ):
+        system_prompt = anima_verify.ANIMA_VERIFY_SYSTEM
+        if multi_person:
+            system_prompt += (
+                "\n这是 /anm 多人任务。还必须严格检查：实际人物数量是否符合请求；"
+                "每个角色是否只出现一次；是否出现分屏、漫画格、多视图、克隆或额外人物；"
+                "固定角色的发色、瞳色、种族和标志性配饰是否串到其他角色；"
+                "互动的主动方、承受方和空间位置是否正确。"
+            )
+
         async def llm_call(prompt: str, image_urls=None) -> str:
             if not provider_id:
                 raise RuntimeError("no_verify_provider_available")
             resp = await self.context.llm_generate(
                 chat_provider_id=provider_id,
                 prompt=prompt,
-                system_prompt=anima_verify.ANIMA_VERIFY_SYSTEM,
+                system_prompt=system_prompt,
                 image_urls=image_urls or None,
                 max_tokens=self._int("prompt_builder_max_tokens", 700),
             )

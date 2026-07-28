@@ -7,6 +7,11 @@ from typing import Any
 
 try:
     from .danbooru_resolver import DanbooruResolver
+    from .multi_person_prompt import (
+        build_multi_person_plan_prompt,
+        parse_multi_person_plan,
+        render_multi_person_character,
+    )
     from .outfit_transfer import (
         build_outfit_summary_prompt,
         build_outfit_transfer_block,
@@ -24,6 +29,7 @@ try:
     )
     from .prompt_presets import (
         apply_config_preset,
+        fixed_character_tags,
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
@@ -33,6 +39,11 @@ try:
     from .tag_cleaner import split_tags
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_resolver import DanbooruResolver
+    from multi_person_prompt import (
+        build_multi_person_plan_prompt,
+        parse_multi_person_plan,
+        render_multi_person_character,
+    )
     from outfit_transfer import (
         build_outfit_summary_prompt,
         build_outfit_transfer_block,
@@ -50,6 +61,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     )
     from prompt_presets import (
         apply_config_preset,
+        fixed_character_tags,
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
@@ -228,8 +240,355 @@ class PromptPipeline:
         )
         return str(getattr(response, "completion_text", "") or "").strip()
 
+    async def _generate_multi_person_plan_with_llm(
+        self,
+        *,
+        provider_id: str,
+        plan_prompt: str,
+        use_deep_thinking: bool,
+    ) -> str:
+        """Ask the active provider for a structured multi-person scene plan.
+
+        Args:
+            provider_id: AstrBot provider identifier.
+            plan_prompt: Structured planning request.
+            use_deep_thinking: Whether to request provider reasoning support.
+
+        Returns:
+            Raw JSON text returned by the provider.
+        """
+        kwargs: dict[str, Any] = {
+            "chat_provider_id": provider_id,
+            "prompt": plan_prompt,
+            "system_prompt": (
+                "You plan multi-character Anima illustrations. "
+                "Return only valid JSON matching the requested schema. "
+                "Keep every character's identity and attributes in its own block."
+            ),
+            "max_tokens": min(self._int("prompt_builder_max_tokens", 700), 900),
+        }
+        if use_deep_thinking:
+            kwargs["reasoning_effort"] = (
+                self._str("prompt_builder_reasoning_effort", "high") or "high"
+            )
+            kwargs["thinking"] = {"type": "enabled"}
+        response = await self.context.llm_generate(**kwargs)
+        return str(getattr(response, "completion_text", "") or "").strip()
+
+    async def _build_multi_person_prompt(
+        self,
+        *,
+        provider_id: str,
+        prompt: str,
+        prompt_config: dict[str, Any],
+        use_deep_thinking: bool,
+        summary: dict[str, Any],
+    ) -> PromptPipelineResult | None:
+        """Build a hybrid tag and natural-language prompt for 2–4 people.
+
+        Args:
+            provider_id: Active chat provider identifier.
+            prompt: User's multi-person scene request.
+            prompt_config: Effective preset-aware plugin configuration.
+            use_deep_thinking: Whether the provider should use reasoning mode.
+            summary: Mutable request summary populated by this branch.
+
+        Returns:
+            Completed prompt result, or None when planning fails and the caller
+            should fall back to the ordinary prompt path.
+        """
+        configured_characters = fixed_character_tags(prompt_config)
+        mentioned_fixed_characters = {
+            name: tags
+            for name, tags in configured_characters.items()
+            if name and name in prompt
+        }
+        plan_prompt = build_multi_person_plan_prompt(
+            prompt,
+            fixed_characters=mentioned_fixed_characters,
+        )
+        try:
+            raw_plan = await self._generate_multi_person_plan_with_llm(
+                provider_id=provider_id,
+                plan_prompt=plan_prompt,
+                use_deep_thinking=use_deep_thinking,
+            )
+        except Exception as exc:
+            self.logger.warning("[comfyui_agent] multi-person planner failed: %s", exc)
+            summary.update(
+                {
+                    "multi_person_mode": True,
+                    "multi_person_plan_failed": True,
+                    "multi_person_error": self._shorten(str(exc), 300),
+                }
+            )
+            return None
+        plan = parse_multi_person_plan(raw_plan)
+        if plan is None:
+            self.logger.warning(
+                "[comfyui_agent] multi-person planner returned invalid JSON"
+            )
+            summary.update(
+                {
+                    "multi_person_mode": True,
+                    "multi_person_plan_failed": True,
+                    "multi_person_error": "invalid_plan",
+                }
+            )
+            return None
+
+        character_blocks: list[str] = []
+        character_entity_names: list[set[str]] = []
+        resolved_count = 0
+        fixed_character_count = 0
+        danbooru_resolved_count = 0
+        character_slots: list[str] = []
+        used_fixed_names: set[str] = set()
+        aliases = ("Character A", "Character B", "Character C", "Character D")
+        interaction_text = " ".join(plan.interactions)
+        contact_source = f"{prompt} {interaction_text}".lower()
+        grouped_contact = any(
+            marker in contact_source
+            for marker in (
+                "扑倒",
+                "压倒",
+                "按倒",
+                "骑在",
+                "拥抱",
+                "抱住",
+                "亲吻",
+                "接吻",
+                "搂住",
+                "扭打",
+                "摔跤",
+                "pounce",
+                "pin down",
+                "pinning",
+                "on top of",
+                "hug",
+                "embrace",
+                "kiss",
+                "wrestl",
+                "grappl",
+            )
+        )
+        for index, character in enumerate(plan.characters):
+            character_slots.append(character.slot)
+            fixed_name = next(
+                (
+                    name
+                    for name in mentioned_fixed_characters
+                    if name not in used_fixed_names
+                    and (
+                        name == character.name
+                        or name in character.name
+                        or character.name in name
+                    )
+                ),
+                "",
+            )
+            fixed_tags = ""
+            resolved_identity = ""
+            if fixed_name:
+                used_fixed_names.add(fixed_name)
+                fixed_tags = ", ".join(
+                    tag
+                    for tag in split_tags(configured_characters[fixed_name])
+                    if tag.lower()
+                    not in {
+                        "1girl",
+                        "1 girl",
+                        "1boy",
+                        "1 boy",
+                        "solo",
+                    }
+                )
+                resolved_count += 1
+                fixed_character_count += 1
+            elif character.danbooru_candidate:
+                resolved = await self._danbooru_resolver.resolve(
+                    llm_content=character.danbooru_candidate,
+                    user_prompt=character.name or prompt,
+                    fixed_character=False,
+                )
+                resolved_tags = split_tags(resolved)
+                resolved_identity = (
+                    resolved_tags[0] if resolved_tags else character.danbooru_candidate
+                )
+                if resolved_identity:
+                    resolved_count += 1
+                    danbooru_resolved_count += 1
+            character_entity_names.append(
+                {
+                    value
+                    for value in (
+                        character.name,
+                        character.danbooru_candidate,
+                        fixed_name,
+                        resolved_identity,
+                    )
+                    if value
+                }
+            )
+            character_blocks.append(
+                render_multi_person_character(
+                    character,
+                    alias=aliases[index],
+                    resolved_identity=resolved_identity,
+                    fixed_tags=fixed_tags,
+                    grouped_contact=grouped_contact,
+                )
+            )
+
+        blocked_positive_markers = (
+            "split screen",
+            "panel",
+            "multiple view",
+            "alternate view",
+            "character sheet",
+            "duplicate character",
+            "cloned character",
+        )
+        common_content = ", ".join(
+            tag
+            for tag in (*plan.count_tags, *plan.common_tags)
+            if not any(marker in tag.lower() for marker in blocked_positive_markers)
+        )
+        low_cfg_harness = bool(prompt_config.get("low_cfg_harness_enabled", False))
+        constraint_raw = ""
+        constraint_plan = parse_constraint_plan("")
+        if low_cfg_harness:
+            try:
+                constraint_raw = await self._generate_constraint_plan_with_llm(
+                    provider_id=provider_id,
+                    plan_prompt=build_constraint_plan_prompt(
+                        user_prompt=prompt,
+                        llm_content=common_content,
+                    ),
+                )
+                constraint_plan = parse_constraint_plan(constraint_raw)
+            except Exception as exc:
+                self.logger.warning(
+                    "[comfyui_agent] multi-person constraint planner failed: %s",
+                    exc,
+                )
+
+        normalized_interactions: list[str] = []
+        for interaction in plan.interactions:
+            normalized = interaction
+            replacements = sorted(
+                (
+                    (name, aliases[index])
+                    for index, names in enumerate(character_entity_names)
+                    for name in names
+                    if name.lower() != aliases[index].lower()
+                ),
+                key=lambda item: len(item[0]),
+                reverse=True,
+            )
+            for name, alias in replacements:
+                if any(ord(char) > 127 for char in name):
+                    normalized = normalized.replace(name, f" {alias} ")
+                else:
+                    normalized = re.sub(
+                        rf"(?<![\w]){re.escape(name)}(?![\w])",
+                        alias,
+                        normalized,
+                        flags=re.IGNORECASE,
+                    )
+            normalized = re.sub(r"\s+", " ", normalized).strip()
+            normalized = re.sub(r"\s+([,.;:!?])", r"\1", normalized)
+            normalized_interactions.append(normalized)
+
+        character_aliases = ", ".join(aliases[: len(plan.characters)])
+        scene_guard = (
+            f"A single unified full-frame composition contains exactly "
+            f"{len(plan.characters)} distinct people: {character_aliases}. "
+            "All are visible together in the same camera view and the same moment."
+        )
+        composition_guard = (
+            f"{character_aliases} form one shared close-contact action group "
+            "inside the same full-frame camera view."
+            if grouped_contact
+            else (
+                f"{character_aliases} share one continuous physical environment "
+                "inside the same full-frame camera view."
+            )
+        )
+        narrative_blocks = (
+            scene_guard,
+            *character_blocks,
+            *normalized_interactions,
+            composition_guard,
+        )
+        built = build_final_prompt(
+            user_prompt=prompt,
+            llm_content=common_content,
+            config=prompt_config,
+            constraint_plan=constraint_plan,
+            narrative_blocks=narrative_blocks,
+            suppress_fixed_character=True,
+            force_multi_character=True,
+        )
+        content_tag_count = len(split_tags(built.content_tags))
+        summary.update(
+            {
+                "multi_person_mode": True,
+                "multi_person_plan_failed": False,
+                "planned_character_count": len(plan.characters),
+                "resolved_character_count": resolved_count,
+                "fixed_character_count": fixed_character_count,
+                "danbooru_resolved_count": danbooru_resolved_count,
+                "character_slots": character_slots,
+                "interaction_count": len(plan.interactions),
+                "grouped_contact": grouped_contact,
+                "interaction_aliases_normalized": (
+                    tuple(normalized_interactions) != plan.interactions
+                ),
+                "composition_source": "deterministic",
+                "hybrid_prompt": True,
+                "raw_mode": False,
+                "deep_thinking": use_deep_thinking,
+                "fixed_character": bool(used_fixed_names),
+                "fixed_character_name": ", ".join(sorted(used_fixed_names)),
+                "sensual_mode": wants_sensual_mode(prompt, prompt_config),
+                "default_style": built.used_default_style,
+                "low_cfg_harness": low_cfg_harness,
+                "constraint_mode": built.constraint_mode,
+                "weighted_style_tags": list(built.weighted_style_tags),
+                "constraint_tags": list(built.constraint_tags),
+                "removed_constraint_tags": list(built.removed_constraint_tags),
+                "constraint_reason": built.constraint_reason,
+                "llm_failed": False,
+                "llm_error": "",
+                "llm_content_tag_count": content_tag_count,
+                "removed_content_tag_count": max(
+                    0,
+                    len(split_tags(common_content)) - content_tag_count,
+                ),
+                "llm_content_chars": len(built.content_tags),
+                "final_prompt_chars": len(built.final_prompt),
+                "final_prompt_head": self._shorten(built.final_prompt, 600),
+            }
+        )
+        if self._bool("debug_prompt_enabled", False):
+            summary.update(
+                {
+                    "multi_person_plan_prompt": plan_prompt,
+                    "multi_person_plan": raw_plan,
+                    "constraint_plan": constraint_raw,
+                    "final_prompt": built.final_prompt,
+                }
+            )
+        return PromptPipelineResult(built.final_prompt, summary)
+
     async def build(
-        self, event: Any, user_prompt: str, mode: str = "txt2img"
+        self,
+        event: Any,
+        user_prompt: str,
+        mode: str = "txt2img",
+        *,
+        multi_person: bool = False,
     ) -> PromptPipelineResult:
         """Build the final prompt and summary for one generation request.
 
@@ -237,6 +596,7 @@ class PromptPipeline:
             event: AstrBot message event for provider and per-chat config lookup.
             user_prompt: User prompt after reference-image augmentation.
             mode: Generation mode, such as `txt2img` or `img2img`.
+            multi_person: Whether `/anm 多人` requested structured planning.
 
         Returns:
             Final prompt plus a serializable summary dict.
@@ -254,6 +614,7 @@ class PromptPipeline:
         summary: dict[str, Any] = {
             "prompt_optimize_enabled": self._bool("prompt_optimize_enabled", True),
             "mode": mode,
+            "multi_person_mode": bool(multi_person),
             "original_prompt_head": self._shorten(original_prompt, 600),
         }
         if not self._bool("prompt_optimize_enabled", True):
@@ -331,6 +692,16 @@ class PromptPipeline:
             if research_plan.use_web_search
             else ""
         )
+        if multi_person:
+            multi_result = await self._build_multi_person_prompt(
+                provider_id=provider_id,
+                prompt=prompt,
+                prompt_config=prompt_config,
+                use_deep_thinking=research_plan.use_deep_thinking,
+                summary=summary,
+            )
+            if multi_result is not None:
+                return multi_result
         outfit_summary = ""
         outfit_summary_source = ""
         reference_tag_text = (

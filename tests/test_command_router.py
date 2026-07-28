@@ -36,6 +36,10 @@ def test_parse_status_and_debug_status():
 
 def test_parse_generate_and_raw_generate():
     assert parse_hard_route("/anm 生图 一个女孩") == ("generate", "一个女孩")
+    assert parse_hard_route("/anm 多人 左边一个女孩，右边一个男孩") == (
+        "multi_person",
+        "左边一个女孩，右边一个男孩",
+    )
     assert parse_hard_route("/anm 无优化 masterpiece, 1girl") == (
         "generate",
         "无优化 masterpiece, 1girl",
@@ -63,6 +67,7 @@ def test_help_text_uses_catalog_visibility():
     text = help_text(img2img_enabled=False)
 
     assert "/anm 生图 <描述>" in text
+    assert "/anm 多人 <描述>" in text
     assert "/anm 无优化 <tags>" in text
     assert "/anm 创建画师组" in text
     assert "/anm 切换画师组" in text
@@ -113,4 +118,17 @@ def test_parse_generation_size_does_not_consume_alias_prefix():
         "宽屏幕上的少女",
         None,
         None,
+    )
+
+
+def test_multi_person_keyword_requires_a_command_boundary():
+    assert parse_hard_route("/anm \u591a\u4eba\u56f4\u89c2\u4e00\u53ea\u732b") == (
+        "generate",
+        "\u591a\u4eba\u56f4\u89c2\u4e00\u53ea\u732b",
+    )
+    assert parse_hard_route(
+        "/anm \u591a\u4eba\uff1a\u5de6\u8fb9\u4e00\u4eba\uff0c\u53f3\u8fb9\u4e00\u4eba"
+    ) == (
+        "multi_person",
+        "\u5de6\u8fb9\u4e00\u4eba\uff0c\u53f3\u8fb9\u4e00\u4eba",
     )

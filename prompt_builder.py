@@ -63,6 +63,9 @@ def build_final_prompt(
     config: dict[str, Any],
     required_core_tags: tuple[str, ...] = (),
     constraint_plan: PromptConstraintPlan | None = None,
+    narrative_blocks: tuple[str, ...] = (),
+    suppress_fixed_character: bool = False,
+    force_multi_character: bool = False,
 ) -> PromptBuildResult:
     config = apply_config_preset(config)
     raw_mode, raw_prompt = strip_raw_prefix(user_prompt)
@@ -79,7 +82,11 @@ def build_final_prompt(
             used_sensual_mode=False,
         )
 
-    fixed_character = selected_fixed_character(user_prompt, config)
+    fixed_character = (
+        None
+        if suppress_fixed_character
+        else selected_fixed_character(user_prompt, config)
+    )
     use_character = fixed_character is not None
     artist = active_artist_tags(config)
     style_tags = active_style_tags(config).strip()
@@ -110,7 +117,7 @@ def build_final_prompt(
         max_content_tags = DEFAULT_MAX_CONTENT_TAGS
     if max_content_tags <= 0:
         max_content_tags = DEFAULT_MAX_CONTENT_TAGS
-    allow_multi_character = any(
+    allow_multi_character = force_multi_character or any(
         marker in prompt_lower
         for marker in (
             "2girls",
@@ -151,8 +158,16 @@ def build_final_prompt(
         if style_tags:
             parts.append(style_tags)
     parts.append(content or user_prompt)
+    final_prompt = join_prompt_parts(parts)
+    narrative = tuple(
+        str(block or "").strip()
+        for block in narrative_blocks
+        if str(block or "").strip()
+    )
+    if narrative:
+        final_prompt += "\n\n" + "\n\n".join(narrative)
     return PromptBuildResult(
-        final_prompt=join_prompt_parts(parts),
+        final_prompt=final_prompt,
         content_tags=content,
         raw_mode=False,
         used_fixed_character=use_character,

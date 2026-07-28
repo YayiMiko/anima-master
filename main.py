@@ -165,8 +165,15 @@ class ComfyUIAgentPlugin(Star):
         event: AstrMessageEvent,
         user_prompt: str,
         mode: str = "txt2img",
+        *,
+        multi_person: bool = False,
     ) -> str:
-        result = await self._prompt_pipeline.build(event, user_prompt, mode)
+        result = await self._prompt_pipeline.build(
+            event,
+            user_prompt,
+            mode,
+            multi_person=multi_person,
+        )
         self._last_prompt_summary.set(dict(result.summary))
         return result.final_prompt
 
@@ -187,6 +194,7 @@ class ComfyUIAgentPlugin(Star):
         steps: int | None = None,
         cfg: float | None = None,
         negative_prompt: str | None = None,
+        multi_person: bool = False,
     ) -> dict[str, Any]:
         payload = await self._generation_task.generate_payload(
             event,
@@ -196,6 +204,7 @@ class ComfyUIAgentPlugin(Star):
             steps=steps,
             cfg=cfg,
             negative_prompt=negative_prompt,
+            multi_person=multi_person,
         )
         verified = await self._services.generation_verifier.verify_and_maybe_retry(
             event,
@@ -206,6 +215,7 @@ class ComfyUIAgentPlugin(Star):
             steps=steps,
             cfg=cfg,
             negative_prompt=negative_prompt,
+            multi_person=multi_person,
         )
         return verified.payload
 
@@ -218,6 +228,7 @@ class ComfyUIAgentPlugin(Star):
         steps: int | None = None,
         cfg: float | None = None,
         negative_prompt: str | None = None,
+        multi_person: bool = False,
     ) -> str:
         payload = await self._generate_payload(
             event,
@@ -227,6 +238,7 @@ class ComfyUIAgentPlugin(Star):
             steps=steps,
             cfg=cfg,
             negative_prompt=negative_prompt,
+            multi_person=multi_person,
         )
         if payload.get("prompt_degraded"):
             try:
@@ -321,6 +333,15 @@ class ComfyUIAgentPlugin(Star):
         event.stop_event()
         message = await self._handle_action(
             event, "generate", str(prompt or "").strip()
+        )
+        if message:
+            yield event.plain_result(message)
+
+    @comfyui_group.command("multi_person", alias={"多人"})
+    async def cmd_multi_person(self, event: AstrMessageEvent, prompt: GreedyStr):
+        event.stop_event()
+        message = await self._handle_action(
+            event, "multi_person", str(prompt or "").strip()
         )
         if message:
             yield event.plain_result(message)

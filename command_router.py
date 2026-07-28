@@ -163,6 +163,7 @@ def parse_hard_route(text: str) -> tuple[str, str] | None:
             ("调试状态", "debug_status"),
             ("调试", "debug_status"),
             ("generate", "generate"),
+            ("多人", "multi_person"),
             ("生图", "generate"),
             ("画图", "generate"),
             ("edit", "edit"),
@@ -238,6 +239,13 @@ def parse_hard_route(text: str) -> tuple[str, str] | None:
         ]
         for keyword, action in action_map:
             if not rest_lower.startswith(keyword.lower()):
+                continue
+            remainder = rest[len(keyword) :]
+            if (
+                action == "multi_person"
+                and remainder
+                and remainder[0] not in " \t\r\n，,：:"
+            ):
                 continue
             prompt = rest[len(keyword) :].strip(" ，,：:")
             return action, prompt

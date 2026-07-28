@@ -40,6 +40,12 @@ COMMAND_ENTRIES: tuple[CommandEntry, ...] = (
         True,
     ),
     CommandEntry(
+        "multi_person",
+        ("多人",),
+        "- /anm 多人 <描述>：按人物分组和互动关系生成 2–4 人画面",
+        True,
+    ),
+    CommandEntry(
         "raw_generate",
         ("无优化", "原样"),
         "- /anm 无优化 <tags>：跳过 LLM 优化，直接按 tags 生图",
