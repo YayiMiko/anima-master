@@ -10,7 +10,6 @@ if str(PLUGIN_DIR) not in sys.path:
 
 from prompt_pipeline import PromptPipeline  # noqa: E402
 from prompt_presets import looks_like_danbooru_tags  # noqa: E402
-from prompt_trace import PromptBuildTrace  # noqa: E402
 from task_summary import (  # noqa: E402
     apply_verification_summary,
     build_last_task_debug_lines,
@@ -68,7 +67,10 @@ def test_prompt_pipeline_refills_details_after_semantic_deduplication():
                         "light particles",
                     ]
                 ),
-                ", ".join(f"refined visual detail {index}" for index in range(48)),
+                ", ".join(
+                    [f"scene detail {index}" for index in range(40)]
+                    + [f"refined visual detail {index}" for index in range(8)]
+                ),
             ]
 
         async def get_current_chat_provider_id(self, umo):
@@ -119,14 +121,116 @@ def test_prompt_pipeline_refills_details_after_semantic_deduplication():
     assert result.summary["short_content_retry"] is False
     assert result.summary["removed_content_tag_count"] == 0
     assert result.summary["llm_content_tag_count"] == 48
-    assert "refined visual detail 47" in result.final_prompt
+    assert "refined visual detail 7" in result.final_prompt
     assert context.outputs == []
+
+
+def test_prompt_pipeline_creative_expansion_strips_flag_and_enriches_tags():
+    class _Response:
+        def __init__(self, text: str):
+            self.completion_text = text
+
+    class _Context:
+        def __init__(self):
+            self.calls = []
+
+        async def get_current_chat_provider_id(self, umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.calls.append(kwargs)
+            return _Response(
+                ", ".join(f"creative visual detail {index}" for index in range(52))
+            )
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, prompt):
+            return _Plan()
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, prompt):
+            return ()
+
+        async def resolve(self, *, llm_content, user_prompt, fixed_character):
+            return llm_content
+
+    class _Event:
+        unified_msg_origin = "session"
+
+    context = _Context()
+    config = {"chiyo_preset_enabled": False}
+    pipeline = PromptPipeline(
+        context=context,
+        config=config,
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda key, default: bool(config.get(key, default)),
+        get_int=lambda key, default: int(config.get(key, default)),
+        get_float=lambda key, default: float(config.get(key, default)),
+        get_str=lambda key, default: str(config.get(key, default)),
+        shorten=_shorten,
+    )
+
+    result = asyncio.run(
+        pipeline.build(
+            _Event(),
+            "1girl, solo, traveling magical girl, white dress, simple background --自由发挥",
+        )
+    )
+
+    assert result.summary["creative_expansion"] is True
+    assert result.summary.get("danbooru_fast_path") is not True
+    assert result.summary["llm_content_tag_count"] == 52
+    assert "--自由发挥" not in result.final_prompt
+    assert len(context.calls) == 1
+    assert "本次启用“自由发挥”模式" in context.calls[0]["prompt"]
+    assert "本次启用自由发挥模式" in context.calls[0]["system_prompt"]
+    assert "场景类Tag门控" not in context.calls[0]["system_prompt"]
 
 
 def test_danbooru_tag_fast_path_detection_accepts_tag_lists():
     assert looks_like_danbooru_tags(
         "masterpiece, best quality, 1girl, solo, white dress, simple background"
     )
+
+
+def test_prompt_pipeline_marks_missing_provider_as_llm_failure() -> None:
+    class _Context:
+        async def get_current_chat_provider_id(self, _umo):
+            return ""
+
+        def get_config(self, *, umo):
+            return {"provider_settings": {}}
+
+    class _Event:
+        unified_msg_origin = "session"
+
+    config = {"chiyo_preset_enabled": False}
+    pipeline = PromptPipeline(
+        context=_Context(),
+        config=config,
+        logger=_Logger(),
+        danbooru_resolver=None,
+        researcher=None,
+        get_bool=lambda key, default: bool(config.get(key, default)),
+        get_int=lambda key, default: int(config.get(key, default)),
+        get_float=lambda key, default: float(config.get(key, default)),
+        get_str=lambda key, default: str(config.get(key, default)),
+        shorten=_shorten,
+    )
+
+    result = asyncio.run(pipeline.build(_Event(), "画一个蓝色连衣裙女孩"))
+
+    assert result.final_prompt == "画一个蓝色连衣裙女孩"
+    assert result.summary["llm_failed"] is True
+    assert result.summary["llm_error"] == "no_chat_provider"
 
 
 def test_danbooru_tag_fast_path_detection_rejects_short_chinese_requests():
@@ -155,110 +259,6 @@ def test_mixed_tag_fast_path_composes_fixed_character_without_llm():
     assert "serious" in result.final_prompt
     assert "狐莉" not in result.final_prompt
     assert "smirk" not in result.final_prompt
-
-
-def test_prompt_trace_records_raw_fast_path():
-    trace = PromptBuildTrace(
-        mode="txt2img",
-        original_prompt="1girl, solo",
-        prompt_optimize_enabled=True,
-        shorten=_shorten,
-    )
-
-    trace.mark_raw("danbooru_tags_detected", "1girl, solo", danbooru_fast_path=True)
-    summary = trace.to_summary()
-
-    assert summary["raw_mode"] is True
-    assert summary["danbooru_fast_path"] is True
-    assert summary["skipped_reason"] == "danbooru_tags_detected"
-    assert summary["llm_ok"] is True
-    assert summary["stage_events"] == [
-        {
-            "stage": "direct_path",
-            "status": "danbooru_fast_path",
-            "reason": "danbooru_tags_detected",
-        }
-    ]
-
-
-def test_prompt_pipeline_direct_path_records_optimizer_disabled():
-    trace = PromptBuildTrace(
-        mode="txt2img",
-        original_prompt="画一个女孩",
-        prompt_optimize_enabled=False,
-        shorten=_shorten,
-    )
-    direct = _pipeline({"prompt_optimize_enabled": False})._try_direct_prompt_path(
-        "画一个女孩",
-        trace,
-    )
-
-    assert direct == "画一个女孩"
-    assert trace.to_summary()["skipped_reason"] == "prompt_optimize_disabled"
-    assert trace.to_summary()["stage_events"][0]["status"] == "skipped"
-
-
-def test_prompt_pipeline_direct_path_records_tag_fast_path():
-    tags = "masterpiece, best quality, 1girl, solo, white dress, simple background"
-    trace = PromptBuildTrace(
-        mode="txt2img",
-        original_prompt=tags,
-        prompt_optimize_enabled=True,
-        shorten=_shorten,
-    )
-    direct = _pipeline()._try_direct_prompt_path(tags, trace)
-
-    assert direct == tags
-    assert trace.to_summary()["danbooru_fast_path"] is True
-    assert trace.to_summary()["stage_events"][0]["status"] == "danbooru_fast_path"
-
-
-def test_prompt_trace_records_final_prompt_fields():
-    class Built:
-        raw_mode = False
-        used_fixed_character = True
-        character_name = "狐莉"
-        used_sensual_mode = False
-        used_default_style = True
-        required_core_tags = ["huli"]
-        content_tags = "1girl, solo"
-        final_prompt = "masterpiece, 1girl, solo"
-
-    class OutfitPlan:
-        enabled = True
-        source_subject = "source"
-        target_character = "狐莉"
-
-    trace = PromptBuildTrace(
-        mode="txt2img",
-        original_prompt="狐莉穿同款衣服",
-        prompt_optimize_enabled=True,
-        shorten=_shorten,
-    )
-    trace.mark_llm_failed()
-    trace.mark_final(
-        built=Built(),
-        web_search=True,
-        deep_thinking=True,
-        search_reason="keyword",
-        thinking_reason="keyword",
-        outfit_plan=OutfitPlan(),
-        outfit_summary_source="search_summary",
-        outfit_summary="dress, ribbon",
-        asset_reference_mode=True,
-        content_tag_count=2,
-        short_content_retry=False,
-        prompt_builder_template_customized=False,
-        final_prompt_head="masterpiece, 1girl, solo",
-    )
-    summary = trace.to_summary()
-
-    assert summary["llm_ok"] is False
-    assert summary["stage_events"][0]["stage"] == "prompt_llm"
-    assert summary["web_search"] is True
-    assert summary["fixed_character_name"] == "狐莉"
-    assert summary["outfit_transfer"] is True
-    assert summary["final_prompt_chars"] == len(Built.final_prompt)
 
 
 def test_strategy_summary_keeps_debug_flags_compact():

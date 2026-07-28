@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 COMMAND_PREFIXES = ("anm", "comfyui", "anima")
 
 
@@ -19,15 +18,56 @@ class CommandEntry:
 
 COMMAND_ENTRIES: tuple[CommandEntry, ...] = (
     CommandEntry("help", ("help", "帮助", "指令表", "指令", "菜单")),
-    CommandEntry("status", ("status", "状态"), "- /anm 状态：查看 ComfyUI / Anima 状态", True),
-    CommandEntry("debug_status", ("debug_status", "debug", "调试状态", "调试"), "- /anm 调试状态：查看插件关键配置和上次任务摘要", True),
-    CommandEntry("generate", ("generate", "生图", "画图"), "- /anm 生图 <描述>：按描述生成图片", True),
-    CommandEntry("raw_generate", ("无优化", "原样"), "- /anm 无优化 <tags>：跳过 LLM 优化，直接按 tags 生图", True),
-    CommandEntry("edit", ("edit", "改图", "图生图", "风格化", "重绘"), "- /anm 改图 <要求>：引用图片后整图重绘/风格化", True, True),
+    CommandEntry(
+        "status", ("status", "状态"), "- /anm 状态：查看 ComfyUI / Anima 状态", True
+    ),
+    CommandEntry(
+        "diagnose",
+        ("diagnose", "诊断"),
+        "- /anm 诊断：检查服务器、网络和 ComfyUI 连接",
+        True,
+    ),
+    CommandEntry(
+        "debug_status",
+        ("debug_status", "debug", "调试状态", "调试"),
+        "- /anm 调试状态：查看插件关键配置和上次任务摘要",
+        True,
+    ),
+    CommandEntry(
+        "generate",
+        ("generate", "生图", "画图"),
+        "- /anm 生图 <描述>：按描述生成图片",
+        True,
+    ),
+    CommandEntry(
+        "raw_generate",
+        ("无优化", "原样"),
+        "- /anm 无优化 <tags>：跳过 LLM 优化，直接按 tags 生图",
+        True,
+    ),
+    CommandEntry(
+        "edit",
+        ("edit", "改图", "图生图", "风格化", "重绘"),
+        "- /anm 改图 <要求>：引用图片后整图重绘/风格化",
+        True,
+        True,
+    ),
     CommandEntry("disabled_upscale", ("upscale", "放大", "高清修复", "高清")),
-    CommandEntry("disabled_remove_bg", ("remove_bg", "remove-bg", "抠图", "去背景", "去除背景")),
-    CommandEntry("spell", ("解析法术", "法术解析", "读取法术", "提取提示词", "读取提示词"), "- /anm 解析法术：读取图片内嵌的生成信息", True),
-    CommandEntry("reverse", ("反推提示词", "图片反推", "反推"), "- /anm 反推：根据图片内容反推 tags", True),
+    CommandEntry(
+        "disabled_remove_bg", ("remove_bg", "remove-bg", "抠图", "去背景", "去除背景")
+    ),
+    CommandEntry(
+        "spell",
+        ("解析法术", "法术解析", "读取法术", "提取提示词", "读取提示词"),
+        "- /anm 解析法术：读取图片内嵌的生成信息",
+        True,
+    ),
+    CommandEntry(
+        "reverse",
+        ("反推提示词", "图片反推", "反推"),
+        "- /anm 反推：根据图片内容反推 tags",
+        True,
+    ),
     CommandEntry(
         "add_fixed_character",
         (
@@ -61,11 +101,32 @@ COMMAND_ENTRIES: tuple[CommandEntry, ...] = (
         True,
     ),
     CommandEntry("list_artist_presets", ("查看画师组", "列出画师组", "画师组列表")),
-    CommandEntry("use_artist_preset", ("使用画师组", "启用画师组", "切换画师组", "选择画师组"), "- /anm 切换画师组 <名称>：切换当前画师组", True),
+    CommandEntry(
+        "use_artist_preset",
+        ("使用画师组", "启用画师组", "切换画师组", "选择画师组"),
+        "- /anm 切换画师组 <名称>：切换当前画师组",
+        True,
+    ),
     CommandEntry("delete_artist_preset", ("删除画师组", "移除画师组")),
     CommandEntry("set_artist_tags", ("设置画师组", "设置新的画师组", "画师组")),
-    CommandEntry("create_artist_preset", ("新建画师组", "新建新的画师组", "创建画师组", "创建新的画师组", "创建新画师组", "保存画师组", "保存新的画师组"), "- /anm 创建画师组 <名称>=<tags>：保存并启用画师组", True),
-    CommandEntry("append_artist_tags", ("追加画师组", "添加画师组", "加入画师组", "加入新的画师组")),
+    CommandEntry(
+        "create_artist_preset",
+        (
+            "新建画师组",
+            "新建新的画师组",
+            "创建画师组",
+            "创建新的画师组",
+            "创建新画师组",
+            "保存画师组",
+            "保存新的画师组",
+        ),
+        "- /anm 创建画师组 <名称>=<tags>：保存并启用画师组",
+        True,
+    ),
+    CommandEntry(
+        "append_artist_tags",
+        ("追加画师组", "添加画师组", "加入画师组", "加入新的画师组"),
+    ),
 )
 
 
@@ -122,14 +183,25 @@ def build_help_text(img2img_enabled: bool = False) -> str:
             continue
         if entry.help_line not in lines:
             lines.append(entry.help_line)
-    lines.extend(["", "也可以把“anm”换成“comfyui / anima”。", "例：/anm 生图 白色礼服，立绘"])
+    lines.extend(
+        [
+            "  可在描述开头写“竖图/横图/方图/宽屏”，或写“1024x1536：描述”",
+            "  也可在末尾写“--尺寸 1216x832”指定本次尺寸",
+            "  附带“--自由发挥”可让 LLM 自主拓展主题并丰富角色细节",
+            "",
+            "也可以把“anm”换成“comfyui / anima”。",
+            "例：/anm 生图 白色礼服，立绘",
+        ]
+    )
     return "\n".join(lines)
 
 
 def natural_action_for(verb: str) -> str:
     """Return action for a natural-language command verb."""
     lowered = str(verb or "").lower()
-    return NATURAL_ACTIONS.get(lowered) or NATURAL_ACTIONS.get(str(verb or ""), "generate")
+    return NATURAL_ACTIONS.get(lowered) or NATURAL_ACTIONS.get(
+        str(verb or ""), "generate"
+    )
 
 
 def is_natural_draw_verb(verb: str) -> bool:

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import astrbot.api.message_components as Comp
 from astrbot.api.event import AstrMessageEvent
@@ -10,7 +11,7 @@ from astrbot.core.utils.quoted_message.onebot_client import OneBotClient
 
 try:
     from .image_storage import SUPPORTED_IMAGE_EXTS
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from image_storage import SUPPORTED_IMAGE_EXTS
 
 
@@ -54,7 +55,9 @@ class OneBotImageResolver:
         client = OneBotClient(event)
         bot = getattr(event, "bot", None)
         direct_call_action = getattr(bot, "call_action", None)
-        if getattr(client, "_call_action", None) is None and callable(direct_call_action):
+        if getattr(client, "_call_action", None) is None and callable(
+            direct_call_action
+        ):
             client._call_action = direct_call_action
         if getattr(client, "_call_action", None) is None:
             return None
@@ -62,7 +65,14 @@ class OneBotImageResolver:
 
     def _image_from_segment(self, data: dict[str, Any]) -> Comp.Image:
         return Comp.Image(
-            file=str(data.get("file") or data.get("url") or data.get("path") or data.get("file_id") or data.get("id") or ""),
+            file=str(
+                data.get("file")
+                or data.get("url")
+                or data.get("path")
+                or data.get("file_id")
+                or data.get("id")
+                or ""
+            ),
             url=str(data.get("url") or ""),
             path=str(data.get("path") or ""),
             _type=str(data.get("sub_type") or data.get("type") or ""),
@@ -101,7 +111,9 @@ class OneBotImageResolver:
             return int(group_id)
         return group_id
 
-    def _actions_for(self, event: AstrMessageEvent, image_ids: list[str]) -> list[tuple[str, dict[str, Any]]]:
+    def _actions_for(
+        self, event: AstrMessageEvent, image_ids: list[str]
+    ) -> list[tuple[str, dict[str, Any]]]:
         actions: list[tuple[str, dict[str, Any]]] = []
         for image_id in image_ids:
             actions.extend(
@@ -117,7 +129,12 @@ class OneBotImageResolver:
         group_id_value = self._group_id_value(event)
         if group_id_value:
             for image_id in image_ids:
-                actions.append(("get_group_file_url", {"group_id": group_id_value, "file_id": image_id}))
+                actions.append(
+                    (
+                        "get_group_file_url",
+                        {"group_id": group_id_value, "file_id": image_id},
+                    )
+                )
         for image_id in image_ids:
             actions.append(("get_private_file_url", {"file_id": image_id}))
         return actions
@@ -138,7 +155,9 @@ class OneBotImageResolver:
             media_refs.append(ref)
         return media_refs
 
-    def _original_name(self, data: dict[str, Any], resolved_data: dict[str, Any] | None = None) -> str:
+    def _original_name(
+        self, data: dict[str, Any], resolved_data: dict[str, Any] | None = None
+    ) -> str:
         resolved_data = resolved_data or {}
         return str(
             resolved_data.get("file_name")
@@ -170,7 +189,9 @@ class OneBotImageResolver:
         details = self._image_component_details(image)
         details["source"] = source
         details["label"] = label
-        details["raw_segment"] = self._shorten(json.dumps(data, ensure_ascii=False), 1000)
+        details["raw_segment"] = self._shorten(
+            json.dumps(data, ensure_ascii=False), 1000
+        )
         if extra_details:
             details.update(extra_details)
 
@@ -190,7 +211,15 @@ class OneBotImageResolver:
                     action,
                     params,
                     sorted(resolved_data.keys()),
-                    self._shorten(str(resolved_data.get("file") or resolved_data.get("path") or resolved_data.get("file_path") or ""), 260),
+                    self._shorten(
+                        str(
+                            resolved_data.get("file")
+                            or resolved_data.get("path")
+                            or resolved_data.get("file_path")
+                            or ""
+                        ),
+                        260,
+                    ),
                     self._shorten(str(resolved_data.get("url") or ""), 260),
                     "yes" if resolved_data.get("base64") else "no",
                 )
@@ -200,7 +229,11 @@ class OneBotImageResolver:
                     label,
                     index,
                     original=self._original_name(data, resolved_data),
-                    details={**details, "resolve_action": action, "resolve_params": params},
+                    details={
+                        **details,
+                        "resolve_action": action,
+                        "resolve_params": params,
+                    },
                 )
                 if saved:
                     return saved
@@ -249,16 +282,24 @@ class OneBotImageResolver:
             try:
                 reply_data = await client.get_msg(reply_id)
             except Exception as exc:
-                self._logger.warning("[comfyui_agent] failed to fetch raw reply message %s: %s", reply_id, exc)
+                self._logger.warning(
+                    "[comfyui_agent] failed to fetch raw reply message %s: %s",
+                    reply_id,
+                    exc,
+                )
                 continue
-            segments = reply_data.get("message") if isinstance(reply_data, dict) else None
+            segments = (
+                reply_data.get("message") if isinstance(reply_data, dict) else None
+            )
             if not isinstance(segments, list):
                 continue
             image_index = 0
             for segment in segments:
                 if not isinstance(segment, dict) or segment.get("type") != "image":
                     continue
-                data = segment.get("data") if isinstance(segment.get("data"), dict) else {}
+                data = (
+                    segment.get("data") if isinstance(segment.get("data"), dict) else {}
+                )
                 image_index += 1
                 saved = await self._save_segment_image(
                     event,

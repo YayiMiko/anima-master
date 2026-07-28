@@ -53,12 +53,18 @@ def extract_comfyui_graph(graph: dict[str, Any]) -> dict[str, Any]:
         elif class_type == "VAELoader" and inputs.get("vae_name"):
             models["vae"] = str(inputs.get("vae_name"))
 
-    positive = "\n".join(text for node_id in positive_ids if (text := _node_text(graph, node_id))).strip()
-    negative = "\n".join(text for node_id in negative_ids if (text := _node_text(graph, node_id))).strip()
+    positive = "\n".join(
+        text for node_id in positive_ids if (text := _node_text(graph, node_id))
+    ).strip()
+    negative = "\n".join(
+        text for node_id in negative_ids if (text := _node_text(graph, node_id))
+    ).strip()
     if not positive:
         text_nodes = []
         for node_id, node in graph.items():
-            if isinstance(node, dict) and "CLIPTextEncode" in str(node.get("class_type") or ""):
+            if isinstance(node, dict) and "CLIPTextEncode" in str(
+                node.get("class_type") or ""
+            ):
                 text = _node_text(graph, str(node_id))
                 if text:
                     text_nodes.append(text)
@@ -126,7 +132,17 @@ def extract_json_generation(data: dict[str, Any]) -> dict[str, Any]:
     if not positive and not negative:
         return {}
     params = {}
-    for key in ("steps", "scale", "cfg", "seed", "sampler", "sampler_name", "width", "height", "model"):
+    for key in (
+        "steps",
+        "scale",
+        "cfg",
+        "seed",
+        "sampler",
+        "sampler_name",
+        "width",
+        "height",
+        "model",
+    ):
         if key in data:
             params[key] = data[key]
     if "width" in params and "height" in params:

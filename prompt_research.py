@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 try:
     from astrbot.core.tools.web_search_tools import _tavily_search
-except Exception:  # pragma: no cover - web search internals may move upstream.
+except ImportError:  # pragma: no cover - web search internals may move upstream.
     _tavily_search = None
 
 
@@ -105,8 +106,10 @@ class PromptResearcher:
         search_reason = self.keyword_reason(prompt, WEB_SEARCH_KEYWORDS)
         thinking_reason = self.keyword_reason(prompt, DEEP_THINKING_KEYWORDS)
         return PromptResearchPlan(
-            use_web_search=bool(search_reason) and self._bool("prompt_builder_web_search_enabled", True),
-            use_deep_thinking=bool(thinking_reason) and self._bool("prompt_builder_deep_thinking_enabled", True),
+            use_web_search=bool(search_reason)
+            and self._bool("prompt_builder_web_search_enabled", True),
+            use_deep_thinking=bool(thinking_reason)
+            and self._bool("prompt_builder_deep_thinking_enabled", True),
             search_reason=search_reason,
             thinking_reason=thinking_reason,
         )
@@ -148,21 +151,28 @@ class PromptResearcher:
         if not self._bool("prompt_builder_web_search_enabled", True):
             return ""
         if _tavily_search is None:
-            self.logger.warning("[comfyui_agent] prompt web search unavailable: tavily helper missing")
+            self.logger.warning(
+                "[comfyui_agent] prompt web search unavailable: tavily helper missing"
+            )
             return ""
 
         try:
             cfg = self.context.get_config(umo=event.unified_msg_origin)
             provider_settings = cfg.get("provider_settings", {})
             if not provider_settings.get("websearch_tavily_key", []):
-                self.logger.warning("[comfyui_agent] prompt web search skipped: Tavily key not configured")
+                self.logger.warning(
+                    "[comfyui_agent] prompt web search skipped: Tavily key not configured"
+                )
                 return ""
-            max_results = max(1, min(self._int("prompt_builder_search_max_results", 5), 8))
+            max_results = max(
+                1, min(self._int("prompt_builder_search_max_results", 5), 8)
+            )
             payload = {
                 "query": self.search_query(search_query_prompt or prompt),
                 "max_results": max_results,
                 "include_favicon": False,
-                "search_depth": self._str("prompt_builder_search_depth", "advanced") or "advanced",
+                "search_depth": self._str("prompt_builder_search_depth", "advanced")
+                or "advanced",
                 "topic": "general",
             }
             if payload["search_depth"] not in {"basic", "advanced"}:
@@ -189,5 +199,9 @@ class PromptResearcher:
         context = "\n".join(lines).strip()
         if len(lines) <= 2:
             return ""
-        self.logger.info("[comfyui_agent] prompt web search ok results=%s chars=%s", len(lines) - 2, len(context))
+        self.logger.info(
+            "[comfyui_agent] prompt web search ok results=%s chars=%s",
+            len(lines) - 2,
+            len(context),
+        )
         return context

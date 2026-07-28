@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -17,7 +18,13 @@ try:
     from .prompt_builder import (
         build_final_prompt,
     )
-    from .prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
+    from .prompt_constraints import (
+        apply_scene_gate,
+        build_constraint_plan_prompt,
+        parse_constraint_plan,
+        retry_preserves_prompt,
+        scene_gate_open,
+    )
     from .prompt_presets import (
         apply_config_preset,
         looks_like_danbooru_tags,
@@ -28,7 +35,7 @@ try:
     from .prompt_research import PromptResearcher
     from .prompt_templates import build_llm_prompt
     from .tag_cleaner import split_tags
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_resolver import DanbooruResolver
     from outfit_transfer import (
         build_outfit_summary_prompt,
@@ -41,7 +48,13 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
     from prompt_builder import (
         build_final_prompt,
     )
-    from prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
+    from prompt_constraints import (
+        apply_scene_gate,
+        build_constraint_plan_prompt,
+        parse_constraint_plan,
+        retry_preserves_prompt,
+        scene_gate_open,
+    )
     from prompt_presets import (
         apply_config_preset,
         looks_like_danbooru_tags,
@@ -109,17 +122,6 @@ class PromptPipeline:
         self._str = get_str
         self._shorten = shorten
 
-    def _try_direct_prompt_path(self, prompt: str, trace: Any) -> str | None:
-        """Return prompt unchanged for disabled optimization or tag-like input."""
-        text = str(prompt or "").strip()
-        if not self._bool("prompt_optimize_enabled", True):
-            trace.mark_skipped("prompt_optimize_disabled", text)
-            return text
-        if looks_like_danbooru_tags(text):
-            trace.mark_raw("danbooru_tags_detected", text, danbooru_fast_path=True)
-            return text
-        return None
-
     async def _current_chat_provider_id(self, event: Any) -> str:
         configured = self._str("prompt_builder_provider_id", "").strip()
         if configured:
@@ -146,13 +148,34 @@ class PromptPipeline:
         use_deep_thinking: bool,
         fixed_character: bool,
         character_name: str = "",
+        creative_expansion: bool = False,
     ) -> str:
         if character_name:
             character_rule = f"不要输出固定角色“{character_name}”的固有外观设定。"
         else:
             character_rule = (
-                "用户没有使用固定角色时，可以并且应该输出主体所需的固有外观设定。"
+                "用户没有使用固定角色时，如果用户明确点名现有作品角色，"
+                "第一项必须输出最可信的标准 Danbooru 角色 tag，使用罗马字和下划线，必要时带作品消歧括号；"
+                "禁止省略角色 tag 而只写外观，后续程序会联网查询 character 分类并校正。"
+                "之后可以并且应该输出主体所需的固有外观设定。"
             )
+        creative_rule = (
+            "本次启用自由发挥模式：在严格保留用户明确要求和角色身份的前提下，"
+            "主动发展统一主题并补充服装结构、材质配饰、姿态手势、前景互动、构图、光影和少量特效，"
+            "目标为50至65个不重复的可见内容tag；背景保持简洁。"
+            if creative_expansion
+            else ""
+        )
+        scene_scope_rule = (
+            ""
+            if creative_expansion
+            else (
+                "非自由发挥模式必须执行场景类Tag门控：先判断用户是否明确提到前景互动、构图镜头、"
+                "环境背景、光影、特效氛围中的任意一类。若均未提及，禁止生成这五类Tag，"
+                "只写主体关系、角色、服装材质配饰、动作手势、神态视线，且不设最低Tag数量；"
+                "若提到任意一类，才可以按需生成全部场景类型。"
+            )
+        )
         kwargs: dict[str, Any] = {
             "chat_provider_id": provider_id,
             "prompt": llm_prompt,
@@ -162,6 +185,8 @@ class PromptPipeline:
                 "只输出英文 danbooru tags，用英文逗号分隔。"
                 "不要解释，不要 Markdown，不要输出质量词或画师词。"
                 f"{character_rule}"
+                f"{creative_rule}"
+                f"{scene_scope_rule}"
             ),
             "max_tokens": self._int("prompt_builder_max_tokens", 700),
         }
@@ -238,11 +263,23 @@ class PromptPipeline:
         Returns:
             Final prompt plus a serializable summary dict.
         """
-        prompt = str(user_prompt or "").strip()
+        original_prompt = str(user_prompt or "").strip()
+        creative_expansion_re = re.compile(
+            r"(?<!\S)--(?:自由发挥|自由拓展|创意拓展|创意扩展|creative)"
+            r"(?=$|\s|[,，;；:：])",
+            re.IGNORECASE,
+        )
+        creative_expansion = bool(creative_expansion_re.search(original_prompt))
+        prompt = creative_expansion_re.sub(" ", original_prompt).strip()
+        prompt = re.sub(r"^[\s,，;；:：]+|[\s,，;；:：]+$", "", prompt)
+        prompt = re.sub(r"([,，;；])\s*[,，;；]+", r"\1", prompt)
+        prompt = re.sub(r"\s+", " ", prompt)
         summary: dict[str, Any] = {
             "prompt_optimize_enabled": self._bool("prompt_optimize_enabled", True),
             "mode": mode,
-            "original_prompt_head": self._shorten(prompt, 600),
+            "original_prompt_head": self._shorten(original_prompt, 600),
+            "creative_expansion": creative_expansion,
+            "scene_gate_open": scene_gate_open(prompt, creative_expansion),
         }
         if not self._bool("prompt_optimize_enabled", True):
             summary.update(
@@ -269,7 +306,7 @@ class PromptPipeline:
         prompt_config = apply_config_preset(dict(self.config))
         fixed_character = selected_fixed_character(prompt, prompt_config)
         fixed_character_name = fixed_character[0] if fixed_character else ""
-        if looks_like_danbooru_tags(prompt):
+        if looks_like_danbooru_tags(prompt) and not creative_expansion:
             direct_content = ", ".join(
                 tag
                 for tag in split_tags(prompt)
@@ -316,6 +353,8 @@ class PromptPipeline:
             summary.update(
                 {
                     "skipped_reason": "no_chat_provider",
+                    "llm_failed": True,
+                    "llm_error": "no_chat_provider",
                     "final_prompt_head": self._shorten(prompt, 600),
                     "final_prompt_chars": len(prompt),
                 }
@@ -399,6 +438,7 @@ class PromptPipeline:
             outfit_transfer_rule=build_outfit_transfer_block(
                 outfit_plan, outfit_summary
             ),
+            creative_expansion=creative_expansion,
         )
         if self._bool("debug_prompt_enabled", False):
             self.logger.info(
@@ -413,6 +453,7 @@ class PromptPipeline:
                 use_deep_thinking=research_plan.use_deep_thinking,
                 fixed_character=use_fixed_character,
                 character_name=fixed_character_name,
+                creative_expansion=creative_expansion,
             )
         except Exception as exc:
             if not research_plan.use_deep_thinking:
@@ -433,6 +474,7 @@ class PromptPipeline:
                         use_deep_thinking=False,
                         fixed_character=use_fixed_character,
                         character_name=fixed_character_name,
+                        creative_expansion=creative_expansion,
                     )
                 except Exception as retry_exc:
                     self.logger.warning(
@@ -450,6 +492,11 @@ class PromptPipeline:
             llm_content=llm_content,
             user_prompt=prompt,
             fixed_character=use_fixed_character,
+        )
+        scene_allowed = scene_gate_open(prompt, creative_expansion)
+        llm_content, removed_scene_tags = apply_scene_gate(
+            llm_content,
+            enabled=scene_allowed,
         )
         low_cfg_harness = bool(prompt_config.get("low_cfg_harness_enabled", False))
         constraint_raw = ""
@@ -488,10 +535,16 @@ class PromptPipeline:
             and not built.raw_mode
             and not built.constraint_mode
             and not low_cfg_harness
-            and (content_tag_count < 35 or removed_tag_count >= 4)
+            and (
+                (creative_expansion and content_tag_count < 48)
+                or (not creative_expansion and scene_allowed and content_tag_count < 35)
+                or removed_tag_count >= 4
+            )
         ):
             reasons: list[str] = []
-            if content_tag_count < 35:
+            if creative_expansion and content_tag_count < 48:
+                reasons.append("自由发挥模式细节不足")
+            elif scene_allowed and content_tag_count < 35:
                 reasons.append("内容不足")
             if removed_tag_count >= 4:
                 reasons.append("同义或无效内容较多")
@@ -503,8 +556,17 @@ class PromptPipeline:
                 + f"清理后的可用 tags：{built.content_tags}\n"
                 + "请重写一份完整列表，不要只在末尾追加。合并同义词后，把空出的篇幅用于不同的可见画面槽位："
                 + "主体与关键物件关系、主要动作和手势、相容神态、服装结构、材质纹样与配饰、前景互动元素、简洁背景层次、构图镜头、功能不同的光影、特效。"
+                + (
+                    ""
+                    if creative_expansion
+                    else "其中前景互动、背景、构图镜头、光影和特效仍受场景类Tag门控：用户五类均未提及时必须全部省略，只补充角色、服装、动作和神态细节。"
+                )
                 + "同一语义簇最多保留 1-2 个词；光源、光束、轮廓光、投影和空气粒子可以分别描述，但不要用多个词反复表达单纯的明亮或发光。"
-                + "常规画面使用 40-55 个具体内容 tags，简单表情包或头像可以使用 30-45 个，复杂画面最多不超过 65 个。"
+                + (
+                    "本次自由发挥模式使用 50-65 个具体、相容且不重复的内容 tags。"
+                    if creative_expansion
+                    else "仅在用户打开场景类门控时参考常规 40-55 个内容 tags；未打开时不设最低数量，不得为凑数补入场景类Tag或同义词。"
+                )
                 + "优先增加人物、服装、手部、物件关系和前景细节，背景只增加少量有区分度的元素。"
                 + "不得替换用户明确的主体、花卉、道具、动作、表情、输出类型或镜头，也不要添加无关道具和冲突神态。"
                 + "不要输出质量词、画师词、解释或 Markdown。"
@@ -516,11 +578,16 @@ class PromptPipeline:
                     use_deep_thinking=False,
                     fixed_character=use_fixed_character,
                     character_name=fixed_character_name,
+                    creative_expansion=creative_expansion,
                 )
                 retry_content = await self._danbooru_resolver.resolve(
                     llm_content=retry_content,
                     user_prompt=prompt,
                     fixed_character=use_fixed_character,
+                )
+                retry_content, retry_removed_scene_tags = apply_scene_gate(
+                    retry_content,
+                    enabled=scene_allowed,
                 )
                 retry_built = build_final_prompt(
                     user_prompt=prompt,
@@ -534,9 +601,18 @@ class PromptPipeline:
                 retry_removed_tag_count = max(
                     0, retry_input_tag_count - retry_tag_count
                 )
-                if retry_tag_count >= content_tag_count and (
-                    retry_tag_count > content_tag_count
-                    or retry_removed_tag_count < removed_tag_count
+                if (
+                    retry_preserves_prompt(
+                        original_tags=built.content_tags,
+                        retry_tags=retry_built.content_tags,
+                        required_core_tags=required_core_tags,
+                        removed_scene_tags=retry_removed_scene_tags,
+                    )
+                    and retry_tag_count >= content_tag_count
+                    and (
+                        retry_tag_count > content_tag_count
+                        or retry_removed_tag_count < removed_tag_count
+                    )
                 ):
                     llm_content = retry_content
                     built = retry_built
@@ -578,6 +654,9 @@ class PromptPipeline:
                 "fixed_character_name": built.character_name,
                 "sensual_mode": built.used_sensual_mode,
                 "default_style": built.used_default_style,
+                "creative_expansion": creative_expansion,
+                "scene_gate_open": scene_allowed,
+                "removed_scene_tags": list(removed_scene_tags),
                 "low_cfg_harness": low_cfg_harness,
                 "constraint_mode": built.constraint_mode,
                 "weighted_style_tags": list(built.weighted_style_tags),

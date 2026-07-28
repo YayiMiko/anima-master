@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 SUPPORTED_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 
 
@@ -16,7 +15,9 @@ class ComfyUIImageResolver:
         self.inputs = self.workspace / "inputs"
         self.manifest = self.inputs / "manifest.jsonl"
         self.latest_input = self.inputs / "latest.json"
-        self.supported_exts = {item.lower() for item in (supported_exts or SUPPORTED_EXTS)}
+        self.supported_exts = {
+            item.lower() for item in (supported_exts or SUPPORTED_EXTS)
+        }
 
     def inside_workspace(self, path: Path) -> Path:
         resolved = path.resolve()
@@ -52,7 +53,11 @@ class ComfyUIImageResolver:
             path = self.inside_workspace(path)
         except SystemExit:
             return None
-        if path.exists() and path.is_file() and path.suffix.lower() in self.supported_exts:
+        if (
+            path.exists()
+            and path.is_file()
+            and path.suffix.lower() in self.supported_exts
+        ):
             return path
         return None
 

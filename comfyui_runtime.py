@@ -20,7 +20,7 @@ try:
         skipped_delivery,
     )
     from .comfyui_startup import ComfyUIStartupManager
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from chat_delivery import (
         ack_timeout_delivery,
         is_ack_timeout,
@@ -34,7 +34,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
 
 try:
     from aiocqhttp.exceptions import ActionFailed
-except Exception:  # pragma: no cover - aiocqhttp may be absent in tests.
+except ImportError:  # pragma: no cover - aiocqhttp may be absent in tests.
     ActionFailed = None
 
 
@@ -160,7 +160,11 @@ class ComfyUIRuntime:
         if detail == "no recent image found in workspace inputs":
             return "没有找到最近收到的图片"
         if detail == "reference_image_not_found":
-            summary = payload.get("image_input_summary") if isinstance(payload.get("image_input_summary"), dict) else {}
+            summary = (
+                payload.get("image_input_summary")
+                if isinstance(payload.get("image_input_summary"), dict)
+                else {}
+            )
             direct_count = int(summary.get("direct_images") or 0)
             reply_count = int(summary.get("reply_images") or 0)
             raw_count = int(summary.get("raw_images") or 0)
@@ -190,7 +194,9 @@ class ComfyUIRuntime:
             await event.send(event.plain_result(message))
             return message
 
-        outputs = [str(item) for item in payload.get("outputs", []) if Path(str(item)).exists()]
+        outputs = [
+            str(item) for item in payload.get("outputs", []) if Path(str(item)).exists()
+        ]
         if not outputs:
             message = "ComfyUI 完成了任务，但没有拿到可发送的图片。"
             payload["delivery"] = no_output_delivery(message)
@@ -200,9 +206,15 @@ class ComfyUIRuntime:
         if self._bool("send_result_to_chat", True):
             for output in outputs[: self._int("max_send_images", 1)]:
                 try:
-                    await event.send(event.chain_result([Comp.Image.fromFileSystem(output)]))
+                    await event.send(
+                        event.chain_result([Comp.Image.fromFileSystem(output)])
+                    )
                 except Exception as exc:
-                    wording = str(getattr(exc, "wording", "") or getattr(exc, "message", "") or exc)
+                    wording = str(
+                        getattr(exc, "wording", "")
+                        or getattr(exc, "message", "")
+                        or exc
+                    )
                     if is_ack_timeout(exc, ActionFailed):
                         self.logger.warning(
                             "[comfyui_agent] image generated but platform send ACK timed out; "
@@ -210,8 +222,20 @@ class ComfyUIRuntime:
                             output,
                             wording[:500],
                         )
-                        message = "ComfyUI 已生成图片，但聊天平台发送回执超时：" + ", ".join(outputs)
-                        payload["delivery"] = ack_timeout_delivery(outputs, output, exc, message)
+                        message = (
+                            "ComfyUI 已生成图片，但聊天平台发送回执超时："
+                            + ", ".join(outputs)
+                        )
+                        payload["delivery"] = ack_timeout_delivery(
+                            outputs, output, exc, message
+                        )
+                        try:
+                            await event.send(event.plain_result(message))
+                        except Exception as notice_exc:
+                            self.logger.warning(
+                                "[comfyui_agent] failed to send ACK-timeout notice: %s",
+                                str(notice_exc)[:500],
+                            )
                         return message
                     self.logger.warning(
                         "[comfyui_agent] image generated but sending failed. path=%s error=%s: %s",
@@ -220,7 +244,16 @@ class ComfyUIRuntime:
                         str(exc)[:500],
                     )
                     message = "ComfyUI 已生成图片，但发送失败：" + ", ".join(outputs)
-                    payload["delivery"] = send_failed_delivery(outputs, output, exc, message)
+                    payload["delivery"] = send_failed_delivery(
+                        outputs, output, exc, message
+                    )
+                    try:
+                        await event.send(event.plain_result(message))
+                    except Exception as notice_exc:
+                        self.logger.warning(
+                            "[comfyui_agent] failed to send image-send failure notice: %s",
+                            str(notice_exc)[:500],
+                        )
                     return message
             message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
             payload["delivery"] = sent_delivery(outputs, message)

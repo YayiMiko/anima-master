@@ -1,4 +1,5 @@
 import sys
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,7 @@ try:
         resolve_chiyo_profile,
     )
     from .service_container import build_services
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from command_router import parse_hard_route
     from config_defaults import (
         flatten_config,
@@ -72,8 +73,11 @@ class ComfyUIAgentPlugin(Star):
         ):
             config.save_config(replace_config=group_config(raw_config, schema_path))
         self.config = apply_config_preset(raw_config)
-        self._danbooru_tag_cache: dict[str, list[Any]] = {}
-        self._last_prompt_summary: dict[str, Any] = {}
+        self._danbooru_tag_cache: dict[str, Any] = {}
+        self._last_prompt_summary: ContextVar[dict[str, Any]] = ContextVar(
+            f"anima_prompt_summary_{id(self)}",
+            default={},
+        )
         self._services = build_services(
             context=self.context,
             config=self.config,
@@ -87,7 +91,7 @@ class ComfyUIAgentPlugin(Star):
             shorten=self._shorten,
             is_allowed=self._is_allowed,
             build_prompt=self._build_anima_prompt,
-            prompt_summary=lambda: self._last_prompt_summary,
+            prompt_summary=lambda: dict(self._last_prompt_summary.get()),
             generate=self._generate,
             edit=self._edit,
             remove_bg=self._remove_bg,
@@ -163,7 +167,7 @@ class ComfyUIAgentPlugin(Star):
         mode: str = "txt2img",
     ) -> str:
         result = await self._prompt_pipeline.build(event, user_prompt, mode)
-        self._last_prompt_summary = dict(result.summary)
+        self._last_prompt_summary.set(dict(result.summary))
         return result.final_prompt
 
     async def _ensure_comfyui_ready(self, event: AstrMessageEvent) -> dict[str, Any]:
@@ -224,8 +228,24 @@ class ComfyUIAgentPlugin(Star):
             cfg=cfg,
             negative_prompt=negative_prompt,
         )
+        if payload.get("prompt_degraded"):
+            try:
+                await event.send(
+                    event.plain_result(
+                        "提示词优化服务不可用，本次已使用原始提示词继续生成；"
+                        "结果可能不符合 Danbooru Tag 预期。"
+                    )
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[comfyui_agent] failed to send prompt degradation notice: %s",
+                    str(exc)[:500],
+                )
         result = await self._send_payload(event, payload)
-        self._generation_task.record_delivery(payload.get("delivery"))
+        self._generation_task.record_delivery(
+            payload.get("task_id"),
+            payload.get("delivery"),
+        )
         return result
 
     async def _edit(self, event: AstrMessageEvent, prompt: str) -> str:

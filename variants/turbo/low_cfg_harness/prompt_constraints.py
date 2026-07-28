@@ -7,7 +7,7 @@ from typing import Any
 
 try:
     from .tag_cleaner import join_prompt_parts, normalize_tag_key, split_tags
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from tag_cleaner import join_prompt_parts, normalize_tag_key, split_tags
 
 

@@ -21,7 +21,9 @@ class ComfyUIHttpClient:
         response.raise_for_status()
         return response.json()
 
-    def post_json(self, path: str, body: dict[str, Any], timeout: int = 10) -> dict[str, Any]:
+    def post_json(
+        self, path: str, body: dict[str, Any], timeout: int = 10
+    ) -> dict[str, Any]:
         response = requests.post(self.base_url + path, json=body, timeout=timeout)
         response.raise_for_status()
         return response.json()

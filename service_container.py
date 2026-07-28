@@ -19,8 +19,9 @@ try:
     from .prompt_pipeline import PromptPipeline
     from .prompt_research import PromptResearcher
     from .reference_context import ReferenceContextBuilder
+    from .storage_retention import StorageRetentionManager
     from .task_state import TaskRecorder
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from comfyui_runtime import ComfyUIRuntime
     from command_actions import CommandActionHandler
     from danbooru_resolver import DanbooruResolver
@@ -32,6 +33,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
     from prompt_pipeline import PromptPipeline
     from prompt_research import PromptResearcher
     from reference_context import ReferenceContextBuilder
+    from storage_retention import StorageRetentionManager
     from task_state import TaskRecorder
 
 
@@ -127,7 +129,7 @@ def build_services(
     config: dict[str, Any],
     config_store: Any = None,
     logger: Any,
-    danbooru_tag_cache: dict[str, list[Any]],
+    danbooru_tag_cache: dict[str, Any],
     get_bool: Callable[[str, bool], bool],
     get_int: Callable[[str, int], int],
     get_float: Callable[[str, float], float],
@@ -168,6 +170,15 @@ def build_services(
         Constructed service container.
     """
     paths = resolve_service_paths()
+    retention = StorageRetentionManager(
+        inputs_dir=paths.inputs,
+        outputs_dir=paths.workspace / "outputs",
+        tasks_dir=paths.plugin_data / "tasks",
+        retention_days=max(0, get_int("storage_retention_days", 30)),
+        manifest_max_records=max(1, get_int("manifest_max_records", 5000)),
+        logger=logger,
+    )
+    retention.run(force=True)
     runtime = ComfyUIRuntime(
         root=paths.root,
         tool=paths.tool,
@@ -245,6 +256,7 @@ def build_services(
         get_float=get_float,
         get_str=get_str,
         shorten=shorten,
+        maintenance=retention.run,
     )
     action_handler = CommandActionHandler(
         config=config,

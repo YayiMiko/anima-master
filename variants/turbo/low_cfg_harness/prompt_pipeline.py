@@ -28,7 +28,7 @@ try:
     from .prompt_research import PromptResearcher
     from .prompt_templates import build_llm_prompt
     from .tag_cleaner import split_tags
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_resolver import DanbooruResolver
     from outfit_transfer import (
         build_outfit_summary_prompt,

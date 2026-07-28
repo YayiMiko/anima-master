@@ -1,4 +1,7 @@
 import json
+import os
+import threading
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +14,8 @@ try:
         chiyo_profile_display_name,
         fixed_character_tags,
     )
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+    from .task_summary import build_last_task_debug_lines, build_strategy_summary
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from prompt_presets import (
         active_artist_preset_name,
         active_artist_tags,
@@ -20,6 +24,7 @@ except Exception:  # pragma: no cover - fallback for direct script-style imports
         chiyo_profile_display_name,
         fixed_character_tags,
     )
+    from task_summary import build_last_task_debug_lines, build_strategy_summary
 
 
 def _bool(config: dict[str, Any], key: str, default: bool) -> bool:
@@ -50,6 +55,8 @@ class TaskRecorder:
         """
         self.path = Path(path)
         self._logger = logger
+        self._lock = threading.RLock()
+        self._tasks_dir = self.path.parent / "tasks"
 
     def write(self, task: dict[str, Any]) -> None:
         """Persist a non-secret summary for the latest Anima task.
@@ -59,17 +66,42 @@ class TaskRecorder:
                 cookies, account tokens, and other secrets.
         """
         try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(
-                json.dumps(task, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
+            task_id = str(task.get("task_id") or "").strip()
+            if not task_id:
+                raise ValueError("task_id is required")
+            payload = json.dumps(task, ensure_ascii=False, indent=2)
+            with self._lock:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self._tasks_dir.mkdir(parents=True, exist_ok=True)
+                task_path = self._tasks_dir / f"{task_id}.json"
+                task_existed = task_path.exists()
+                task_temp = task_path.with_name(
+                    f".{task_path.name}.{uuid.uuid4().hex}.tmp"
+                )
+                task_temp.write_text(payload, encoding="utf-8")
+                os.replace(task_temp, task_path)
+
+                latest = self.read()
+                if not latest or latest.get("task_id") in {None, task_id}:
+                    latest_temp = self.path.with_name(
+                        f".{self.path.name}.{uuid.uuid4().hex}.tmp"
+                    )
+                    latest_temp.write_text(payload, encoding="utf-8")
+                    os.replace(latest_temp, self.path)
+                elif not task_existed and str(task.get("time") or "") >= str(
+                    latest.get("time") or ""
+                ):
+                    latest_temp = self.path.with_name(
+                        f".{self.path.name}.{uuid.uuid4().hex}.tmp"
+                    )
+                    latest_temp.write_text(payload, encoding="utf-8")
+                    os.replace(latest_temp, self.path)
         except Exception as exc:
             self._logger.warning(
                 "[comfyui_agent] failed to write last task summary: %s", exc
             )
 
-    def read(self) -> dict[str, Any]:
+    def read(self, task_id: str | None = None) -> dict[str, Any]:
         """Read the latest non-secret Anima task summary.
 
         Returns:
@@ -77,9 +109,10 @@ class TaskRecorder:
             or unreadable.
         """
         try:
-            if not self.path.exists():
+            path = self._tasks_dir / f"{task_id}.json" if task_id else self.path
+            if not path.exists():
                 return {}
-            data = json.loads(self.path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8"))
             return data if isinstance(data, dict) else {}
         except Exception as exc:
             self._logger.warning(
@@ -122,7 +155,8 @@ class TaskRecorder:
         """
         prompt_head = shorten(original_prompt, 1000)
         return {
-            "time": started_at.isoformat(timespec="seconds"),
+            "task_id": uuid.uuid4().hex,
+            "time": started_at.isoformat(timespec="microseconds"),
             "action": "generate",
             "platform_id": event.get_platform_id(),
             "session_id": event.get_session_id(),
@@ -222,7 +256,21 @@ class TaskRecorder:
             task: Mutable task record.
             prompt_summary: Non-secret prompt pipeline summary.
         """
+        prompt_summary = dict(prompt_summary)
+        prompt_summary["llm_ok"] = not bool(prompt_summary.get("llm_failed"))
+        if "stage_events" not in prompt_summary:
+            prompt_summary["stage_events"] = [
+                {
+                    "stage": "prompt_llm",
+                    "status": (
+                        "failed"
+                        if prompt_summary.get("llm_failed")
+                        else prompt_summary.get("skipped_reason") or "ok"
+                    ),
+                }
+            ]
         task["prompt_summary"] = prompt_summary
+        task["strategy_summary"] = build_strategy_summary(task, prompt_summary)
         if isinstance(task.get("prompt"), dict):
             task["prompt"]["summary"] = dict(prompt_summary)
 
@@ -304,21 +352,5 @@ class TaskRecorder:
             f"- 上次任务：{self.path if self.path.exists() else '暂无'}",
         ]
         if last_task:
-            prompt_summary = last_task.get("prompt_summary")
-            if not isinstance(prompt_summary, dict):
-                prompt_summary = {}
-            lines.extend(
-                [
-                    "",
-                    "上次任务摘要：",
-                    f"- 时间：{last_task.get('time') or '未知'}",
-                    f"- 动作：{last_task.get('action') or '未知'} / 成功：{last_task.get('ok')}",
-                    f"- 错误：{last_task.get('error') or '无'}",
-                    f"- 引用图：requested={last_task.get('reference_image_requested')} applied={last_task.get('reference_context_applied')}",
-                    f"- 角色：{prompt_summary.get('fixed_character_name') or '无'}",
-                    f"- 搜索/思考：{prompt_summary.get('web_search')} / {prompt_summary.get('deep_thinking')}",
-                    f"- 最终 prompt 长度：{prompt_summary.get('final_prompt_chars') or 0}",
-                    f"- 输出：{len(last_task.get('outputs') or [])} 张",
-                ]
-            )
+            lines.extend(["", *build_last_task_debug_lines(last_task)])
         return "\n".join(lines)

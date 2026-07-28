@@ -1,6 +1,8 @@
 import base64
+from collections.abc import Callable
+from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import astrbot.api.message_components as Comp
 from astrbot.api.event import AstrMessageEvent
@@ -10,7 +12,7 @@ try:
     from .image_manifest import ImageInputManifest
     from .image_storage import ImageInputStorage
     from .onebot_image_resolver import OneBotImageResolver
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from image_manifest import ImageInputManifest
     from image_storage import ImageInputStorage
     from onebot_image_resolver import OneBotImageResolver
@@ -52,7 +54,24 @@ class ImageInputResolver:
             save_media_ref_image=self._save_media_ref_image,
             save_image_component=self._save_image_component,
         )
-        self.last_summary: dict[str, Any] = {}
+        self._last_summary: ContextVar[dict[str, Any]] = ContextVar(
+            f"anima_image_input_summary_{id(self)}",
+            default={},
+        )
+
+    @property
+    def last_summary(self) -> dict[str, Any]:
+        """Return the image summary scoped to the current async request."""
+        return self._last_summary.get()
+
+    @last_summary.setter
+    def last_summary(self, value: dict[str, Any]) -> None:
+        """Store an image summary for the current async request.
+
+        Args:
+            value: Non-secret image resolution summary.
+        """
+        self._last_summary.set(dict(value))
 
     def _safe_name(self, value: str, fallback: str = "image") -> str:
         return self._manifest.safe_name(value, fallback)
@@ -68,8 +87,19 @@ class ImageInputResolver:
         *,
         details: dict[str, Any] | None = None,
     ) -> None:
-        self._manifest.write_input_record(event, target, original, details=details)
-        self.last_summary = dict(self._manifest.last_summary)
+        record = self._manifest.write_input_record(
+            event,
+            target,
+            original,
+            details=details,
+        )
+        self.last_summary = {
+            "path": str(target),
+            "source": str(details.get("source") if details else record["source"]),
+            "label": str(details.get("label") if details else ""),
+            "size": record["size"],
+            "original_name": record["original_name"],
+        }
 
     def _image_component_details(self, component: Comp.Image) -> dict[str, str]:
         return {
@@ -89,10 +119,14 @@ class ImageInputResolver:
         try:
             source = Path(await component.convert_to_file_path())
         except Exception as exc:
-            self._logger.warning("[comfyui_agent] failed to resolve %s image: %s", label, exc)
+            self._logger.warning(
+                "[comfyui_agent] failed to resolve %s image: %s", label, exc
+            )
             return None
         if not source.exists() or not source.is_file():
-            self._logger.warning("[comfyui_agent] resolved %s image does not exist: %s", label, source)
+            self._logger.warning(
+                "[comfyui_agent] resolved %s image does not exist: %s", label, source
+            )
             return None
         original = component.file or component.url or source.name or "image.png"
         target = self._storage.copy_file(
@@ -136,7 +170,11 @@ class ImageInputResolver:
             ).as_path() as resolved:
                 source = resolved.path
                 if not source.exists() or not source.is_file():
-                    self._logger.warning("[comfyui_agent] resolved %s media ref does not exist: %s", label, source)
+                    self._logger.warning(
+                        "[comfyui_agent] resolved %s media ref does not exist: %s",
+                        label,
+                        source,
+                    )
                     return None
 
                 original_name = original or image_ref or source.name or "image.png"
@@ -150,12 +188,16 @@ class ImageInputResolver:
                 )
 
                 record_details = dict(details or {})
-                record_details["source"] = str(record_details.get("source") or "media_ref")
+                record_details["source"] = str(
+                    record_details.get("source") or "media_ref"
+                )
                 record_details["label"] = label
                 record_details["resolved_ref"] = self._shorten(image_ref, 500)
                 record_details["resolved_source"] = self._shorten(str(source), 500)
                 record_details["resolved_mime_type"] = str(resolved.mime_type or "")
-                self._write_input_record(event, target, original_name, details=record_details)
+                self._write_input_record(
+                    event, target, original_name, details=record_details
+                )
                 self._logger.info(
                     "[comfyui_agent] saved %s image input from media ref: %s ref=%s source=%s",
                     label,
@@ -165,7 +207,12 @@ class ImageInputResolver:
                 )
                 return str(target)
         except Exception as exc:
-            self._logger.warning("[comfyui_agent] failed to resolve %s media ref %s: %s", label, self._shorten(image_ref, 160), exc)
+            self._logger.warning(
+                "[comfyui_agent] failed to resolve %s media ref %s: %s",
+                label,
+                self._shorten(image_ref, 160),
+                exc,
+            )
             return None
 
     def _save_base64_image(
@@ -191,7 +238,9 @@ class ImageInputResolver:
         try:
             image_bytes = base64.b64decode("".join(data.split()), validate=False)
         except Exception as exc:
-            self._logger.warning("[comfyui_agent] failed to decode %s base64 image: %s", label, exc)
+            self._logger.warning(
+                "[comfyui_agent] failed to decode %s base64 image: %s", label, exc
+            )
             return None
         if not image_bytes:
             return None
@@ -218,7 +267,9 @@ class ImageInputResolver:
         )
         return str(target)
 
-    def _raw_message_image_segments(self, event: AstrMessageEvent) -> list[dict[str, Any]]:
+    def _raw_message_image_segments(
+        self, event: AstrMessageEvent
+    ) -> list[dict[str, Any]]:
         raw = getattr(event.message_obj, "raw_message", None)
         segments = raw.get("message") if hasattr(raw, "get") else None
         if not isinstance(segments, list):
@@ -239,7 +290,9 @@ class ImageInputResolver:
         label: str,
         index: int,
     ) -> str | None:
-        return await self._onebot_images.save_raw_message_image(event, data, label, index)
+        return await self._onebot_images.save_raw_message_image(
+            event, data, label, index
+        )
 
     async def _save_onebot_reply_image(self, event: AstrMessageEvent) -> str | None:
         return await self._onebot_images.save_reply_image(event)

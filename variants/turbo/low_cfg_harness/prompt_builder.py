@@ -15,7 +15,7 @@ try:
         wants_sensual_mode,
     )
     from .tag_cleaner import clean_content_tags, join_prompt_parts
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from prompt_constraints import PromptConstraintPlan, apply_prompt_constraints
     from prompt_presets import (
         DEFAULT_CHARACTER_TAGS,

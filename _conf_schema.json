@@ -83,6 +83,20 @@
         "hint": "示例：300",
         "collapsed": true
       },
+      "storage_retention_days": {
+        "description": "输入、输出和任务记录保留天数",
+        "type": "int",
+        "default": 30,
+        "hint": "设为 0 可关闭按时间清理；默认 30 天。",
+        "collapsed": true
+      },
+      "manifest_max_records": {
+        "description": "输入图片清单最大记录数",
+        "type": "int",
+        "default": 5000,
+        "hint": "清理时只保留仍存在的最近记录。",
+        "collapsed": true
+      },
       "poll_interval": {
         "description": "生成状态查询间隔（秒）",
         "type": "int",
@@ -403,13 +417,13 @@
   "anima_master_tag_lookup": {
     "description": "联网校正角色 Tag",
     "type": "object",
-    "hint": "用于校正少量角色核心 tag；只在需要时访问 Donmai / Danbooru。",
+    "hint": "用于校正少量角色核心 tag；优先访问 Donmai，接口不可用时自动回退到 Safebooru 只读 DAPI。",
     "items": {
       "danbooru_core_tag_lookup_enabled": {
         "description": "联网校正角色 Tag",
         "type": "bool",
         "default": true,
-        "hint": "只处理少量疑似角色名；需要时访问 Donmai / Danbooru。"
+        "hint": "只处理少量疑似角色名；需要时访问 Donmai，并在其不可用时回退到 Safebooru。"
       },
       "danbooru_tag_base_urls": {
         "description": "Donmai 查询地址",

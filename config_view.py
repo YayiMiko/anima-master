@@ -14,7 +14,7 @@ try:
         fixed_character_tags,
         style_presets,
     )
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from prompt_presets import (
         active_artist_preset_name,
         active_artist_tags,

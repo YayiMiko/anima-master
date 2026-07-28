@@ -1,5 +1,10 @@
 import re
 
+try:
+    from .command_catalog import build_help_text
+except ImportError:  # pragma: no cover - direct script-style import.
+    from command_catalog import build_help_text
+
 _ROUTE_PREFIX_RE = re.compile(r"^\s*/?", re.IGNORECASE)
 _SPACES_RE = re.compile(r"\s+")
 _SIZE_VALUE_PATTERN = r"(?P<width>\d{2,5})\s*[xX×*＊✕✖хХ]\s*(?P<height>\d{2,5})"
@@ -37,27 +42,7 @@ def help_text(img2img_enabled: bool = False) -> str:
     Returns:
         The help text shown in chat.
     """
-    lines = [
-        "Anima 指令表：",
-        "- /anm 状态：查看 ComfyUI / Anima 状态",
-        "- /anm 诊断：检查服务器、网络和 ComfyUI 连接",
-        "- /anm 调试状态：查看插件关键配置和上次任务摘要",
-        "- /anm 生图 <描述>：按描述生成图片",
-        "  可在描述开头写“竖图/横图/方图/宽屏”，或写“1024x1536：描述”",
-        "  也可在末尾写“--尺寸 1216x832”指定本次尺寸",
-        "- /anm 无优化 <tags>：跳过 LLM 优化，直接按 tags 生图",
-        "- /anm 解析法术：读取图片内嵌的生成信息",
-        "- /anm 反推：根据图片内容反推 tags",
-        "- /anm 创建画师组 <名称>=<tags>：保存并启用画师组",
-        "- /anm 切换画师组 <名称>：切换当前画师组",
-        "- /anm 添加角色 <名称>=<tags>：新增或覆盖角色",
-    ]
-    if img2img_enabled:
-        lines.append("- /anm 改图 <要求>：引用图片后整图重绘/风格化")
-    lines.extend(
-        ["", "也可以把“anm”换成“comfyui / anima”。", "例：/anm 生图 白色礼服，立绘"]
-    )
-    return "\n".join(lines)
+    return build_help_text(img2img_enabled)
 
 
 def parse_generation_size(

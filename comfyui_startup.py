@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import os
-from pathlib import Path
 import subprocess
 import sys
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from pathlib import Path
+from typing import Any
 
 
 class ComfyUIStartupManager:
@@ -106,7 +107,10 @@ class ComfyUIStartupManager:
         try:
             if sys.platform == "win32" and visible_window:
                 command_path = Path(command.strip('"'))
-                if command_path.suffix.lower() in {".bat", ".cmd"} and command_path.exists():
+                if (
+                    command_path.suffix.lower() in {".bat", ".cmd"}
+                    and command_path.exists()
+                ):
                     cmd_args = [
                         "cmd.exe",
                         "/k",
@@ -136,7 +140,10 @@ class ComfyUIStartupManager:
                     creationflags=flags,
                 )
         except Exception as exc:
-            return {"ok": False, "error": f"startup_failed: {type(exc).__name__}: {exc}"}
+            return {
+                "ok": False,
+                "error": f"startup_failed: {type(exc).__name__}: {exc}",
+            }
         self.logger.info(
             "[comfyui_agent] auto_start launched command=%s workdir=%s visible_window=%s",
             command,

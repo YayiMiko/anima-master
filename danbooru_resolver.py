@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 try:
     from .danbooru_tags import (
@@ -12,7 +13,7 @@ try:
         required_core_tags_for_prompt,
         resolve_core_tags,
     )
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_tags import (
         DEFAULT_DONMAI_BASE_URLS,
         DEFAULT_USER_AGENT,
@@ -92,23 +93,40 @@ class DanbooruResolver:
         """
         if not llm_content or not self._bool("danbooru_core_tag_lookup_enabled", True):
             return llm_content
-        timeout = max(1.0, min(self._float("danbooru_tag_lookup_timeout", 6.0), 20.0))
+        timeout = max(
+            1.0,
+            min(self._float("danbooru_tag_lookup_timeout", 6.0), 20.0),
+        )
         max_candidates = max(1, min(self._int("danbooru_tag_max_candidates", 6), 16))
-        user_agent = self._str("danbooru_tag_user_agent", DEFAULT_USER_AGENT).strip() or DEFAULT_USER_AGENT
+        user_agent = (
+            self._str("danbooru_tag_user_agent", DEFAULT_USER_AGENT).strip()
+            or DEFAULT_USER_AGENT
+        )
         try:
-            result = await asyncio.to_thread(
-                resolve_core_tags,
-                llm_content,
-                user_prompt=user_prompt,
-                allow_insert=not fixed_character,
-                max_candidates=max_candidates,
+            result = await asyncio.wait_for(
+                asyncio.to_thread(
+                    resolve_core_tags,
+                    llm_content,
+                    user_prompt=user_prompt,
+                    allow_insert=not fixed_character,
+                    max_candidates=max_candidates,
+                    timeout=min(2.0, timeout),
+                    donmai_base_urls=self._base_urls(),
+                    user_agent=user_agent,
+                    cache=self._cache,
+                ),
                 timeout=timeout,
-                donmai_base_urls=self._base_urls(),
-                user_agent=user_agent,
-                cache=self._cache,
             )
+        except TimeoutError:
+            self.logger.warning(
+                "[comfyui_agent] danbooru core tag lookup exceeded total %.1fs budget",
+                timeout,
+            )
+            return llm_content
         except Exception as exc:
-            self.logger.warning("[comfyui_agent] danbooru core tag lookup failed: %s", exc)
+            self.logger.warning(
+                "[comfyui_agent] danbooru core tag lookup failed: %s", exc
+            )
             return llm_content
         for old, new, count, source in result.replacements:
             self.logger.info(
@@ -122,6 +140,13 @@ class DanbooruResolver:
             self.logger.info(
                 "[comfyui_agent] danbooru core tag inserted: %s post_count=%s source=%s",
                 new,
+                count,
+                source,
+            )
+        for name, count, source in result.verified:
+            self.logger.info(
+                "[comfyui_agent] danbooru character tag verified: %s post_count=%s source=%s",
+                name,
                 count,
                 source,
             )

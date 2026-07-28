@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
-from pathlib import Path
 import time
 import uuid
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from comfyui_http import ComfyUIHttpClient
@@ -47,7 +47,9 @@ class ComfyUIHistoryRunner:
     def save_history_images(self, history: dict[str, Any]) -> tuple[list[Path], int]:
         """Download all image outputs from a history payload."""
         images = output_images(history)
-        outputs = [self.download_image(image, idx) for idx, image in enumerate(images, start=1)]
+        outputs = [
+            self.download_image(image, idx) for idx, image in enumerate(images, start=1)
+        ]
         return outputs, len(images)
 
     def download_image(self, image: dict[str, Any], index: int) -> Path:
@@ -61,7 +63,7 @@ class ComfyUIHistoryRunner:
 
 
 def _now() -> str:
-    return datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}-{uuid.uuid4().hex[:8]}"
 
 
 def output_images(history: dict[str, Any]) -> list[dict[str, Any]]:
@@ -81,6 +83,9 @@ def output_images(history: dict[str, Any]) -> list[dict[str, Any]]:
 def history_failed(history: dict[str, Any]) -> dict[str, Any] | None:
     """Return the failed status payload if ComfyUI marked the run failed."""
     status_payload = history.get("status") or {}
-    if isinstance(status_payload, dict) and status_payload.get("status_str") not in {None, "success"}:
+    if isinstance(status_payload, dict) and status_payload.get("status_str") not in {
+        None,
+        "success",
+    }:
         return status_payload
     return None

@@ -67,8 +67,24 @@ def build_llm_prompt(
     mode: str = "txt2img",
     prompt_builder_template: str = "",
     outfit_transfer_rule: str = "",
+    creative_expansion: bool = False,
 ) -> str:
-    """Build the prompt sent to the chat LLM for Danbooru tag generation."""
+    """Build the prompt sent to the chat LLM for Danbooru tag generation.
+
+    Args:
+        theme: User-requested image theme.
+        search_context: Optional web research context.
+        fixed_character: Whether fixed character tags will be composed later.
+        character_name: Selected fixed character name.
+        sensual_mode: Whether the request enables sensual presentation.
+        mode: Generation mode such as `txt2img` or `img2img`.
+        prompt_builder_template: Optional custom prompt template.
+        outfit_transfer_rule: Optional outfit-transfer instructions.
+        creative_expansion: Whether to let the LLM freely enrich the theme.
+
+    Returns:
+        Complete instruction text for the prompt-building LLM.
+    """
     theme = str(theme or "").strip()
     search_context = str(search_context or "").strip()
     if character_name:
@@ -78,7 +94,9 @@ def build_llm_prompt(
         )
     else:
         character_rule = (
-            "用户没有使用固定角色。请为用户指定或描述的主体列出必要的可识别外观特征、年龄感、发色、瞳色、配饰和标志性元素。"
+            "用户没有使用固定角色。若用户明确点名现有作品角色，输出的第一项必须是你认为最可信的标准 Danbooru 角色 tag，"
+            "使用罗马字和下划线，必要时带作品消歧括号；不要省略角色 tag、只写外观，也不要把角色姓名翻译成普通描述，"
+            "程序会联网查询 character 分类并校正候选。随后再列出主体必要的可识别外观特征、年龄感、发色、瞳色、配饰和标志性元素。"
             if not fixed_character
             else "最终 prompt 前缀中会拼接固定角色词，因此具体内容段不要重复列出该角色的固有设定。"
         )
@@ -128,6 +146,24 @@ def build_llm_prompt(
 这是非 R18 的擦边表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、暧昧姿势等视觉方向。
 不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。
 """
+    creative_expansion_rule = ""
+    if creative_expansion:
+        creative_expansion_rule = """
+-----------
+本次启用“自由发挥”模式。请在不改变用户明确指定的角色身份、主体、数量、关键服装、动作、表情和道具的前提下，自主把简短主题发展成完整、统一且具有明确视觉主题的角色画面。
+你可以自由设计相容的服装结构、剪裁层次、材质纹样、配饰、姿态、手势、前景互动、构图、色彩关系、功能不同的光影和少量特效，也可以把抽象主题转化为清晰可见的叙事符号。标准模式中“不要添加用户未提及元素”的保守限制，在本模式下仅对冲突元素生效，不妨碍你补充服务于主题的新细节。
+重点塑造美丽、精致、有辨识度的角色，避免只用同义词增加数量。通常输出 50-65 个互不重复、可见且相容的内容 tags；背景仍只使用约 2-6 个有区分度的 tags，保持简洁、有设计感，不扩写成复杂场景。
+仍然不要输出质量词、画师词、多人元素、相互冲突的动作或角色固有设定重复项。
+"""
+    scene_scope_rule = ""
+    if not creative_expansion:
+        scene_scope_rule = """
+-----------
+场景类 Tag 门控（本段覆盖上文关于自动补充环境、背景、构图、镜头、光影、特效、氛围及常规数量的建议）：
+先在内部判断用户是否明确提到了以下任意一类内容：前景互动；构图或镜头；环境或背景；光影；特效或氛围。
+如果五类均未提及，只生成主体与关键关系、角色身份、服装结构、材质纹样、配饰、动作手势、神态和视线相关 tags。不得自行生成 foreground、background、environment、scenery、camera、shot、view、angle、depth of field、lighting、shadow、glow、particles、effects、atmosphere 等场景类内容，也不要用 simple background、white background、soft lighting、depth of field、floating particles 等惯用词填充篇幅。此时不设最低 Tag 数量，不得为达到常规数量目标堆叠同义词。
+只要用户明确提到上述任意一类，场景类门控即整体打开；你可以根据主题需要生成这五类中的任意或全部类型，但并非必须凑齐，背景仍应保持简洁。
+"""
     configured_template = str(prompt_builder_template or "").strip()
     template = (
         DEFAULT_LLM_PROMPT_TEMPLATE
@@ -143,11 +179,21 @@ def build_llm_prompt(
         "img2img_rule": img2img_rule,
         "style_block": "",
         "sensual_rule": sensual_rule,
+        "creative_expansion_rule": creative_expansion_rule,
     }
     try:
-        return template.format(**values)
+        prompt = template.format(**values)
     except Exception:
-        return DEFAULT_LLM_PROMPT_TEMPLATE.format(**values)
+        prompt = DEFAULT_LLM_PROMPT_TEMPLATE.format(**values)
+    if (
+        creative_expansion_rule
+        and "{creative_expansion_rule}" not in template
+        and creative_expansion_rule.strip() not in prompt
+    ):
+        prompt = prompt.rstrip() + "\n" + creative_expansion_rule
+    if scene_scope_rule and scene_scope_rule.strip() not in prompt:
+        prompt = prompt.rstrip() + "\n" + scene_scope_rule
+    return prompt
 
 
 def is_legacy_builtin_template(template: str) -> bool:

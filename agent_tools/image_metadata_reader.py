@@ -26,10 +26,21 @@ def image_metadata(path: Path) -> dict[str, str]:
 def image_summary(path: Path, workspace: Path) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "input": str(path),
-        "relative_path": str(path.relative_to(workspace)) if path.is_relative_to(workspace) else None,
+        "relative_path": str(path.relative_to(workspace))
+        if path.is_relative_to(workspace)
+        else None,
         "size": path.stat().st_size,
-        "modified": datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec="seconds"),
+        "modified": datetime.fromtimestamp(path.stat().st_mtime).isoformat(
+            timespec="seconds"
+        ),
     }
     with Image.open(path) as image:
-        payload.update({"width": image.width, "height": image.height, "format": image.format, "mode": image.mode})
+        payload.update(
+            {
+                "width": image.width,
+                "height": image.height,
+                "format": image.format,
+                "mode": image.mode,
+            }
+        )
     return payload

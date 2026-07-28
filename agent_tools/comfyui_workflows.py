@@ -291,12 +291,24 @@ def _apply_custom_workflow_inputs(
     *,
     override_size: bool = False,
 ) -> None:
-    text_nodes = _text_encode_nodes(workflow_body)
-    positive_ids = _auto_positive_node_ids(text_nodes)
-    negative_ids = _auto_negative_node_ids(text_nodes, positive_ids)
+    text_nodes = set(_text_encode_nodes(workflow_body))
+    positive_ids = _conditioning_text_node_ids(
+        workflow_body,
+        "positive",
+        text_nodes,
+    )
+    negative_ids = _conditioning_text_node_ids(
+        workflow_body,
+        "negative",
+        text_nodes,
+    )
 
     if not positive_ids:
         raise SystemExit("custom_workflow_positive_node_not_found")
+    if not negative_ids:
+        raise SystemExit("custom_workflow_negative_node_not_found")
+    if set(positive_ids) & set(negative_ids):
+        raise SystemExit("custom_workflow_prompt_nodes_ambiguous")
 
     for node_id in positive_ids:
         _set_node_input(workflow_body, node_id, "text", prompt)
@@ -353,18 +365,55 @@ def _text_encode_nodes(workflow_body: dict[str, Any]) -> list[str]:
     return node_ids
 
 
-def _auto_positive_node_ids(text_nodes: list[str]) -> list[str]:
-    return text_nodes[:1]
-
-
-def _auto_negative_node_ids(
-    workflow_body_text_nodes: list[str], positive_ids: list[str]
+def _conditioning_text_node_ids(
+    workflow_body: dict[str, Any],
+    input_name: str,
+    text_nodes: set[str],
 ) -> list[str]:
-    return [
-        node_id
-        for node_id in workflow_body_text_nodes
-        if node_id not in set(positive_ids)
-    ][:1]
+    """Find text encoders feeding a sampler conditioning input.
+
+    Args:
+        workflow_body: ComfyUI API workflow graph.
+        input_name: Sampler input name, either positive or negative.
+        text_nodes: Known text encoder node identifiers.
+
+    Returns:
+        Text encoder identifiers reachable from the conditioning input.
+    """
+    pending: list[str] = []
+    for node in workflow_body.values():
+        if not isinstance(node, dict):
+            continue
+        if str(node.get("class_type") or "") not in {
+            "KSampler",
+            "KSamplerAdvanced",
+        }:
+            continue
+        inputs = node.get("inputs")
+        link = inputs.get(input_name) if isinstance(inputs, dict) else None
+        if isinstance(link, list) and link:
+            pending.append(str(link[0]))
+
+    found: list[str] = []
+    visited: set[str] = set()
+    while pending:
+        node_id = pending.pop()
+        if node_id in visited:
+            continue
+        visited.add(node_id)
+        if node_id in text_nodes:
+            found.append(node_id)
+            continue
+        node = workflow_body.get(node_id)
+        inputs = node.get("inputs") if isinstance(node, dict) else None
+        if not isinstance(inputs, dict):
+            continue
+        for value in inputs.values():
+            if isinstance(value, list) and value:
+                source_id = str(value[0])
+                if source_id in workflow_body:
+                    pending.append(source_id)
+    return found
 
 
 def _set_node_input(

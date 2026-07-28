@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+import time
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from typing import Any
 
 try:
     import requests
-except Exception:  # pragma: no cover - requests is expected in AstrBot env.
+except ImportError:  # pragma: no cover - requests is expected in AstrBot env.
     requests = None
 
 
@@ -16,6 +18,7 @@ DEFAULT_DONMAI_BASE_URLS = (
     "https://safebooru.donmai.us",
     "https://danbooru.donmai.us",
 )
+DEFAULT_SAFEBOORU_DAPI_URL = "https://safebooru.org/index.php"
 DEFAULT_USER_AGENT = "AstrBotComfyUIAgent/0.13"
 
 KNOWN_CORE_ALIASES: dict[str, tuple[str, ...]] = {
@@ -112,6 +115,7 @@ class CoreTagResolution:
     text: str
     replacements: tuple[tuple[str, str, int, str], ...]
     inserted: tuple[tuple[str, int, str], ...]
+    verified: tuple[tuple[str, int, str], ...] = ()
 
 
 def required_core_tags_for_prompt(user_prompt: str) -> tuple[str, ...]:
@@ -131,7 +135,12 @@ def _split_tags(text: str) -> list[str]:
     cleaned = str(text or "")
     cleaned = cleaned.replace("，", ",").replace("、", ",").replace(";", ",")
     cleaned = cleaned.replace("\n", ",")
-    cleaned = re.sub(r"^(?:positive|prompt|tags|提示词|正向提示词)\s*[:：]", "", cleaned.strip(), flags=re.I)
+    cleaned = re.sub(
+        r"^(?:positive|prompt|tags|提示词|正向提示词)\s*[:：]",
+        "",
+        cleaned.strip(),
+        flags=re.I,
+    )
     parts = [part.strip(" \t\r\n,.;:：") for part in cleaned.split(",")]
     return [part for part in parts if part]
 
@@ -140,7 +149,12 @@ def _normalize_query(tag: str) -> str:
     value = str(tag or "").strip().lower()
     value = re.sub(r":\s*[\d.]+$", "", value)
     value = value.strip(" []{}")
-    if value.startswith("(") and value.endswith(")") and value.count("(") == 1 and value.count(")") == 1:
+    if (
+        value.startswith("(")
+        and value.endswith(")")
+        and value.count("(") == 1
+        and value.count(")") == 1
+    ):
         value = value[1:-1].strip()
     value = re.sub(r"\s+", "_", value)
     return value
@@ -182,12 +196,17 @@ def _looks_like_core_tag(tag: str) -> bool:
         return False
     if parts[-1] in GENERAL_TAG_WORDS:
         return False
-    if any(part in {"hair", "eyes", "dress", "skirt", "background", "smile"} for part in parts):
+    if any(
+        part in {"hair", "eyes", "dress", "skirt", "background", "smile"}
+        for part in parts
+    ):
         return False
     return True
 
 
-def _http_get_json(url: str, *, params: dict[str, Any], timeout: float, user_agent: str) -> Any:
+def _http_get_json(
+    url: str, *, params: dict[str, Any], timeout: float, user_agent: str
+) -> Any:
     if requests is None:
         return None
     response = requests.get(
@@ -207,7 +226,9 @@ def _http_get_json(url: str, *, params: dict[str, Any], timeout: float, user_age
     return response.json()
 
 
-def _fetch_donmai_tag(base_url: str, query: str, *, timeout: float, user_agent: str) -> list[TagRecord]:
+def _fetch_donmai_tag(
+    base_url: str, query: str, *, timeout: float, user_agent: str
+) -> list[TagRecord]:
     data = _http_get_json(
         base_url.rstrip("/") + "/tags.json",
         params={"search[name_matches]": query, "limit": 10},
@@ -270,26 +291,100 @@ def _fetch_donmai_autocomplete(
     return records
 
 
+def _fetch_safebooru_dapi_tag(
+    query: str,
+    *,
+    timeout: float,
+    user_agent: str,
+) -> list[TagRecord]:
+    """Fetch an exact tag from the Safebooru-compatible read-only DAPI.
+
+    Args:
+        query: Normalized tag name to query.
+        timeout: HTTP request timeout in seconds.
+        user_agent: User-Agent header value.
+
+    Returns:
+        Parsed tag records, or an empty list when the request is unavailable.
+    """
+    if requests is None:
+        return []
+    try:
+        response = requests.get(
+            DEFAULT_SAFEBOORU_DAPI_URL,
+            params={
+                "page": "dapi",
+                "s": "tag",
+                "q": "index",
+                "name": query,
+            },
+            timeout=timeout,
+            headers={
+                "User-Agent": user_agent,
+                "Accept": "application/xml,text/xml,*/*",
+            },
+        )
+        if response.status_code != 200:
+            return []
+        root = ET.fromstring(response.text)
+    except Exception:
+        return []
+
+    records: list[TagRecord] = []
+    for item in root.findall("tag"):
+        name = str(item.attrib.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            category = int(item.attrib.get("type") or 0)
+            post_count = int(item.attrib.get("count") or 0)
+        except (TypeError, ValueError):
+            continue
+        records.append(
+            TagRecord(
+                name=name,
+                category=category,
+                post_count=post_count,
+                source="https://safebooru.org/dapi",
+            )
+        )
+    return records
+
+
 def _fetch_tag_records(
     query: str,
     *,
     donmai_base_urls: tuple[str, ...],
     timeout: float,
     user_agent: str,
-    cache: dict[str, list[TagRecord]],
+    cache: dict[str, Any],
 ) -> list[TagRecord]:
     query = _normalize_query(query)
     if not query:
         return []
-    if query in cache:
-        return cache[query]
+    cached = cache.get(query)
+    if isinstance(cached, tuple) and len(cached) == 2:
+        cached_at, cached_records = cached
+        ttl = 3600.0 if cached_records else 60.0
+        if time.monotonic() - float(cached_at) < ttl:
+            return list(cached_records)
+    elif isinstance(cached, list):
+        return cached
 
     records: list[TagRecord] = []
     for base_url in donmai_base_urls:
-        records = _fetch_donmai_tag(base_url, query, timeout=timeout, user_agent=user_agent)
+        records = _fetch_donmai_tag(
+            base_url, query, timeout=timeout, user_agent=user_agent
+        )
         if records:
             break
-    cache[query] = records
+    if not records:
+        records = _fetch_safebooru_dapi_tag(
+            query,
+            timeout=timeout,
+            user_agent=user_agent,
+        )
+    cache[query] = (time.monotonic(), records)
     return records
 
 
@@ -299,14 +394,20 @@ def _fetch_autocomplete_records(
     donmai_base_urls: tuple[str, ...],
     timeout: float,
     user_agent: str,
-    cache: dict[str, list[TagRecord]],
+    cache: dict[str, Any],
 ) -> list[TagRecord]:
     query = _normalize_query(query)
     if not query:
         return []
     cache_key = f"autocomplete:{query}"
-    if cache_key in cache:
-        return cache[cache_key]
+    cached = cache.get(cache_key)
+    if isinstance(cached, tuple) and len(cached) == 2:
+        cached_at, cached_records = cached
+        ttl = 3600.0 if cached_records else 60.0
+        if time.monotonic() - float(cached_at) < ttl:
+            return list(cached_records)
+    elif isinstance(cached, list):
+        return cached
 
     records: list[TagRecord] = []
     for base_url in donmai_base_urls:
@@ -318,7 +419,7 @@ def _fetch_autocomplete_records(
         )
         if records:
             break
-    cache[cache_key] = records
+    cache[cache_key] = (time.monotonic(), records)
     return records
 
 
@@ -328,7 +429,7 @@ def _best_character(
     donmai_base_urls: tuple[str, ...],
     timeout: float,
     user_agent: str,
-    cache: dict[str, list[TagRecord]],
+    cache: dict[str, Any],
     use_autocomplete: bool = False,
 ) -> TagRecord | None:
     records: list[TagRecord] = []
@@ -377,6 +478,34 @@ def _known_canonical_record(queries: list[str]) -> TagRecord | None:
     return None
 
 
+def _user_character_queries(user_prompt: str) -> list[str]:
+    """Extract likely explicitly named characters from the raw user request.
+
+    Args:
+        user_prompt: Original natural-language request.
+
+    Returns:
+        A small ordered list of names suitable for autocomplete lookup.
+    """
+    text = str(user_prompt or "")
+    queries: list[str] = []
+    for match in re.finditer(
+        r"(?:画|生成|绘制|来一张|生图)?\s*"
+        r"([\u4e00-\u9fffぁ-んァ-ヶ]{2,12}?)"
+        r"(?=穿|戴|拿|手持|站|坐|躺|跑|看|和|与|，|,|\s|$)",
+        text,
+    ):
+        name = match.group(1).strip()
+        name = re.sub(r"^(?:一个|一位|角色|人物|少女|女孩)", "", name)
+        if name.startswith(("穿", "戴", "拿", "手持", "站", "坐", "躺", "跑", "看")):
+            continue
+        if 2 <= len(name) <= 12 and name not in queries:
+            queries.append(name)
+        if len(queries) >= 2:
+            break
+    return queries
+
+
 def resolve_core_tags(
     text: str,
     *,
@@ -386,12 +515,13 @@ def resolve_core_tags(
     timeout: float = 6.0,
     donmai_base_urls: tuple[str, ...] = DEFAULT_DONMAI_BASE_URLS,
     user_agent: str = DEFAULT_USER_AGENT,
-    cache: dict[str, list[TagRecord]] | None = None,
+    cache: dict[str, Any] | None = None,
 ) -> CoreTagResolution:
     tag_cache = cache if cache is not None else {}
     tags = _split_tags(text)
     replacements: list[tuple[str, str, int, str]] = []
     inserted: list[tuple[str, int, str]] = []
+    verified: list[tuple[str, int, str]] = []
 
     candidate_indexes: list[int] = []
     for index, tag in enumerate(tags[: max(max_candidates * 3, 12)]):
@@ -412,9 +542,13 @@ def resolve_core_tags(
             use_autocomplete=False,
         )
         original_key = _normalize_query(original)
-        if best and (best.name != original_key or best.name != original.strip()):
+        if not best:
+            continue
+        verified.append((best.name, best.post_count, best.source))
+        if best.name != original_key or best.name != original.strip():
             tags[index] = best.name
             replacements.append((original, best.name, best.post_count, best.source))
+        break
 
     if allow_insert:
         existing = {_normalize_query(tag) for tag in tags}
@@ -435,7 +569,10 @@ def resolve_core_tags(
             alias_keys = {_normalize_query(query) for query in alias_queries}
             replaced = False
             for index, tag in enumerate(tags):
-                if _normalize_query(tag) not in alias_keys or _normalize_query(tag) == best.name:
+                if (
+                    _normalize_query(tag) not in alias_keys
+                    or _normalize_query(tag) == best.name
+                ):
                     continue
                 old = tags[index]
                 tags[index] = best.name
@@ -449,8 +586,34 @@ def resolve_core_tags(
                 existing.add(best.name)
                 inserted.append((best.name, best.post_count, best.source))
 
+        if not inserted:
+            for raw_name in _user_character_queries(user_prompt):
+                best = _best_character(
+                    [raw_name],
+                    donmai_base_urls=donmai_base_urls,
+                    timeout=timeout,
+                    user_agent=user_agent,
+                    cache=tag_cache,
+                    use_autocomplete=True,
+                )
+                if not best or best.name in existing:
+                    continue
+                if candidate_indexes:
+                    index = candidate_indexes[0]
+                    old = tags[index]
+                    tags[index] = best.name
+                    existing.discard(_normalize_query(old))
+                    existing.add(best.name)
+                    replacements.append((old, best.name, best.post_count, best.source))
+                else:
+                    tags.insert(0, best.name)
+                    existing.add(best.name)
+                    inserted.append((best.name, best.post_count, best.source))
+                break
+
     return CoreTagResolution(
         text=", ".join(tags),
         replacements=tuple(replacements),
         inserted=tuple(inserted),
+        verified=tuple(verified),
     )

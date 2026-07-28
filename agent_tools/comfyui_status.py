@@ -6,7 +6,6 @@ from typing import Any
 from urllib.parse import urlparse
 
 import requests
-
 from comfyui_http import ComfyUIHttpClient
 
 
@@ -27,12 +26,21 @@ def _connection_issue(error: Exception, mode: str) -> tuple[str, str]:
                 "remote_connect_timeout",
                 "服务器连不到 ComfyUI。若本机 127.0.0.1 可打开，请用 --listen 0.0.0.0 重启 ComfyUI，并确认 Windows 防火墙和 Tailscale 在线。",
             )
-        return "local_connect_timeout", "ComfyUI 连接超时。请确认 ComfyUI 已启动并监听 8188。"
+        return (
+            "local_connect_timeout",
+            "ComfyUI 连接超时。请确认 ComfyUI 已启动并监听 8188。",
+        )
     if isinstance(error, requests.exceptions.ReadTimeout):
-        return "api_read_timeout", "ComfyUI API 响应过慢。可能正在启动、卡住或负载过高。"
+        return (
+            "api_read_timeout",
+            "ComfyUI API 响应过慢。可能正在启动、卡住或负载过高。",
+        )
     if isinstance(error, requests.exceptions.ConnectionError):
         if "Connection refused" in text or "actively refused" in text:
-            return "connection_refused", "目标地址可达但端口拒绝连接。请确认 ComfyUI 已启动并监听配置的端口。"
+            return (
+                "connection_refused",
+                "目标地址可达但端口拒绝连接。请确认 ComfyUI 已启动并监听配置的端口。",
+            )
         if mode == "remote":
             return (
                 "remote_connection_failed",
@@ -40,11 +48,16 @@ def _connection_issue(error: Exception, mode: str) -> tuple[str, str]:
             )
         return "connection_failed", "无法连接 ComfyUI。请确认地址、端口和进程状态。"
     if isinstance(error, requests.exceptions.HTTPError):
-        return "http_error", "ComfyUI 返回 HTTP 错误。请确认地址指向 ComfyUI API，而不是启动器页面。"
+        return (
+            "http_error",
+            "ComfyUI 返回 HTTP 错误。请确认地址指向 ComfyUI API，而不是启动器页面。",
+        )
     return "unknown_connection_error", "ComfyUI 连接检查失败。请查看日志中的具体错误。"
 
 
-def build_status_payload(config: dict[str, Any], allowed_sizes: list[str]) -> dict[str, Any]:
+def build_status_payload(
+    config: dict[str, Any], allowed_sizes: list[str]
+) -> dict[str, Any]:
     """Return the JSON payload for the ComfyUI helper status command."""
     base_url = str(config.get("comfyui_base_url") or "").strip()
     parsed_base_url = urlparse(base_url)
@@ -82,10 +95,16 @@ def build_status_payload(config: dict[str, Any], allowed_sizes: list[str]) -> di
                 "gpu": device.get("name"),
                 "vram_total_mb": int(device.get("vram_total", 0) / 1024 / 1024),
                 "vram_free_mb": int(device.get("vram_free", 0) / 1024 / 1024),
-                "unet_available": config.get("unet_name") in _available_models(object_info, "UNETLoader", "unet_name"),
-                "clip_available": config.get("clip_name") in _available_models(object_info, "CLIPLoader", "clip_name"),
-                "vae_available": config.get("vae_name") in _available_models(object_info, "VAELoader", "vae_name"),
-                "img2img_available": all(name in object_info for name in ["LoadImage", "VAEEncode", "ImageScale"]),
+                "unet_available": config.get("unet_name")
+                in _available_models(object_info, "UNETLoader", "unet_name"),
+                "clip_available": config.get("clip_name")
+                in _available_models(object_info, "CLIPLoader", "clip_name"),
+                "vae_available": config.get("vae_name")
+                in _available_models(object_info, "VAELoader", "vae_name"),
+                "img2img_available": all(
+                    name in object_info
+                    for name in ["LoadImage", "VAEEncode", "ImageScale"]
+                ),
                 "upscale_available": "ImageScaleBy" in object_info,
                 "remove_bg_available": "BiRefNetRMBG" in object_info,
                 "comfyui_api_reachable": True,
@@ -105,7 +124,9 @@ def build_status_payload(config: dict[str, Any], allowed_sizes: list[str]) -> di
     return payload
 
 
-def _available_models(object_info: dict[str, Any], node: str, input_name: str) -> list[str]:
+def _available_models(
+    object_info: dict[str, Any], node: str, input_name: str
+) -> list[str]:
     try:
         value = object_info[node]["input"]["required"][input_name]
         if isinstance(value, list) and value and isinstance(value[0], list):

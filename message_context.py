@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import astrbot.api.message_components as Comp
-
 
 REFERENCE_PROMPT_MARKERS = (
     "参考引用图",
@@ -111,7 +111,9 @@ class MessageContextBuilder:
         text = str(prompt or "")
         if "引用" not in text:
             return False
-        return any(marker in text for marker in ("提示词", "法术", "tags", "tag", "咒语"))
+        return any(
+            marker in text for marker in ("提示词", "法术", "tags", "tag", "咒语")
+        )
 
     def wants_reference_image(self, prompt: str) -> bool:
         """Check whether the prompt asks to use an attached or quoted image.
@@ -154,12 +156,19 @@ class MessageContextBuilder:
                 "如果用户指定了固定角色，只保留固定角色自身设定，不要复制引用法术里的角色身份、发色、眼色、年龄、种族等固有设定。"
             )
             augmented = "\n".join(lines)
-            self._logger.info("[comfyui_agent] prompt augmented with quoted spell chars=%s", len(augmented))
+            self._logger.info(
+                "[comfyui_agent] prompt augmented with quoted spell chars=%s",
+                len(augmented),
+            )
             return augmented
-        self._logger.info("[comfyui_agent] quoted prompt requested but no spell result found in reply")
+        self._logger.info(
+            "[comfyui_agent] quoted prompt requested but no spell result found in reply"
+        )
         return prompt
 
-    async def augment_prompt_with_reference_image(self, event: Any, prompt: str) -> str | None:
+    async def augment_prompt_with_reference_image(
+        self, event: Any, prompt: str
+    ) -> str | None:
         """Augment a prompt with reference image context when requested.
 
         Args:
@@ -173,11 +182,18 @@ class MessageContextBuilder:
             return prompt
         image_input = await self._event_image_input(event)
         if self._bool("debug_image_reference_enabled", False):
-            self._logger.info("[comfyui_agent] reference image requested input=%s", image_input or "none")
+            self._logger.info(
+                "[comfyui_agent] reference image requested input=%s",
+                image_input or "none",
+            )
         if not image_input:
-            self._logger.info("[comfyui_agent] reference image requested but no image component found")
+            self._logger.info(
+                "[comfyui_agent] reference image requested but no image component found"
+            )
             return None
-        reference = await self._reference_context.reference_prompt_context(event, image_input)
+        reference = await self._reference_context.reference_prompt_context(
+            event, image_input
+        )
         if self._bool("debug_image_reference_enabled", False):
             self._logger.info(
                 "[comfyui_agent] reference image context chars=%s content=%s",
@@ -186,7 +202,10 @@ class MessageContextBuilder:
             )
         if not reference:
             return prompt
-        self._logger.info("[comfyui_agent] prompt augmented with image reference chars=%s", len(reference))
+        self._logger.info(
+            "[comfyui_agent] prompt augmented with image reference chars=%s",
+            len(reference),
+        )
         return f"用户要求：{prompt}\n{reference}"
 
     def format_spell_payload(self, payload: dict[str, Any]) -> str:
@@ -202,7 +221,11 @@ class MessageContextBuilder:
             return f"法术解析失败：{payload.get('error') or 'unknown_error'}"
         positive = str(payload.get("positive_prompt") or "").strip()
         negative = str(payload.get("negative_prompt") or "").strip()
-        params = payload.get("parameters") if isinstance(payload.get("parameters"), dict) else {}
+        params = (
+            payload.get("parameters")
+            if isinstance(payload.get("parameters"), dict)
+            else {}
+        )
         lines = [
             "法术解析结果：",
             f"- 格式：{payload.get('metadata_format') or '未识别到生成信息'}",
@@ -210,7 +233,19 @@ class MessageContextBuilder:
         ]
         if params:
             compact_params = []
-            for key in ("steps", "Steps", "cfg", "CFG scale", "sampler_name", "Sampler", "scheduler", "seed", "Seed", "size", "Size"):
+            for key in (
+                "steps",
+                "Steps",
+                "cfg",
+                "CFG scale",
+                "sampler_name",
+                "Sampler",
+                "scheduler",
+                "seed",
+                "Seed",
+                "size",
+                "Size",
+            ):
                 if key in params:
                     compact_params.append(f"{key}={params[key]}")
             if compact_params:
@@ -219,8 +254,12 @@ class MessageContextBuilder:
         lines.append("正面提示词：")
         if positive:
             lines.append(self._shorten(positive, 2200))
-        elif str(payload.get("format") or "").upper() == "JPEG" and payload.get("metadata_keys") == ["jfif", "jfif_density", "jfif_unit", "jfif_version"]:
-            lines.append("未读取到正面提示词。这张图是 QQ/NapCat 取回的 JPEG 副本，生成信息大概率已经被平台转码时去掉。")
+        elif str(payload.get("format") or "").upper() == "JPEG" and payload.get(
+            "metadata_keys"
+        ) == ["jfif", "jfif_density", "jfif_unit", "jfif_version"]:
+            lines.append(
+                "未读取到正面提示词。这张图是 QQ/NapCat 取回的 JPEG 副本，生成信息大概率已经被平台转码时去掉。"
+            )
         else:
             lines.append("未读取到正面提示词")
         if negative:

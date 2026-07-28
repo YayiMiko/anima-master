@@ -27,6 +27,7 @@ class GenerationTaskRunner:
         get_float: Callable[[str, float], float],
         get_str: Callable[[str, str], str],
         shorten: Callable[[str, int], str],
+        maintenance: Callable[[], Any] | None = None,
     ):
         """Store dependencies required to run one generation.
 
@@ -47,6 +48,7 @@ class GenerationTaskRunner:
             get_float: Config float accessor.
             get_str: Config string accessor.
             shorten: Text-shortening helper.
+            maintenance: Optional periodic storage maintenance callback.
         """
         self._task_recorder = task_recorder
         self._image_inputs = image_inputs
@@ -64,6 +66,7 @@ class GenerationTaskRunner:
         self._float = get_float
         self._str = get_str
         self._shorten = shorten
+        self._maintenance = maintenance
 
     async def generate_payload(
         self,
@@ -109,22 +112,31 @@ class GenerationTaskRunner:
             shorten=self._shorten,
         )
         if not self._is_allowed(event):
-            payload = {"ok": False, "error": "not_permitted"}
+            payload = {
+                "ok": False,
+                "error": "not_permitted",
+                "task_id": task["task_id"],
+            }
             self._task_recorder.mark_failure(task, payload["error"])
-            self._task_recorder.write(task)
+            self._persist_task(task)
             return payload
         ready = await self._ensure_ready(event)
         if not ready.get("ok"):
+            ready["task_id"] = task["task_id"]
             self._task_recorder.mark_failure(
                 task, ready.get("error") or "comfyui_not_ready"
             )
-            self._task_recorder.write(task)
+            self._persist_task(task)
             return ready
         prompt = original_prompt
         if not prompt:
-            payload = {"ok": False, "error": "missing_prompt"}
+            payload = {
+                "ok": False,
+                "error": "missing_prompt",
+                "task_id": task["task_id"],
+            }
             self._task_recorder.mark_failure(task, payload["error"])
-            self._task_recorder.write(task)
+            self._persist_task(task)
             return payload
         prompt = await self._augment_reference_image(event, prompt)
         if prompt is None:
@@ -132,10 +144,11 @@ class GenerationTaskRunner:
             payload = {
                 "ok": False,
                 "error": "reference_image_not_found",
+                "task_id": task["task_id"],
                 "image_input_summary": image_input_summary,
             }
             self._task_recorder.mark_reference_missing(task, image_input_summary)
-            self._task_recorder.write(task)
+            self._persist_task(task)
             return payload
         if reference_requested:
             self._task_recorder.mark_reference_context(
@@ -146,7 +159,8 @@ class GenerationTaskRunner:
             )
         prompt = self._augment_quoted_spell(event, prompt)
         prompt = await self._build_prompt(event, prompt)
-        self._task_recorder.mark_prompt_built(task, dict(self._prompt_summary()))
+        prompt_summary = dict(self._prompt_summary())
+        self._task_recorder.mark_prompt_built(task, prompt_summary)
         args = ["generate", "--prompt", prompt]
         if width:
             args.extend(["--width", str(int(width))])
@@ -161,25 +175,47 @@ class GenerationTaskRunner:
         if negative_prompt:
             args.extend(["--negative-prompt", str(negative_prompt)])
         payload = await self._run_tool(args)
+        payload["task_id"] = task["task_id"]
+        if prompt_summary.get("llm_failed"):
+            payload["prompt_degraded"] = True
+            payload["prompt_degraded_reason"] = str(
+                prompt_summary.get("llm_error") or "prompt_builder_failed"
+            )
         self._task_recorder.mark_completed(
             task,
             payload=payload,
             elapsed_seconds=round((datetime.now() - started_at).total_seconds(), 2),
             include_payload=self._bool("debug_send_payload_enabled", False),
         )
-        self._task_recorder.write(task)
+        self._persist_task(task)
         return payload
 
-    def record_delivery(self, delivery: dict[str, Any] | None) -> None:
-        """Persist delivery state into the latest task record.
+    def _persist_task(self, task: dict[str, Any]) -> None:
+        """Persist a task and trigger bounded periodic maintenance.
 
         Args:
+            task: Mutable non-secret task record.
+        """
+        self._task_recorder.write(task)
+        maintenance = getattr(self, "_maintenance", None)
+        if maintenance is not None:
+            maintenance()
+
+    def record_delivery(
+        self,
+        task_id: str | None,
+        delivery: dict[str, Any] | None,
+    ) -> None:
+        """Persist delivery state into its originating task record.
+
+        Args:
+            task_id: Identifier returned by the originating generation request.
             delivery: Delivery state produced after sending generated outputs.
         """
-        if not isinstance(delivery, dict) or not delivery:
+        if not task_id or not isinstance(delivery, dict) or not delivery:
             return
-        task = self._task_recorder.read()
+        task = self._task_recorder.read(task_id)
         if not task:
             return
         self._task_recorder.mark_delivery(task, delivery)
-        self._task_recorder.write(task)
+        self._persist_task(task)

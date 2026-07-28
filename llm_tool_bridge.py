@@ -36,7 +36,15 @@ class LLMToolBridge:
 
     def capability_names(self) -> set[str]:
         """Return the stable capability names implemented by this bridge."""
-        return {"status", "generate", "edit", "upscale", "remove_bg", "spell", "reverse"}
+        return {
+            "status",
+            "generate",
+            "edit",
+            "upscale",
+            "remove_bg",
+            "spell",
+            "reverse",
+        }
 
     async def status(self, event: Any) -> str:
         """Return a compact status string for LLM tool use.

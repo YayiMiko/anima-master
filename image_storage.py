@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import shutil
 from datetime import datetime
 from pathlib import Path
-import shutil
 from typing import TYPE_CHECKING
 
 try:
     from .image_manifest import ImageInputManifest
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from image_manifest import ImageInputManifest
 
 if TYPE_CHECKING:
@@ -37,14 +37,16 @@ class ImageInputStorage:
         mime_type: str = "",
     ) -> str:
         """Choose a supported image extension for a saved input."""
-        ext = Path(str(original or "")).suffix.lower() or str(source_suffix or "").lower()
+        ext = (
+            Path(str(original or "")).suffix.lower() or str(source_suffix or "").lower()
+        )
         if ext in SUPPORTED_IMAGE_EXTS:
             return ext
         return MIME_IMAGE_EXTS.get(str(mime_type or "").lower(), ".png")
 
     def target_path(
         self,
-        event: "AstrMessageEvent",
+        event: AstrMessageEvent,
         *,
         label: str,
         index: int,
@@ -59,7 +61,7 @@ class ImageInputStorage:
 
     def copy_file(
         self,
-        event: "AstrMessageEvent",
+        event: AstrMessageEvent,
         source: Path,
         *,
         label: str,
@@ -68,14 +70,16 @@ class ImageInputStorage:
         mime_type: str = "",
     ) -> Path:
         """Copy a resolved image file into workspace inputs."""
-        ext = self.extension_for(original, source_suffix=source.suffix, mime_type=mime_type)
+        ext = self.extension_for(
+            original, source_suffix=source.suffix, mime_type=mime_type
+        )
         target = self.target_path(event, label=label, index=index, extension=ext)
         shutil.copy2(source, target)
         return target
 
     def write_bytes(
         self,
-        event: "AstrMessageEvent",
+        event: AstrMessageEvent,
         image_bytes: bytes,
         *,
         label: str,

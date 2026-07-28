@@ -20,6 +20,8 @@
         "custom_workflow_path",
         "custom_workflow_override_parameters",
         "timeout",
+        "storage_retention_days",
+        "manifest_max_records",
         "poll_interval",
         "auto_start",
         "startup_command",

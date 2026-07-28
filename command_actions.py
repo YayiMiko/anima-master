@@ -22,7 +22,7 @@ try:
         merge_tag_text,
     )
     from .tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from agent_tools.comfyui_sizes import allowed_sizes
     from command_catalog import COMMAND_ENTRIES
     from command_router import (
@@ -311,10 +311,12 @@ class CommandActionHandler:
         if not prompt:
             return "请在后面写改图提示词。"
         image_input = await self._event_image_input(event)
+        if not image_input:
+            return "改图失败：请在本次消息中附图，或引用一条包含图片的消息。"
         if self._bool("prompt_optimize_img2img_enabled", False):
             prompt = await self._build_prompt(event, prompt, mode="img2img")
         payload = await self._run_tool(
-            ["edit", "--prompt", prompt, "--input", image_input or "latest"]
+            ["edit", "--prompt", prompt, "--input", image_input]
         )
         return await self._send_payload(event, payload)
 
@@ -340,7 +342,9 @@ class CommandActionHandler:
         if not ready.get("ok"):
             return await self._send_payload(event, ready)
         image_input = await self._event_image_input(event)
-        payload = await self._run_tool(["upscale", "--input", image_input or "latest"])
+        if not image_input:
+            return "放大失败：请在本次消息中附图，或引用一条包含图片的消息。"
+        payload = await self._run_tool(["upscale", "--input", image_input])
         return await self._send_payload(event, payload)
 
     async def remove_bg(self, event: Any) -> str:

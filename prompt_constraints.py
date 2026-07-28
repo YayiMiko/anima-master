@@ -7,7 +7,7 @@ from typing import Any
 
 try:
     from .tag_cleaner import join_prompt_parts, normalize_tag_key, split_tags
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from tag_cleaner import join_prompt_parts, normalize_tag_key, split_tags
 
 
@@ -29,6 +29,136 @@ class PromptConstraintResult:
     priority_tags: tuple[str, ...] = ()
     removed_tags: tuple[str, ...] = ()
     reason: str = ""
+
+
+SCENE_REQUEST_MARKERS = (
+    "背景",
+    "环境",
+    "场景",
+    "前景",
+    "镜头",
+    "构图",
+    "视角",
+    "光影",
+    "晨光",
+    "光线",
+    "灯光",
+    "阴影",
+    "特效",
+    "氛围",
+    "background",
+    "foreground",
+    "scenery",
+    "environment",
+    "camera",
+    "shot",
+    "view",
+    "angle",
+    "lighting",
+    "shadow",
+    "glow",
+    "effect",
+    "atmosphere",
+)
+
+SCENE_TAG_MARKERS = (
+    "background",
+    "foreground",
+    "scenery",
+    "environment",
+    "indoors",
+    "outdoors",
+    "camera",
+    "shot",
+    "view",
+    "angle",
+    "perspective",
+    "depth of field",
+    "lighting",
+    "light rays",
+    "sunlight",
+    "rim light",
+    "backlight",
+    "shadow",
+    "glow",
+    "particle",
+    "effect",
+    "atmosphere",
+)
+
+
+def scene_gate_open(user_prompt: str, creative_expansion: bool = False) -> bool:
+    """Return whether scene-like tags are allowed for this request.
+
+    Args:
+        user_prompt: Original user request.
+        creative_expansion: Whether the user explicitly enabled creative mode.
+
+    Returns:
+        True when creative mode or an explicit scene category is present.
+    """
+    if creative_expansion:
+        return True
+    text = str(user_prompt or "").casefold()
+    return any(marker in text for marker in SCENE_REQUEST_MARKERS)
+
+
+def apply_scene_gate(
+    content_tags: str, *, enabled: bool
+) -> tuple[str, tuple[str, ...]]:
+    """Remove unrequested scene tags when the scene gate is closed.
+
+    Args:
+        content_tags: Candidate Danbooru-style content tags.
+        enabled: Whether the user opened the scene gate.
+
+    Returns:
+        Filtered tag text and removed tags.
+    """
+    if enabled:
+        return content_tags, ()
+    kept: list[str] = []
+    removed: list[str] = []
+    for tag in split_tags(content_tags):
+        key = normalize_tag_key(tag)
+        if any(marker in key for marker in SCENE_TAG_MARKERS):
+            removed.append(tag)
+        else:
+            kept.append(tag)
+    return join_prompt_parts(kept), tuple(removed)
+
+
+def retry_preserves_prompt(
+    *,
+    original_tags: str,
+    retry_tags: str,
+    required_core_tags: tuple[str, ...],
+    removed_scene_tags: tuple[str, ...],
+    minimum_overlap: float = 0.7,
+) -> bool:
+    """Validate that a detail-refill retry preserves the original semantics.
+
+    Args:
+        original_tags: Cleaned tags from the first LLM result.
+        retry_tags: Cleaned tags from the retry candidate.
+        required_core_tags: Character anchors that must remain present.
+        removed_scene_tags: Scene tags removed from the retry candidate.
+        minimum_overlap: Minimum fraction of original tags retained.
+
+    Returns:
+        True when core tags, scene gating, and semantic overlap are preserved.
+    """
+    if removed_scene_tags:
+        return False
+    original_keys = {normalize_tag_key(tag) for tag in split_tags(original_tags)}
+    retry_keys = {normalize_tag_key(tag) for tag in split_tags(retry_tags)}
+    original_keys.discard("")
+    retry_keys.discard("")
+    overlap = (
+        len(original_keys & retry_keys) / len(original_keys) if original_keys else 1.0
+    )
+    required_keys = {normalize_tag_key(tag) for tag in required_core_tags}
+    return overlap >= minimum_overlap and required_keys <= retry_keys
 
 
 def build_constraint_plan_prompt(

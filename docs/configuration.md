@@ -51,6 +51,8 @@ vae_name = ComfyUI 中的 VAE 文件名
 - `custom_workflow_enabled`：是否改用自定义 ComfyUI API 工作流；普通版默认关闭。
 - `custom_workflow_path`：自定义工作流 JSON 路径；千代turbo 会自动使用 `variants/turbo/` 中的工作流。
 - `timeout`：等待生成完成的最长时间。
+- `storage_retention_days`：输入图片、输出图片和逐任务状态文件的保留天数；设为 `0` 可关闭按时间清理。
+- `manifest_max_records`：输入图片清单压缩后保留的最大有效记录数，默认 `5000`。
 - `poll_interval`：查询 ComfyUI 生成状态的间隔。
 
 `custom_workflow_override_parameters` 默认关闭。关闭时保留自定义工作流中的尺寸、采样步数、CFG、采样器和调度器；Turbo 工作流应保持关闭。需要统一使用插件出图参数时再开启。
@@ -84,8 +86,8 @@ vae_name = ComfyUI 中的 VAE 文件名
 
 - `prompt_builder_web_search_enabled`：允许在需要时联网搜索。
 - `prompt_builder_search_query_template`：搜索查询模板。
-- `danbooru_core_tag_lookup_enabled`：校正少量疑似角色核心 tag。
-- `danbooru_tag_base_urls`：Donmai tag API 地址。
+- `danbooru_core_tag_lookup_enabled`：校正少量疑似角色核心 tag。Donmai 不可用时会自动回退到 Safebooru 只读 DAPI。
+- `danbooru_tag_base_urls`：优先使用的 Donmai tag API 地址。
 
 联网搜索需要 AstrBot 全局 Tavily key。搜索失败会自动降级，不会中断生图。
 

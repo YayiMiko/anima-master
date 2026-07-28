@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 try:
     from . import anima_verify
     from .task_summary import apply_verification_summary
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     import anima_verify
     from task_summary import apply_verification_summary
 
@@ -86,7 +87,7 @@ class GenerationVerifier:
             "retry_count": 0,
             "attempts": [],
         }
-        initial_task = self._task_recorder.read()
+        initial_task = self._task_recorder.read(payload.get("task_id"))
         final_uses_initial_task = True
 
         if not payload.get("ok"):
@@ -128,8 +129,12 @@ class GenerationVerifier:
         while not verdict.passed and not verdict.skipped and retries < max_retry:
             retries += 1
             summary["retry_count"] = retries
-            hint = verdict.fix_hint or ("；".join(verdict.issues) if verdict.issues else "")
-            self.logger.info("[comfyui_agent] verify retry %s with hint: %s", retries, hint)
+            hint = verdict.fix_hint or (
+                "；".join(verdict.issues) if verdict.issues else ""
+            )
+            self.logger.info(
+                "[comfyui_agent] verify retry %s with hint: %s", retries, hint
+            )
             retry_prompt = user_request
             if hint:
                 retry_prompt = f"{user_request}\n【上次问题，请修正】{hint}"
@@ -143,7 +148,9 @@ class GenerationVerifier:
                 negative_prompt=negative_prompt,
             )
             if not retry_payload.get("ok"):
-                summary["retry_failed"] = retry_payload.get("error") or "generation_failed"
+                summary["retry_failed"] = (
+                    retry_payload.get("error") or "generation_failed"
+                )
                 break
             retry_outputs = self._output_paths(retry_payload)
             if not retry_outputs:
@@ -169,7 +176,9 @@ class GenerationVerifier:
         summary.update(
             {
                 "skipped": bool(outcome.verdict.skipped) if outcome.verdict else False,
-                "final_passed": bool(outcome.verdict.passed) if outcome.verdict else None,
+                "final_passed": bool(outcome.verdict.passed)
+                if outcome.verdict
+                else None,
                 "final_score": int(outcome.verdict.score) if outcome.verdict else None,
                 "issues": list(outcome.verdict.issues[:5]) if outcome.verdict else [],
                 "error": outcome.verdict.error if outcome.verdict else "",
@@ -234,7 +243,7 @@ class GenerationVerifier:
         *,
         base_task: dict[str, Any] | None = None,
     ) -> None:
-        task = dict(base_task or self._task_recorder.read() or {})
+        task = dict(base_task or self._task_recorder.read(payload.get("task_id")) or {})
         if not task:
             return
         self._task_recorder.write(apply_verification_summary(task, summary, payload))

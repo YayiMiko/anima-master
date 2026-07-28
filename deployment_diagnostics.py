@@ -4,7 +4,7 @@ from typing import Any
 
 try:
     from .image_input_diagnostics import image_input_diagnostic_lines
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from image_input_diagnostics import image_input_diagnostic_lines
 
 
@@ -67,7 +67,9 @@ def compact_status_text(payload: dict[str, Any]) -> str:
         Short human-readable status text.
     """
     if not payload.get("ok"):
-        lines = [f"ComfyUI 状态检查失败：{payload.get('connection_issue') or _error_summary(payload.get('error'))}"]
+        lines = [
+            f"ComfyUI 状态检查失败：{payload.get('connection_issue') or _error_summary(payload.get('error'))}"
+        ]
         if payload.get("connection_hint"):
             lines.append(f"建议：{_short(payload.get('connection_hint'), 180)}")
         return "\n".join(lines)
@@ -105,10 +107,12 @@ def diagnostic_text(
     Returns:
         Human-readable diagnostic text for server/local split deployments.
     """
-    dns_checks = payload.get("dns_checks") if isinstance(payload.get("dns_checks"), dict) else {}
-    dns_text = " / ".join(
-        f"{host}:{_flag(ok)}" for host, ok in dns_checks.items()
-    ) or "未检查"
+    dns_checks = (
+        payload.get("dns_checks") if isinstance(payload.get("dns_checks"), dict) else {}
+    )
+    dns_text = (
+        " / ".join(f"{host}:{_flag(ok)}" for host, ok in dns_checks.items()) or "未检查"
+    )
     auto_start = bool(config.get("auto_start", False))
     remote_warning = ""
     if payload.get("comfyui_connection_mode") == "remote" and auto_start:
@@ -131,11 +135,11 @@ def diagnostic_text(
             _section(
                 "ComfyUI",
                 [
-                f"- ComfyUI：{payload.get('comfyui_version') or '未知'}",
-                f"- GPU：{_short(payload.get('gpu') or '未知', 90)}",
-                f"- 显存：{payload.get('vram_free_mb')} / {payload.get('vram_total_mb')} MB",
-                f"- 模型：UNET {_flag(payload.get('unet_available'))} / CLIP {_flag(payload.get('clip_available'))} / VAE {_flag(payload.get('vae_available'))}",
-                f"- 附加组件：图生图 {_flag(payload.get('img2img_available'))} / 放大 {_flag(payload.get('upscale_available'))} / 去背景 {_flag(payload.get('remove_bg_available'))}",
+                    f"- ComfyUI：{payload.get('comfyui_version') or '未知'}",
+                    f"- GPU：{_short(payload.get('gpu') or '未知', 90)}",
+                    f"- 显存：{payload.get('vram_free_mb')} / {payload.get('vram_total_mb')} MB",
+                    f"- 模型：UNET {_flag(payload.get('unet_available'))} / CLIP {_flag(payload.get('clip_available'))} / VAE {_flag(payload.get('vae_available'))}",
+                    f"- 附加组件：图生图 {_flag(payload.get('img2img_available'))} / 放大 {_flag(payload.get('upscale_available'))} / 去背景 {_flag(payload.get('remove_bg_available'))}",
                 ],
             )
         )
@@ -156,13 +160,13 @@ def diagnostic_text(
         if not isinstance(delivery, dict):
             delivery = {}
         items = [
-                f"- 时间：{last_task.get('time') or '未知'}",
-                f"- 动作：{last_task.get('action') or '未知'} / 成功：{last_task.get('ok')}",
-                f"- 错误：{_error_summary(last_task.get('error') or '无')}",
-                f"- 引用图：requested={last_task.get('reference_image_requested')} applied={last_task.get('reference_context_applied')}",
-                f"- Prompt：失败={prompt_summary.get('llm_failed', False)} / 长度={prompt_summary.get('final_prompt_chars') or 0}",
-                f"- 输出/发送：{len(last_task.get('outputs') or [])} 张 / {delivery.get('status') or '未记录'}",
-                f"- ACK/失败：{delivery.get('ack_timeout', False)} / {delivery.get('send_failed', False)}",
+            f"- 时间：{last_task.get('time') or '未知'}",
+            f"- 动作：{last_task.get('action') or '未知'} / 成功：{last_task.get('ok')}",
+            f"- 错误：{_error_summary(last_task.get('error') or '无')}",
+            f"- 引用图：requested={last_task.get('reference_image_requested')} applied={last_task.get('reference_context_applied')}",
+            f"- Prompt：失败={prompt_summary.get('llm_failed', False)} / 长度={prompt_summary.get('final_prompt_chars') or 0}",
+            f"- 输出/发送：{len(last_task.get('outputs') or [])} 张 / {delivery.get('status') or '未记录'}",
+            f"- ACK/失败：{delivery.get('ack_timeout', False)} / {delivery.get('send_failed', False)}",
         ]
         if delivery.get("error"):
             items.append(f"- 发送错误：{_error_summary(delivery.get('error'))}")

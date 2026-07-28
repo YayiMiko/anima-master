@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 try:
     from .tag_cleaner import normalize_tag_key, split_tags
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from tag_cleaner import normalize_tag_key, split_tags
 
 
@@ -71,7 +71,18 @@ _SUBJECT_TAIL_TRIM_RE = re.compile(
 )
 _NEGATIVE_TARGET_RE = re.compile(r"(?:不要|不用|不使用)(?:固定角色|角色)")
 _SPELL_NEGATIVE_SPLIT_RE = re.compile(r"\n\s*引用法术负面提示词[：:]", re.S)
-_PRONOUN_SUBJECTS = {"她", "他", "它", "她们", "他们", "它们", "这个", "那个", "该角色", "这位角色"}
+_PRONOUN_SUBJECTS = {
+    "她",
+    "他",
+    "它",
+    "她们",
+    "他们",
+    "它们",
+    "这个",
+    "那个",
+    "该角色",
+    "这位角色",
+}
 
 _OUTFIT_HINTS = (
     "dress",
@@ -250,7 +261,9 @@ def build_outfit_transfer_context(
     )
 
 
-def detect_outfit_transfer(prompt: str, fixed_character_name: str = "") -> OutfitTransferPlan:
+def detect_outfit_transfer(
+    prompt: str, fixed_character_name: str = ""
+) -> OutfitTransferPlan:
     """Detect the "source outfit -> target character" task pattern."""
     text = str(prompt or "").strip()
     directive = _directive_text(text)
@@ -291,7 +304,9 @@ def extract_reference_tag_text(prompt: str) -> str:
     text = str(prompt or "").strip()
     spell_match = re.search(r"引用法术正面提示词[：:]\s*(.*)\Z", text, flags=re.S)
     if spell_match:
-        return _SPELL_NEGATIVE_SPLIT_RE.split(spell_match.group(1), maxsplit=1)[0].strip()
+        return _SPELL_NEGATIVE_SPLIT_RE.split(spell_match.group(1), maxsplit=1)[
+            0
+        ].strip()
     for marker in ("参考图视觉反推 tags", "参考图原始正面提示词"):
         match = re.search(rf"{re.escape(marker)}[：:]\s*(.*)\Z", text, flags=re.S)
         if match:
@@ -381,7 +396,11 @@ def _extract_source_subject(directive: str, fixed_character_name: str) -> str:
         if not match:
             continue
         subject = _clean_subject(match.group("subject"))
-        if subject and subject not in _PRONOUN_SUBJECTS and subject != fixed_character_name:
+        if (
+            subject
+            and subject not in _PRONOUN_SUBJECTS
+            and subject != fixed_character_name
+        ):
             return subject
     outfit_match = re.search(
         r"(?P<subject>[\u4e00-\u9fffA-Za-z0-9·_\-]{1,32})的(?:衣服|服装)",
@@ -390,7 +409,11 @@ def _extract_source_subject(directive: str, fixed_character_name: str) -> str:
     )
     if outfit_match:
         subject = _clean_subject(outfit_match.group("subject"))
-        if subject and subject not in _PRONOUN_SUBJECTS and subject != fixed_character_name:
+        if (
+            subject
+            and subject not in _PRONOUN_SUBJECTS
+            and subject != fixed_character_name
+        ):
             return subject
     return ""
 

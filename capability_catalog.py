@@ -18,7 +18,9 @@ CAPABILITY_ENTRIES: tuple[CapabilityEntry, ...] = (
     CapabilityEntry("generate", "generate", "generate", "comfyui_generate"),
     CapabilityEntry("edit", "edit", "edit", "comfyui_edit"),
     CapabilityEntry("upscale", "disabled_upscale", "upscale", None),
-    CapabilityEntry("remove_bg", "disabled_remove_bg", "remove_bg", "comfyui_remove_bg"),
+    CapabilityEntry(
+        "remove_bg", "disabled_remove_bg", "remove_bg", "comfyui_remove_bg"
+    ),
     CapabilityEntry("spell", "spell", "extract_prompt", "comfyui_extract_prompt"),
     CapabilityEntry("reverse", "reverse", "reverse_prompt", "comfyui_reverse_prompt"),
 )

@@ -1,4 +1,6 @@
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
+from typing import Any
 
 from astrbot.api.event import AstrMessageEvent
 
@@ -32,7 +34,24 @@ class ReferenceContextBuilder:
         self._logger = logger
         self._get_int = get_int
         self._shorten = shorten
-        self.last_summary: dict[str, Any] = {}
+        self._last_summary: ContextVar[dict[str, Any]] = ContextVar(
+            f"anima_reference_summary_{id(self)}",
+            default={},
+        )
+
+    @property
+    def last_summary(self) -> dict[str, Any]:
+        """Return the reference summary scoped to the current async request."""
+        return self._last_summary.get()
+
+    @last_summary.setter
+    def last_summary(self, value: dict[str, Any]) -> None:
+        """Store a reference summary for the current async request.
+
+        Args:
+            value: Non-secret reference-context summary.
+        """
+        self._last_summary.set(dict(value))
 
     async def _image_caption_provider_id(self, event: AstrMessageEvent) -> str:
         cfg = self._context.get_config(umo=event.unified_msg_origin)
@@ -58,11 +77,10 @@ class ReferenceContextBuilder:
             Prompt helper payload.
         """
         image_input = image_input or await self._event_image_input(event)
+        if not image_input:
+            return {"ok": False, "error": "image_not_found"}
         args = ["inspect"]
-        if image_input:
-            args.extend(["--input", image_input])
-        else:
-            args.extend(["--input", "latest"])
+        args.extend(["--input", image_input])
         return await self._run_prompt_tool(args)
 
     async def reverse_image_tags(
@@ -81,7 +99,7 @@ class ReferenceContextBuilder:
         """
         image_input = image_input or await self._event_image_input(event)
         if not image_input:
-            image_input = "latest"
+            return ""
         provider_id = await self._image_caption_provider_id(event)
         if not provider_id:
             return ""
@@ -125,28 +143,40 @@ class ReferenceContextBuilder:
             "reverse_ok": False,
         }
         payload = await self.image_spell_payload(event, image_input)
-        positive = str(payload.get("positive_prompt") or "").strip() if payload.get("ok") else ""
-        self.last_summary["spell_ok"] = bool(positive)
+        positive = (
+            str(payload.get("positive_prompt") or "").strip()
+            if payload.get("ok")
+            else ""
+        )
+        summary = dict(self.last_summary)
+        summary["spell_ok"] = bool(positive)
+        self.last_summary = summary
         if positive:
             context = "参考图原始正面提示词：\n" + self._shorten(positive, 2200)
-            self.last_summary.update(
+            summary = dict(self.last_summary)
+            summary.update(
                 {
                     "reference_context_method": "spell",
                     "reference_context_chars": len(context),
                     "metadata_format": payload.get("metadata_format") or "",
                 }
             )
+            self.last_summary = summary
             return context
 
         reverse = await self.reverse_image_tags(event, image_input)
-        self.last_summary["reverse_ok"] = bool(reverse)
+        summary = dict(self.last_summary)
+        summary["reverse_ok"] = bool(reverse)
+        self.last_summary = summary
         if reverse:
             context = "参考图视觉反推 tags：\n" + self._shorten(reverse, 1800)
-            self.last_summary.update(
+            summary = dict(self.last_summary)
+            summary.update(
                 {
                     "reference_context_method": "reverse",
                     "reference_context_chars": len(context),
                 }
             )
+            self.last_summary = summary
             return context
         return ""

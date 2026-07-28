@@ -9,7 +9,7 @@ try:
         DEFAULT_LLM_PROMPT_TEMPLATE,
         is_legacy_builtin_template,
     )
-except Exception:  # pragma: no cover - fallback for direct script-style imports.
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from prompt_templates import DEFAULT_LLM_PROMPT_TEMPLATE, is_legacy_builtin_template
 
 

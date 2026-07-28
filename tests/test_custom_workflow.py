@@ -25,6 +25,8 @@ def test_custom_workflow_applies_generation_parameters(tmp_path: Path) -> None:
                 "4": {
                     "class_type": "KSampler",
                     "inputs": {
+                        "positive": ["1", 0],
+                        "negative": ["2", 0],
                         "steps": 10,
                         "cfg": 1,
                         "sampler_name": "euler",
@@ -77,6 +79,8 @@ def test_explicit_size_does_not_override_turbo_sampling_parameters(
                 "4": {
                     "class_type": "KSampler",
                     "inputs": {
+                        "positive": ["1", 0],
+                        "negative": ["2", 0],
                         "steps": 6,
                         "cfg": 1,
                         "sampler_name": "euler",
@@ -112,3 +116,89 @@ def test_explicit_size_does_not_override_turbo_sampling_parameters(
     assert result["4"]["inputs"]["cfg"] == 1
     assert result["4"]["inputs"]["sampler_name"] == "euler"
     assert result["4"]["inputs"]["scheduler"] == "normal"
+
+
+def test_custom_workflow_uses_sampler_links_when_text_nodes_are_unordered(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workflow.json"
+    path.write_text(
+        json.dumps(
+            {
+                "90": {
+                    "class_type": "CLIPTextEncode",
+                    "inputs": {"text": "unrelated"},
+                },
+                "20": {
+                    "class_type": "CLIPTextEncode",
+                    "inputs": {"text": "negative"},
+                },
+                "10": {
+                    "class_type": "CLIPTextEncode",
+                    "inputs": {"text": "positive"},
+                },
+                "30": {
+                    "class_type": "KSampler",
+                    "inputs": {
+                        "positive": ["10", 0],
+                        "negative": ["20", 0],
+                        "seed": 1,
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = custom_t2i_workflow(
+        {"custom_workflow_path": str(path)},
+        "new positive",
+        "new negative",
+        1024,
+        1536,
+        30,
+        5.0,
+        42,
+    )
+
+    assert result["10"]["inputs"]["text"] == "new positive"
+    assert result["20"]["inputs"]["text"] == "new negative"
+    assert result["90"]["inputs"]["text"] == "unrelated"
+
+
+def test_custom_workflow_rejects_missing_conditioning_links(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workflow.json"
+    path.write_text(
+        json.dumps(
+            {
+                "1": {
+                    "class_type": "CLIPTextEncode",
+                    "inputs": {"text": "first"},
+                },
+                "2": {
+                    "class_type": "CLIPTextEncode",
+                    "inputs": {"text": "second"},
+                },
+                "3": {"class_type": "KSampler", "inputs": {"seed": 1}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        custom_t2i_workflow(
+            {"custom_workflow_path": str(path)},
+            "positive",
+            "negative",
+            1024,
+            1536,
+            30,
+            5.0,
+            42,
+        )
+    except SystemExit as exc:
+        assert str(exc) == "custom_workflow_positive_node_not_found"
+    else:
+        raise AssertionError("ambiguous custom workflow must be rejected")
