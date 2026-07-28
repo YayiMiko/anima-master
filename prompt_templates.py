@@ -2,36 +2,21 @@ from __future__ import annotations
 
 import hashlib
 
-DEFAULT_LLM_PROMPT_TEMPLATE = """我是一名 AI 画师，请根据以下主题设计大师级提示词。输出应为适用于 Anima 模型的英文 Danbooru tags，而不是自然语言描述。
+DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面提示词的 AI 画师。
 
-请先在内部拆解画面，再将结果汇总为一行、使用英文逗号分隔的 tags。不要输出分析过程、标题、Markdown、编号或中文。
+请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将结果输出为英文 Danbooru-style tags。
 
-内容规则：
-- 为画面设计细致的服饰 tags、动作 tags、神态 tags，并根据主题补充必要的环境、背景、氛围、构图、镜头、光影和特效 tags。
-- 不要输出角色自身已有的固定设定，例如发色、瞳色、年龄、种族和固定配饰；固定角色词会由程序另行拼接。
-- 不要输出 masterpiece、best quality 等前置质量词，也不要输出画师词。
-- 用户明确提出的主体、物种、花卉、道具、动作、服装、表情、镜头和画面重点必须原义保留，不要替换成相邻概念或更常见的素材。例如 pear blossoms 不能改成 cherry blossoms，serious 不能改成 smirk。
-- 只选择一个主要动作、一个主要表情和一组相容的镜头关系。不要追加会争夺肢体、视线或情绪的次要指令。持有物必须同时保留“物件存在”和“物件关系”两个锚点；例如用户要求剑指观众时使用 holding sword、sword pointed at viewer，不要把剑改成举起、背在身后、双剑或纯装饰。
-- 视线与镜头必须描述同一个瞬间：looking away 与 looking at viewer、profile 与 frontal view、eyes closed 与 looking at viewer 不得同时出现。只保留最符合用户原意的一项；用户未指定时选择最容易表现主题的一项。
-- 具体物种、花卉或特色物件是主题核心时，除保留其准确名称外，再使用 2-3 个不改变类别的可见形态锚点。例如梨花可使用 pear blossoms、white five-petaled flowers、pear tree branches；这些锚点必须描述同一对象，不能换成樱花或额外增加另一种花。
-- 抽象主题可以转化为可见符号，但必须先确定“谁对什么做了什么”以及动作产生的可见结果，再保留至少两个直接表达原主题的视觉锚点。不要把“创造光”改写成“伸手接受光”，也不要让自行补充的王座、礼服、花朵等常见素材取代主题。
-- 如果用户输入主要由逗号分隔的 tags 构成，只整理有效 tags、翻译其中少量中文要求、删除重复和冲突项；不要重新设计画面，也不要为了达到数量目标扩写。
-
-细节密度：
-- 先在内部把画面信息分配到不同槽位：主题与关键关系、动作和手势、神态与视线、服装结构、材质纹样与配饰、前景互动元素、简洁背景层次、构图镜头、光影、特效。一个槽位已经足够清楚后，应补充缺失槽位，不要继续堆叠近义词。
-- 服饰通常使用 10-16 个有效 tags，复杂礼服最多约 18 个；从款式、剪裁、层次、领口、袖型、腰部、下装、材质、配色、纹样、镶边、扣件、饰品和鞋袜中只选择画面实际可见且彼此相容的细节。用户未提及鞋袜且主题不依赖足部造型时，不要自行补充靴子、高跟鞋、袜子或腿饰。
-- 动作与姿态通常使用 4-8 个 tags，覆盖整体姿势、身体朝向、关键肢体、手部动作、持有物和重心；先保证主要动作完整，不要用多个动作凑数量。
-- 神态通常使用 2-4 个相容 tags，覆盖视线、眼部、嘴部和核心情绪。用户明确神态时，不要追加相反或稀释它的表情。
-- 背景与环境通常使用 4-10 个 tags，光影、特效和氛围通常使用 3-6 个 tags；只保留真正帮助主题的内容。
-- 同一语义簇最多保留 1-2 个词。光源形态、光束、轮廓光、投影和空气粒子属于不同功能，可以分别描述；glowing、illuminated、bright、luminous、radiant 等只是在重复“发光”，不能同时堆叠。删除同义词后，应把空出的篇幅用于具体服装结构、手部与物件关系、材质纹样、前景互动或空间层次，而不是让画面变得更单薄。
-- 常规输出 40-55 个互不重复、可见、可生成的内容 tags；简单表情包或头像可以使用 30-45 个，复杂服装或复杂构图可增加到约 60 个，最多不得超过 65 个。已经是 tags 的输入不设最低数量。画面元素单薄时优先增加人物、服装和前景的具体细节；背景仍保持简洁，不要加入用户未要求的道具、鞋袜、花朵、建筑或表情。
-
-表达规则：
-- 优先使用确实能表达可见画面元素的 Danbooru tags。部分概念直译可能没有有效词条，应拆解为具体形状、材质、纹样、颜色、装饰和视觉感受。例如“苗族少女”可以转化为 ornate silver headdress、silver jewelry、embroidered dress 等可见元素。
-- 不要用 holding nothing、no weapon、without shoes 等否定式或不可见的短语描述缺失内容；需要表达赤足时使用 barefoot，其他未出现的物件直接省略。
-- 背景保持简约、有设计感。通常只使用 2-6 个背景相关 tags，可根据主题选择 white background、simple background、character sheet、subtle geometric background、floating particles 等少量元素，不要同时堆叠多个地点、复杂建筑和互相冲突的光源。
-- 没有特殊要求时，整体采用可爱、自然、精致的角色表现。可爱主要体现在服装设计、姿态和神态，不要擅自幼化角色。
-- 输出前先删除互相冲突的构图、光影、天气和画风 tags，并合并 nude/naked、mist/morning mist、sheer fabric/translucent fabric 等包含关系明确的重复词，只保留更准确的一项。Tag 按以下优先级排列：用户明确要求、主体动作与关键物件、服装、神态、构图、背景、光影与特效、氛围与画风。越重要的内容越靠前。
+输出要求：
+- 只输出一行英文 tags，使用英文逗号分隔。
+- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。
+- 不要输出 masterpiece、best quality、score 等质量前缀。
+- 不要输出画师 tags；质量词和画师组会由程序另行拼接。
+- 尽量使用模型容易理解的可见画面描述。
+- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。
+- 除上述明确要求外，可以自由决定服装细节、姿态、构图、镜头、背景、环境、光影、色彩、氛围、前景和特效。
+- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。
+- 不要为了数量重复同义词；画面已经完整时即可停止。
+- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。
 
 角色和动态上下文：
 {character_rule}
@@ -41,7 +26,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """我是一名 AI 画师，请根据以下主题�
 {img2img_rule}
 {sensual_rule}
 
-这次，请为我生成以下主题的提示词：
+用户原始要求：
 {theme}"""
 
 
@@ -67,7 +52,6 @@ def build_llm_prompt(
     mode: str = "txt2img",
     prompt_builder_template: str = "",
     outfit_transfer_rule: str = "",
-    creative_expansion: bool = False,
 ) -> str:
     """Build the prompt sent to the chat LLM for Danbooru tag generation.
 
@@ -80,7 +64,6 @@ def build_llm_prompt(
         mode: Generation mode such as `txt2img` or `img2img`.
         prompt_builder_template: Optional custom prompt template.
         outfit_transfer_rule: Optional outfit-transfer instructions.
-        creative_expansion: Whether to let the LLM freely enrich the theme.
 
     Returns:
         Complete instruction text for the prompt-building LLM.
@@ -146,24 +129,6 @@ def build_llm_prompt(
 这是非 R18 的擦边表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、暧昧姿势等视觉方向。
 不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。
 """
-    creative_expansion_rule = ""
-    if creative_expansion:
-        creative_expansion_rule = """
------------
-本次启用“自由发挥”模式。请在不改变用户明确指定的角色身份、主体、数量、关键服装、动作、表情和道具的前提下，自主把简短主题发展成完整、统一且具有明确视觉主题的角色画面。
-你可以自由设计相容的服装结构、剪裁层次、材质纹样、配饰、姿态、手势、前景互动、构图、色彩关系、功能不同的光影和少量特效，也可以把抽象主题转化为清晰可见的叙事符号。标准模式中“不要添加用户未提及元素”的保守限制，在本模式下仅对冲突元素生效，不妨碍你补充服务于主题的新细节。
-重点塑造美丽、精致、有辨识度的角色，避免只用同义词增加数量。通常输出 50-65 个互不重复、可见且相容的内容 tags；背景仍只使用约 2-6 个有区分度的 tags，保持简洁、有设计感，不扩写成复杂场景。
-仍然不要输出质量词、画师词、多人元素、相互冲突的动作或角色固有设定重复项。
-"""
-    scene_scope_rule = ""
-    if not creative_expansion:
-        scene_scope_rule = """
------------
-场景类 Tag 门控（本段覆盖上文关于自动补充环境、背景、构图、镜头、光影、特效、氛围及常规数量的建议）：
-先在内部判断用户是否明确提到了以下任意一类内容：前景互动；构图或镜头；环境或背景；光影；特效或氛围。
-如果五类均未提及，只生成主体与关键关系、角色身份、服装结构、材质纹样、配饰、动作手势、神态和视线相关 tags。不得自行生成 foreground、background、environment、scenery、camera、shot、view、angle、depth of field、lighting、shadow、glow、particles、effects、atmosphere 等场景类内容，也不要用 simple background、white background、soft lighting、depth of field、floating particles 等惯用词填充篇幅。此时不设最低 Tag 数量，不得为达到常规数量目标堆叠同义词。
-只要用户明确提到上述任意一类，场景类门控即整体打开；你可以根据主题需要生成这五类中的任意或全部类型，但并非必须凑齐，背景仍应保持简洁。
-"""
     configured_template = str(prompt_builder_template or "").strip()
     template = (
         DEFAULT_LLM_PROMPT_TEMPLATE
@@ -179,20 +144,11 @@ def build_llm_prompt(
         "img2img_rule": img2img_rule,
         "style_block": "",
         "sensual_rule": sensual_rule,
-        "creative_expansion_rule": creative_expansion_rule,
     }
     try:
         prompt = template.format(**values)
     except Exception:
         prompt = DEFAULT_LLM_PROMPT_TEMPLATE.format(**values)
-    if (
-        creative_expansion_rule
-        and "{creative_expansion_rule}" not in template
-        and creative_expansion_rule.strip() not in prompt
-    ):
-        prompt = prompt.rstrip() + "\n" + creative_expansion_rule
-    if scene_scope_rule and scene_scope_rule.strip() not in prompt:
-        prompt = prompt.rstrip() + "\n" + scene_scope_rule
     return prompt
 
 

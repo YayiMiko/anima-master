@@ -68,7 +68,7 @@ def test_help_text_uses_catalog_visibility():
     assert "/anm 切换画师组" in text
     assert "/anm 添加角色" in text
     assert "--尺寸 1216x832" in text
-    assert "--自由发挥" in text
+    assert "--自由发挥" not in text
     assert "/anm 改图" not in text
 
 

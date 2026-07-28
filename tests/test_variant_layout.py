@@ -73,20 +73,18 @@ def test_advanced_example_uses_the_builtin_template() -> None:
     assert json.loads(match.group(1)) == DEFAULT_LLM_PROMPT_TEMPLATE
 
 
-def test_builtin_template_uses_aesthetic_density_and_fidelity_rules() -> None:
-    assert "常规输出 40-55 个" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "最多不得超过 65 个" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "pear blossoms 不能改成 cherry blossoms" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "looking away 与 looking at viewer" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "holding sword、sword pointed at viewer" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "white five-petaled flowers" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "不要自行补充靴子、高跟鞋、袜子或腿饰" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "不要用 holding nothing" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "已经是 tags 的输入不设最低数量" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "谁对什么做了什么" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "同一语义簇最多保留 1-2 个词" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "把空出的篇幅用于具体服装结构" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "简单表情包或头像可以使用 30-45 个" in DEFAULT_LLM_PROMPT_TEMPLATE
+def test_builtin_template_prioritizes_one_pass_visual_quality() -> None:
+    assert "一幅完整、协调、具有视觉吸引力的画面" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "可以自由决定服装细节、姿态、构图、镜头、背景" in (
+        DEFAULT_LLM_PROMPT_TEMPLATE
+    )
+    assert "以最终图像协调、精致、有表现力和好看为优先" in (
+        DEFAULT_LLM_PROMPT_TEMPLATE
+    )
+    assert "不需要机械追求固定 Tag 数量" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "保持用户明确指定的角色、主体、人数" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "40-55" not in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "50-65" not in DEFAULT_LLM_PROMPT_TEMPLATE
 
 
 def test_turbo_variant_archive_contains_expected_workflow() -> None:

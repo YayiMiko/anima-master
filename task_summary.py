@@ -26,7 +26,6 @@ def build_strategy_summary(
         "reference_requested": bool(task.get("reference_image_requested")),
         "reference_applied": bool(task.get("reference_context_applied")),
         "raw_mode": bool(prompt_summary.get("raw_mode")),
-        "danbooru_fast_path": bool(prompt_summary.get("danbooru_fast_path")),
         "skipped_reason": prompt_summary.get("skipped_reason") or "",
         "llm_ok": prompt_summary.get(
             "llm_ok",
@@ -39,13 +38,11 @@ def build_strategy_summary(
         "fixed_character_name": prompt_summary.get("fixed_character_name") or "",
         "default_style": bool(prompt_summary.get("default_style")),
         "sensual_mode": bool(prompt_summary.get("sensual_mode")),
-        "creative_expansion": bool(prompt_summary.get("creative_expansion")),
         "asset_reference_mode": bool(prompt_summary.get("asset_reference_mode")),
         "outfit_transfer": bool(prompt_summary.get("outfit_transfer")),
         "outfit_transfer_source": prompt_summary.get("outfit_transfer_source") or "",
         "outfit_transfer_target": prompt_summary.get("outfit_transfer_target") or "",
         "content_tag_count": prompt_summary.get("llm_content_tag_count") or 0,
-        "short_content_retry": bool(prompt_summary.get("short_content_retry")),
         "final_prompt_chars": prompt_summary.get("final_prompt_chars") or 0,
     }
 
@@ -126,7 +123,6 @@ def build_last_task_debug_lines(last_task: dict[str, Any]) -> list[str]:
         (
             "- 策略："
             f"raw={strategy_summary.get('raw_mode')} "
-            f"tags快路径={strategy_summary.get('danbooru_fast_path')} "
             f"服装迁移={strategy_summary.get('outfit_transfer')}"
         ),
         (

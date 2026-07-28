@@ -86,29 +86,17 @@ def test_non_fixed_character_prompt_requires_queryable_character_candidate() -> 
     assert "程序会联网查询 character 分类并校正候选" in prompt
 
 
-def test_creative_expansion_rule_enriches_character_but_keeps_background_simple() -> (
-    None
-):
-    prompt = build_llm_prompt("独自旅行的魔法少女", creative_expansion=True)
+def test_default_prompt_prioritizes_visual_quality_without_fixed_tag_target() -> None:
+    prompt = build_llm_prompt("独自旅行的魔法少女")
 
-    assert "本次启用“自由发挥”模式" in prompt
-    assert "通常输出 50-65 个" in prompt
-    assert "背景仍只使用约 2-6 个" in prompt
+    assert "以最终图像协调、精致、有表现力和好看为优先" in prompt
+    assert "不需要机械追求固定 Tag 数量" in prompt
+    assert "50-65" not in prompt
 
 
-def test_standard_prompt_gates_scene_tags_until_user_mentions_one_category() -> None:
+def test_default_prompt_has_no_standard_scene_gate() -> None:
     prompt = build_llm_prompt("穿白裙的少女")
 
-    assert "场景类 Tag 门控" in prompt
-    assert "如果五类均未提及" in prompt
-    assert "只要用户明确提到上述任意一类" in prompt
-    assert "此时不设最低 Tag 数量" in prompt
-
-
-def test_creative_expansion_does_not_apply_standard_scene_gate() -> None:
-    prompt = build_llm_prompt("穿白裙的少女", creative_expansion=True)
-
-    assert "本次启用“自由发挥”模式" in prompt
     assert "场景类 Tag 门控" not in prompt
 
 

@@ -45,7 +45,7 @@ def _pipeline(config: dict | None = None) -> PromptPipeline:
     )
 
 
-def test_prompt_pipeline_refills_details_after_semantic_deduplication():
+def test_prompt_pipeline_keeps_first_llm_result_after_tag_cleaning():
     class _Response:
         def __init__(self, text: str):
             self.completion_text = text
@@ -66,11 +66,7 @@ def test_prompt_pipeline_refills_details_after_semantic_deduplication():
                         "floating particles",
                         "light particles",
                     ]
-                ),
-                ", ".join(
-                    [f"scene detail {index}" for index in range(40)]
-                    + [f"refined visual detail {index}" for index in range(8)]
-                ),
+                )
             ]
 
         async def get_current_chat_provider_id(self, umo):
@@ -116,16 +112,15 @@ def test_prompt_pipeline_refills_details_after_semantic_deduplication():
 
     result = asyncio.run(pipeline.build(_Event(), "女孩在晨光中伸手"))
 
-    assert result.summary["detail_refill_attempted"] is True
-    assert result.summary["detail_refill_retry"] is True
-    assert result.summary["short_content_retry"] is False
-    assert result.summary["removed_content_tag_count"] == 0
-    assert result.summary["llm_content_tag_count"] == 48
-    assert "refined visual detail 7" in result.final_prompt
+    assert "detail_refill_attempted" not in result.summary
+    assert "detail_refill_retry" not in result.summary
+    assert "short_content_retry" not in result.summary
+    assert result.summary["removed_content_tag_count"] > 0
+    assert "scene detail 39" in result.final_prompt
     assert context.outputs == []
 
 
-def test_prompt_pipeline_creative_expansion_strips_flag_and_enriches_tags():
+def test_prompt_pipeline_uses_default_creative_generation():
     class _Response:
         def __init__(self, text: str):
             self.completion_text = text
@@ -181,17 +176,15 @@ def test_prompt_pipeline_creative_expansion_strips_flag_and_enriches_tags():
     result = asyncio.run(
         pipeline.build(
             _Event(),
-            "1girl, solo, traveling magical girl, white dress, simple background --自由发挥",
+            "1girl, solo, traveling magical girl, white dress, simple background",
         )
     )
 
-    assert result.summary["creative_expansion"] is True
     assert result.summary.get("danbooru_fast_path") is not True
     assert result.summary["llm_content_tag_count"] == 52
-    assert "--自由发挥" not in result.final_prompt
     assert len(context.calls) == 1
-    assert "本次启用“自由发挥”模式" in context.calls[0]["prompt"]
-    assert "本次启用自由发挥模式" in context.calls[0]["system_prompt"]
+    assert "以最终图像协调、精致、有表现力和好看为优先" in context.calls[0]["prompt"]
+    assert "默认采用自由创作策略" in context.calls[0]["system_prompt"]
     assert "场景类Tag门控" not in context.calls[0]["system_prompt"]
 
 
@@ -244,23 +237,6 @@ def test_danbooru_tag_fast_path_accepts_one_chinese_character_name():
     )
 
 
-def test_mixed_tag_fast_path_composes_fixed_character_without_llm():
-    result = asyncio.run(
-        _pipeline({"chiyo_preset": "aesthetic"}).build(
-            object(),
-            "1girl, solo, 狐莉, knee up, standing on one leg, foreshortening, "
-            "pov, from below, holding sword, point a sword at audience, serious",
-        )
-    )
-
-    assert result.summary["danbooru_fast_path"] is True
-    assert result.summary["fixed_character_name"] == "狐莉"
-    assert "point a sword at audience" in result.final_prompt
-    assert "serious" in result.final_prompt
-    assert "狐莉" not in result.final_prompt
-    assert "smirk" not in result.final_prompt
-
-
 def test_strategy_summary_keeps_debug_flags_compact():
     task = {
         "reference_image_requested": True,
@@ -268,7 +244,6 @@ def test_strategy_summary_keeps_debug_flags_compact():
     }
     prompt_summary = {
         "raw_mode": True,
-        "danbooru_fast_path": True,
         "llm_ok": False,
         "outfit_summary_ok": True,
         "web_search": False,
@@ -284,7 +259,6 @@ def test_strategy_summary_keeps_debug_flags_compact():
 
     assert summary["reference_requested"] is True
     assert summary["reference_applied"] is False
-    assert summary["danbooru_fast_path"] is True
     assert summary["llm_ok"] is False
     assert summary["fixed_character_name"] == "狐莉"
     assert summary["content_tag_count"] == 72
@@ -331,7 +305,6 @@ def test_last_task_debug_lines_use_strategy_summary():
                 "reference_requested": False,
                 "reference_applied": False,
                 "raw_mode": True,
-                "danbooru_fast_path": True,
                 "outfit_transfer": False,
                 "llm_ok": True,
                 "outfit_summary_ok": True,
@@ -354,6 +327,6 @@ def test_last_task_debug_lines_use_strategy_summary():
     text = "\n".join(lines)
     assert "上次任务摘要" in text
     assert "角色：狐莉" in text
-    assert "tags快路径=True" in text
+    assert "raw=True" in text
     assert "自检：enabled=True passed=True retry=0" in text
     assert "阶段事件：provider=ok，prompt_llm=ok" in text
