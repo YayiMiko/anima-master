@@ -187,6 +187,17 @@ class GenerationTaskRunner:
             payload["prompt_degraded_reason"] = str(
                 prompt_summary.get("llm_error") or "prompt_builder_failed"
             )
+        character_status = str(prompt_summary.get("character_resolution_status") or "")
+        unresolved_count = int(prompt_summary.get("unresolved_character_count") or 0)
+        if (
+            prompt_summary.get("named_character_detected")
+            and character_status in {"unresolved", "source_unavailable"}
+        ) or unresolved_count:
+            payload["character_resolution_warning"] = True
+            payload["character_resolution_status"] = (
+                character_status or "partially_unresolved"
+            )
+            payload["unresolved_character_count"] = unresolved_count
         self._task_recorder.mark_completed(
             task,
             payload=payload,

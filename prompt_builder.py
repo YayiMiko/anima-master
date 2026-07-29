@@ -139,7 +139,7 @@ def build_final_prompt(
     content = clean_content_tags(
         llm_content or user_prompt,
         max_tags=max_content_tags,
-        strip_character_tags=use_character,
+        strip_character_tags=use_character or bool(required_core_tags),
         protected_core_tags=required_core_tags,
         allow_multi_character=allow_multi_character,
     )

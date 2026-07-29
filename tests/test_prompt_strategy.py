@@ -10,6 +10,7 @@ if str(PLUGIN_DIR) not in sys.path:
 
 from prompt_pipeline import PromptPipeline  # noqa: E402
 from prompt_presets import looks_like_danbooru_tags  # noqa: E402
+from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
 from task_summary import (  # noqa: E402
     apply_verification_summary,
     build_last_task_debug_lines,
@@ -89,8 +90,15 @@ def test_prompt_pipeline_keeps_first_llm_result_after_tag_cleaning():
         def required_core_tags_for_prompt(self, prompt):
             return ()
 
-        async def resolve(self, *, llm_content, user_prompt, fixed_character):
-            return llm_content
+        async def resolve_detailed(
+            self,
+            *,
+            llm_content,
+            user_prompt,
+            fixed_character,
+            candidate_hints=(),
+        ):
+            return DanbooruResolveOutcome(text=llm_content)
 
     class _Event:
         unified_msg_origin = "session"
@@ -152,8 +160,15 @@ def test_prompt_pipeline_uses_default_creative_generation():
         def required_core_tags_for_prompt(self, prompt):
             return ()
 
-        async def resolve(self, *, llm_content, user_prompt, fixed_character):
-            return llm_content
+        async def resolve_detailed(
+            self,
+            *,
+            llm_content,
+            user_prompt,
+            fixed_character,
+            candidate_hints=(),
+        ):
+            return DanbooruResolveOutcome(text=llm_content)
 
     class _Event:
         unified_msg_origin = "session"
@@ -186,6 +201,111 @@ def test_prompt_pipeline_uses_default_creative_generation():
     assert "以最终图像协调、精致、有表现力和好看为优先" in context.calls[0]["prompt"]
     assert "默认采用自由创作策略" in context.calls[0]["system_prompt"]
     assert "场景类Tag门控" not in context.calls[0]["system_prompt"]
+
+
+def test_named_character_uses_evidence_candidate_and_stable_anchors():
+    class _Response:
+        def __init__(self, text: str):
+            self.completion_text = text
+
+    class _Context:
+        def __init__(self):
+            self.outputs = [
+                "wrong_name_(example_work), 1girl, black hair, red eyes, white dress",
+                (
+                    '{"source_name":"伊诺","copyright":"example work",'
+                    '"tag_candidates":["correct_name_(example_work)"]}'
+                ),
+            ]
+
+        async def get_current_chat_provider_id(self, umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            return _Response(self.outputs.pop(0))
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, prompt):
+            return _Plan()
+
+    class _Resolver:
+        def __init__(self):
+            self.calls = []
+
+        def required_core_tags_for_prompt(self, prompt):
+            return ()
+
+        async def resolve_detailed(
+            self,
+            *,
+            llm_content,
+            user_prompt,
+            fixed_character,
+            candidate_hints=(),
+        ):
+            self.calls.append(tuple(candidate_hints))
+            if not candidate_hints:
+                return DanbooruResolveOutcome(
+                    text=llm_content,
+                    status="resolved",
+                    canonical_tag="wrong_name_(example_work)",
+                    identity_tags=("wrong_name_(example_work)",),
+                    explicit_request=True,
+                )
+            return DanbooruResolveOutcome(
+                text=llm_content.replace(
+                    "wrong_name_(example_work)",
+                    "correct_name_(example_work)",
+                ),
+                status="resolved",
+                canonical_tag="correct_name_(example_work)",
+                identity_tags=(
+                    "correct_name_(example_work)",
+                    "blue hair",
+                    "blue eyes",
+                    "long hair",
+                ),
+                candidate_hints=tuple(candidate_hints),
+            )
+
+    resolver = _Resolver()
+    config = {"chiyo_preset_enabled": False}
+    pipeline = PromptPipeline(
+        context=_Context(),
+        config=config,
+        logger=_Logger(),
+        danbooru_resolver=resolver,
+        researcher=_Researcher(),
+        get_bool=lambda key, default: bool(config.get(key, default)),
+        get_int=lambda key, default: int(config.get(key, default)),
+        get_float=lambda key, default: float(config.get(key, default)),
+        get_str=lambda key, default: str(config.get(key, default)),
+        shorten=_shorten,
+    )
+
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+    result = asyncio.run(pipeline.build(event, "示例游戏角色伊诺"))
+
+    assert resolver.calls == [(), ("correct_name_(example_work)",)]
+    assert result.summary["character_resolution_status"] == "resolved"
+    assert result.summary["character_canonical_tag"] == "correct_name_(example_work)"
+    assert result.summary["character_identity_tags"] == [
+        "correct_name_(example_work)",
+        "blue hair",
+        "blue eyes",
+        "long hair",
+    ]
+    assert "correct_name_(example_work)" in result.final_prompt
+    assert "blue hair" in result.final_prompt
+    assert "blue eyes" in result.final_prompt
+    assert "black hair" not in result.final_prompt
+    assert "red eyes" not in result.final_prompt
 
 
 def test_danbooru_tag_fast_path_detection_accepts_tag_lists():
@@ -288,6 +408,7 @@ def test_apply_verification_summary_updates_task_and_strategy():
     assert updated["strategy_summary"]["verification"] == {
         "enabled": True,
         "forced_multi_person": False,
+        "forced_named_character": False,
         "skipped": False,
         "passed": False,
         "score": 5,
@@ -329,5 +450,8 @@ def test_last_task_debug_lines_use_strategy_summary():
     assert "上次任务摘要" in text
     assert "角色：狐莉" in text
     assert "raw=True" in text
-    assert "自检：enabled=True 多人强制=False passed=True retry=0" in text
+    assert (
+        "自检：enabled=True 多人强制=False 角色强制=False passed=True retry=0"
+        in text
+    )
     assert "阶段事件：provider=ok，prompt_llm=ok" in text

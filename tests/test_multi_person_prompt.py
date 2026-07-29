@@ -15,6 +15,7 @@ from multi_person_prompt import (  # noqa: E402
     parse_multi_person_plan,
     render_multi_person_character,
 )
+from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
 from prompt_pipeline import PromptPipeline  # noqa: E402
 
 
@@ -170,9 +171,21 @@ def test_multi_person_pipeline_builds_hybrid_prompt_and_resolves_each_character(
         def required_core_tags_for_prompt(self, prompt):
             return ()
 
-        async def resolve(self, *, llm_content, user_prompt, fixed_character):
+        async def resolve_detailed(
+            self,
+            *,
+            llm_content,
+            user_prompt,
+            fixed_character,
+            candidate_hints=(),
+        ):
             self.calls.append((llm_content, user_prompt, fixed_character))
-            return f"verified_{llm_content}"
+            return DanbooruResolveOutcome(
+                text=f"verified_{llm_content}",
+                status="resolved",
+                canonical_tag=f"verified_{llm_content}",
+                identity_tags=(f"verified_{llm_content}",),
+            )
 
     resolver = _Resolver()
     config = {"chiyo_preset": "", "prompt_optimize_enabled": True}
@@ -228,8 +241,20 @@ def test_multi_person_pipeline_protects_fixed_character_appearance():
         def required_core_tags_for_prompt(self, prompt):
             return ()
 
-        async def resolve(self, *, llm_content, user_prompt, fixed_character):
-            return llm_content
+        async def resolve_detailed(
+            self,
+            *,
+            llm_content,
+            user_prompt,
+            fixed_character,
+            candidate_hints=(),
+        ):
+            return DanbooruResolveOutcome(
+                text=llm_content,
+                status="resolved",
+                canonical_tag=llm_content,
+                identity_tags=(llm_content,),
+            )
 
     config = {
         "chiyo_preset": "",
@@ -310,8 +335,20 @@ def test_close_contact_uses_one_group_and_aliases_without_forbidden_concepts():
         def required_core_tags_for_prompt(self, prompt):
             return ()
 
-        async def resolve(self, *, llm_content, user_prompt, fixed_character):
-            return llm_content
+        async def resolve_detailed(
+            self,
+            *,
+            llm_content,
+            user_prompt,
+            fixed_character,
+            candidate_hints=(),
+        ):
+            return DanbooruResolveOutcome(
+                text=llm_content,
+                status="resolved",
+                canonical_tag=llm_content,
+                identity_tags=(llm_content,),
+            )
 
     config = {
         "chiyo_preset": "",
@@ -386,8 +423,20 @@ def test_turbo_constraints_do_not_modify_multi_person_narrative_blocks():
         def required_core_tags_for_prompt(self, prompt):
             return ()
 
-        async def resolve(self, *, llm_content, user_prompt, fixed_character):
-            return llm_content
+        async def resolve_detailed(
+            self,
+            *,
+            llm_content,
+            user_prompt,
+            fixed_character,
+            candidate_hints=(),
+        ):
+            return DanbooruResolveOutcome(
+                text=llm_content,
+                status="resolved",
+                canonical_tag=llm_content,
+                identity_tags=(llm_content,),
+            )
 
     config = {
         "chiyo_preset": "",

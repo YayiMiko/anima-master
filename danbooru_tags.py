@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import time
 import xml.etree.ElementTree as ET
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
@@ -116,6 +117,52 @@ class CoreTagResolution:
     replacements: tuple[tuple[str, str, int, str], ...]
     inserted: tuple[tuple[str, int, str], ...]
     verified: tuple[tuple[str, int, str], ...] = ()
+    status: str = "not_requested"
+    canonical_tag: str = ""
+    identity_tags: tuple[str, ...] = ()
+    candidate_hints: tuple[str, ...] = ()
+    evidence: tuple[str, ...] = ()
+    explicit_request: bool = False
+
+
+_STABLE_IDENTITY_EXACT_TAGS = {
+    "ahoge",
+    "animal_ears",
+    "bat_wings",
+    "cat_ears",
+    "cat_tail",
+    "demon_horns",
+    "demon_wings",
+    "double_bun",
+    "fang",
+    "fox_ears",
+    "fox_tail",
+    "gradient_hair",
+    "halo",
+    "heterochromia",
+    "horns",
+    "long_hair",
+    "low_twintails",
+    "multicolored_hair",
+    "one_side_up",
+    "pointy_ears",
+    "ponytail",
+    "short_hair",
+    "side_ponytail",
+    "streaked_hair",
+    "tail",
+    "twintails",
+    "very_long_hair",
+    "wings",
+}
+_STABLE_IDENTITY_PATTERNS = (
+    re.compile(
+        r"^(?:black|blonde|blue|brown|green|grey|gray|orange|pink|purple|red|silver|white)_hair$"
+    ),
+    re.compile(
+        r"^(?:amber|black|blue|brown|gold|golden|green|grey|gray|orange|pink|purple|red|yellow)_eyes$"
+    ),
+)
 
 
 def required_core_tags_for_prompt(user_prompt: str) -> tuple[str, ...]:
@@ -351,6 +398,82 @@ def _fetch_safebooru_dapi_tag(
     return records
 
 
+def _fetch_stable_identity_tags(
+    canonical_tag: str,
+    *,
+    timeout: float,
+    user_agent: str,
+    cache: dict[str, Any],
+) -> tuple[str, ...]:
+    """Infer stable visible identity tags from solo posts.
+
+    Args:
+        canonical_tag: Verified Danbooru-style character tag.
+        timeout: HTTP timeout for the Safebooru request.
+        user_agent: User-Agent header value.
+        cache: Shared resolver cache.
+
+    Returns:
+        High-frequency hair, eye, and anatomy identity tags.
+    """
+    cache_key = f"identity:{_normalize_query(canonical_tag)}"
+    cached = cache.get(cache_key)
+    if isinstance(cached, tuple) and len(cached) == 2:
+        cached_at, cached_tags = cached
+        ttl = 86400.0 if cached_tags else 600.0
+        if time.monotonic() - float(cached_at) < ttl:
+            return tuple(cached_tags)
+    if requests is None:
+        return ()
+    try:
+        response = requests.get(
+            DEFAULT_SAFEBOORU_DAPI_URL,
+            params={
+                "page": "dapi",
+                "s": "post",
+                "q": "index",
+                "tags": f"{canonical_tag} solo",
+                "limit": 100,
+            },
+            timeout=timeout,
+            headers={
+                "User-Agent": user_agent,
+                "Accept": "application/xml,text/xml,*/*",
+            },
+        )
+        if response.status_code != 200:
+            cache[cache_key] = (time.monotonic(), ())
+            return ()
+        root = ET.fromstring(response.text)
+    except Exception:
+        cache[cache_key] = (time.monotonic(), ())
+        return ()
+
+    posts = root.findall("post")
+    if len(posts) < 4:
+        cache[cache_key] = (time.monotonic(), ())
+        return ()
+    counts: Counter[str] = Counter()
+    for post in posts:
+        for tag in str(post.attrib.get("tags") or "").split():
+            normalized = tag.strip().lower()
+            if normalized in _STABLE_IDENTITY_EXACT_TAGS or any(
+                pattern.fullmatch(normalized) for pattern in _STABLE_IDENTITY_PATTERNS
+            ):
+                counts[normalized] += 1
+    threshold = max(1, int(len(posts) * 0.55 + 0.999))
+    stable = tuple(
+        tag.replace("_", " ")
+        for tag, count in sorted(
+            counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+        if count >= threshold
+    )[:10]
+    cache[cache_key] = (time.monotonic(), stable)
+    return stable
+
+
 def _fetch_tag_records(
     query: str,
     *,
@@ -478,6 +601,80 @@ def _known_canonical_record(queries: list[str]) -> TagRecord | None:
     return None
 
 
+def _resolve_evidence_candidates(
+    candidates: tuple[str, ...],
+    *,
+    donmai_base_urls: tuple[str, ...],
+    timeout: float,
+    user_agent: str,
+    cache: dict[str, Any],
+) -> tuple[TagRecord | None, tuple[str, ...]]:
+    """Select a canonical character tag from evidence-backed LLM candidates.
+
+    Args:
+        candidates: Bounded Danbooru-style candidates proposed by the LLM.
+        donmai_base_urls: Ordered Donmai-compatible API roots.
+        timeout: Per-request HTTP timeout.
+        user_agent: User-Agent header value.
+        cache: Shared resolver cache.
+
+    Returns:
+        Best verified record and compact evidence strings.
+    """
+    scored: list[tuple[int, TagRecord, str]] = []
+    for candidate in candidates[:8]:
+        normalized = _normalize_query(candidate)
+        if not re.fullmatch(r"[a-z0-9_.'():-]{3,100}", normalized):
+            continue
+        scoped_identity = bool(
+            re.fullmatch(
+                r"[a-z0-9_.'-]{2,}_\([a-z0-9_.' :-]{2,}\)",
+                normalized,
+            )
+        )
+        for query in _candidate_queries(normalized):
+            records = _fetch_tag_records(
+                query,
+                donmai_base_urls=donmai_base_urls,
+                timeout=timeout,
+                user_agent=user_agent,
+                cache=cache,
+            )
+            for record in records:
+                record_name = _normalize_query(record.name)
+                exact = record_name == normalized
+                if record.category == CHARACTER_CATEGORY:
+                    score = 100 + (30 if exact else 0)
+                elif (
+                    exact
+                    and scoped_identity
+                    and record.post_count > 0
+                    and record.source.endswith("/dapi")
+                ):
+                    # Safebooru's DAPI reports many imported character tags as
+                    # type=0, so a scoped exact tag with real posts is accepted
+                    # as degraded evidence instead of being discarded.
+                    score = 70
+                else:
+                    continue
+                score += min(20, len(str(max(1, record.post_count))))
+                detail = (
+                    f"{record.name}|score={score}|count={record.post_count}|"
+                    f"source={record.source}|category={record.category}"
+                )
+                scored.append((score, record, detail))
+    if not scored:
+        return None, ()
+    scored.sort(key=lambda item: (item[0], item[1].post_count), reverse=True)
+    best_score, best_record, _ = scored[0]
+    if len(scored) > 1 and best_score - scored[1][0] < 5:
+        first = _normalize_query(best_record.name)
+        second = _normalize_query(scored[1][1].name)
+        if first != second:
+            return None, tuple(item[2] for item in scored[:6])
+    return best_record, tuple(item[2] for item in scored[:6])
+
+
 def _user_character_queries(user_prompt: str) -> list[str]:
     """Extract likely explicitly named characters from the raw user request.
 
@@ -487,23 +684,99 @@ def _user_character_queries(user_prompt: str) -> list[str]:
     Returns:
         A small ordered list of names suitable for autocomplete lookup.
     """
-    text = str(user_prompt or "")
+    text = str(user_prompt or "").strip()
     queries: list[str] = []
-    for match in re.finditer(
-        r"(?:画|生成|绘制|来一张|生图)?\s*"
-        r"([\u4e00-\u9fffぁ-んァ-ヶ]{2,12}?)"
-        r"(?=穿|戴|拿|手持|站|坐|躺|跑|看|和|与|，|,|\s|$)",
-        text,
+    name_chars = r"\u4e00-\u9fffぁ-んァ-ヶー"
+    stop = (
+        r"(?=穿|戴|拿|手持|站|坐|躺|跑|走|看|望|笑|哭|和|与|在|，|。|、|"
+        r",|;|；|\s|$)"
+    )
+    patterns = (
+        rf"(?:游戏|手游|动画|动漫|漫画)?角色\s*([{name_chars}]{{2,12}}?){stop}",
+        rf"(?:画|生成|绘制|来一张|生图)\s*([{name_chars}]{{2,12}}?){stop}",
+    )
+    generic_people = {
+        "一个女孩",
+        "一位女孩",
+        "一个少女",
+        "一位少女",
+        "女孩",
+        "少女",
+        "人物",
+        "角色",
+        "女人",
+        "男性",
+        "男人",
+        "少年",
+    }
+    if (
+        re.fullmatch(rf"[{name_chars}]{{2,8}}", text)
+        and text not in generic_people
+        and "角色" not in text
+        and not any(
+            marker in text
+            for marker in (
+                "穿",
+                "戴",
+                "拿",
+                "站",
+                "坐",
+                "躺",
+                "跑",
+                "走",
+                "看",
+                "望",
+                "笑",
+                "哭",
+                "在",
+                "和",
+                "与",
+            )
+        )
     ):
-        name = match.group(1).strip()
-        name = re.sub(r"^(?:一个|一位|角色|人物|少女|女孩)", "", name)
-        if name.startswith(("穿", "戴", "拿", "手持", "站", "坐", "躺", "跑", "看")):
-            continue
-        if 2 <= len(name) <= 12 and name not in queries:
-            queries.append(name)
-        if len(queries) >= 2:
-            break
+        queries.append(text)
+    for pattern in patterns:
+        for match in re.finditer(pattern, text):
+            name = match.group(1).strip()
+            if name in generic_people:
+                continue
+            if name.startswith(("一个", "一位")):
+                name = name[2:]
+            if 2 <= len(name) <= 12 and name not in generic_people:
+                if name not in queries:
+                    queries.append(name)
+            if len(queries) >= 2:
+                return queries
     return queries
+
+
+def character_resolution_requested(
+    text: str,
+    *,
+    user_prompt: str = "",
+    candidate_hints: tuple[str, ...] = (),
+) -> bool:
+    """Return whether a request carries credible named-character evidence.
+
+    Args:
+        text: LLM-generated Danbooru tags.
+        user_prompt: Original natural-language request.
+        candidate_hints: Bounded candidates from the character planner.
+
+    Returns:
+        True when character lookup failure should be surfaced to the caller.
+    """
+    scoped_candidate = any(
+        "_(" in _normalize_query(tag)
+        for tag in _split_tags(text)
+        if _looks_like_core_tag(tag)
+    )
+    return bool(
+        candidate_hints
+        or scoped_candidate
+        or _user_character_queries(user_prompt)
+        or any(alias in user_prompt for alias in KNOWN_CORE_ALIASES)
+    )
 
 
 def resolve_core_tags(
@@ -511,6 +784,7 @@ def resolve_core_tags(
     *,
     user_prompt: str = "",
     allow_insert: bool = False,
+    candidate_hints: tuple[str, ...] = (),
     max_candidates: int = 6,
     timeout: float = 6.0,
     donmai_base_urls: tuple[str, ...] = DEFAULT_DONMAI_BASE_URLS,
@@ -522,6 +796,8 @@ def resolve_core_tags(
     replacements: list[tuple[str, str, int, str]] = []
     inserted: list[tuple[str, int, str]] = []
     verified: list[tuple[str, int, str]] = []
+    evidence: tuple[str, ...] = ()
+    canonical_record: TagRecord | None = None
 
     candidate_indexes: list[int] = []
     for index, tag in enumerate(tags[: max(max_candidates * 3, 12)]):
@@ -544,6 +820,7 @@ def resolve_core_tags(
         original_key = _normalize_query(original)
         if not best:
             continue
+        canonical_record = best
         verified.append((best.name, best.post_count, best.source))
         if best.name != original_key or best.name != original.strip():
             tags[index] = best.name
@@ -566,6 +843,7 @@ def resolve_core_tags(
             )
             if not best:
                 continue
+            canonical_record = best
             alias_keys = {_normalize_query(query) for query in alias_queries}
             replaced = False
             for index, tag in enumerate(tags):
@@ -586,6 +864,39 @@ def resolve_core_tags(
                 existing.add(best.name)
                 inserted.append((best.name, best.post_count, best.source))
 
+        if candidate_hints:
+            best, evidence = _resolve_evidence_candidates(
+                tuple(candidate_hints),
+                donmai_base_urls=donmai_base_urls,
+                timeout=timeout,
+                user_agent=user_agent,
+                cache=tag_cache,
+            )
+            if best:
+                canonical_record = best
+                verified.append((best.name, best.post_count, best.source))
+                existing_index = next(
+                    (
+                        index
+                        for index, tag in enumerate(tags)
+                        if _normalize_query(tag) == _normalize_query(best.name)
+                    ),
+                    None,
+                )
+                if existing_index is not None:
+                    existing.add(_normalize_query(best.name))
+                elif candidate_indexes:
+                    index = candidate_indexes[0]
+                    old = tags[index]
+                    tags[index] = best.name
+                    existing.discard(_normalize_query(old))
+                    existing.add(_normalize_query(best.name))
+                    replacements.append((old, best.name, best.post_count, best.source))
+                elif _normalize_query(best.name) not in existing:
+                    tags.insert(0, best.name)
+                    existing.add(_normalize_query(best.name))
+                    inserted.append((best.name, best.post_count, best.source))
+
         if not inserted:
             for raw_name in _user_character_queries(user_prompt):
                 best = _best_character(
@@ -598,6 +909,7 @@ def resolve_core_tags(
                 )
                 if not best or best.name in existing:
                     continue
+                canonical_record = best
                 if candidate_indexes:
                     index = candidate_indexes[0]
                     old = tags[index]
@@ -611,9 +923,40 @@ def resolve_core_tags(
                     inserted.append((best.name, best.post_count, best.source))
                 break
 
+    identity_tags: tuple[str, ...] = ()
+    if canonical_record:
+        stable_tags = _fetch_stable_identity_tags(
+            canonical_record.name,
+            timeout=timeout,
+            user_agent=user_agent,
+            cache=tag_cache,
+        )
+        identity_tags = (canonical_record.name, *stable_tags)
+    explicit_request = bool(
+        allow_insert
+        and (
+            _user_character_queries(user_prompt)
+            or any(alias in user_prompt for alias in KNOWN_CORE_ALIASES)
+        )
+    )
+    requested = character_resolution_requested(
+        text,
+        user_prompt=user_prompt if allow_insert else "",
+        candidate_hints=candidate_hints,
+    )
     return CoreTagResolution(
         text=", ".join(tags),
         replacements=tuple(replacements),
         inserted=tuple(inserted),
         verified=tuple(verified),
+        status=(
+            "resolved"
+            if canonical_record
+            else ("unresolved" if requested else "not_requested")
+        ),
+        canonical_tag=canonical_record.name if canonical_record else "",
+        identity_tags=identity_tags,
+        candidate_hints=tuple(candidate_hints),
+        evidence=evidence,
+        explicit_request=explicit_request,
     )

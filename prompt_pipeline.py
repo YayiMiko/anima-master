@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -214,6 +215,77 @@ class PromptPipeline:
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()
 
+    async def _generate_character_candidates_with_llm(
+        self,
+        *,
+        provider_id: str,
+        user_prompt: str,
+        rejected_content: str,
+        target_name: str = "",
+    ) -> tuple[str, ...]:
+        """Extract bounded Danbooru character candidates from the user request.
+
+        Args:
+            provider_id: Active AstrBot provider identifier.
+            user_prompt: Original request containing the named character.
+            rejected_content: Initial LLM tags that online lookup could not verify.
+            target_name: Optional character name selected by a multi-person plan.
+
+        Returns:
+            Normalized candidate tags proposed for evidence-based lookup.
+        """
+        response = await self.context.llm_generate(
+            chat_provider_id=provider_id,
+            prompt=(
+                "Extract the explicitly named existing anime/game character from "
+                "the user request and propose up to 6 possible canonical Danbooru "
+                "character tags. Preserve the exact source-language name and infer "
+                "the work/copyright separately. Candidate tags must use lowercase "
+                "ASCII, underscores, and a work disambiguation suffix when known.\n\n"
+                'Return JSON only: {"source_name":"原文中的名字",'
+                '"copyright":"work name","tag_candidates":["name_(work)"]}.\n'
+                "The source_name must be an exact substring of the user request. "
+                "Do not invent a character when none is explicitly named.\n\n"
+                f"Target name: {target_name or 'not separately specified'}\n"
+                f"User request: {user_prompt}\n"
+                f"Initial character tags to cross-check: "
+                f"{self._shorten(rejected_content, 500)}"
+            ),
+            system_prompt=(
+                "You resolve named anime and game characters to candidate Danbooru "
+                "tags. Return valid JSON only. Your candidates are search hints, "
+                "not authoritative answers."
+            ),
+            max_tokens=350,
+        )
+        raw = str(getattr(response, "completion_text", "") or "").strip()
+        raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
+        raw = re.sub(r"\s*```$", "", raw)
+        match = re.search(r"\{.*\}", raw, flags=re.S)
+        if match:
+            raw = match.group(0)
+        try:
+            data = json.loads(raw)
+        except (TypeError, ValueError):
+            return ()
+        if not isinstance(data, dict):
+            return ()
+        source_name = str(data.get("source_name") or "").strip()
+        if not source_name or source_name not in user_prompt:
+            return ()
+        raw_candidates = data.get("tag_candidates")
+        if not isinstance(raw_candidates, list):
+            return ()
+        candidates: list[str] = []
+        for item in raw_candidates:
+            candidate = str(item or "").strip().lower()
+            candidate = re.sub(r"\s+", "_", candidate)
+            if not re.fullmatch(r"[a-z0-9_.'():-]{3,100}", candidate):
+                continue
+            if candidate not in candidates:
+                candidates.append(candidate)
+        return tuple(candidates[:6])
+
     async def _generate_constraint_plan_with_llm(
         self,
         *,
@@ -342,6 +414,8 @@ class PromptPipeline:
         resolved_count = 0
         fixed_character_count = 0
         danbooru_resolved_count = 0
+        unresolved_character_count = 0
+        character_resolution_statuses: list[dict[str, Any]] = []
         character_slots: list[str] = []
         used_fixed_names: set[str] = set()
         aliases = ("Character A", "Character B", "Character C", "Character D")
@@ -389,6 +463,8 @@ class PromptPipeline:
             )
             fixed_tags = ""
             resolved_identity = ""
+            resolution_status = "not_requested"
+            candidate_hints: tuple[str, ...] = ()
             if fixed_name:
                 used_fixed_names.add(fixed_name)
                 fixed_tags = ", ".join(
@@ -405,19 +481,59 @@ class PromptPipeline:
                 )
                 resolved_count += 1
                 fixed_character_count += 1
+                resolution_status = "fixed"
             elif character.danbooru_candidate:
-                resolved = await self._danbooru_resolver.resolve(
+                resolution = await self._danbooru_resolver.resolve_detailed(
                     llm_content=character.danbooru_candidate,
                     user_prompt=character.name or prompt,
                     fixed_character=False,
                 )
-                resolved_tags = split_tags(resolved)
-                resolved_identity = (
-                    resolved_tags[0] if resolved_tags else character.danbooru_candidate
-                )
-                if resolved_identity:
+                if resolution.status == "unresolved" or resolution.explicit_request:
+                    try:
+                        candidate_hints = (
+                            await self._generate_character_candidates_with_llm(
+                                provider_id=provider_id,
+                                user_prompt=prompt,
+                                rejected_content=character.danbooru_candidate,
+                                target_name=character.name,
+                            )
+                        )
+                    except Exception as exc:
+                        self.logger.warning(
+                            "[comfyui_agent] multi-person character candidate "
+                            "planner failed for %s: %s",
+                            character.name or character.danbooru_candidate,
+                            exc,
+                        )
+                    if candidate_hints:
+                        resolution = await self._danbooru_resolver.resolve_detailed(
+                            llm_content=character.danbooru_candidate,
+                            user_prompt=character.name or prompt,
+                            fixed_character=False,
+                            candidate_hints=candidate_hints,
+                        )
+                resolution_status = resolution.status
+                if resolution.status == "resolved":
+                    resolved_identity = resolution.canonical_tag or next(
+                        iter(split_tags(resolution.text)), ""
+                    )
+                    if len(resolution.identity_tags) > 1:
+                        fixed_tags = ", ".join(resolution.identity_tags[1:])
                     resolved_count += 1
                     danbooru_resolved_count += 1
+                else:
+                    resolved_identity = character.danbooru_candidate
+                    unresolved_character_count += 1
+            character_resolution_statuses.append(
+                {
+                    "name": character.name,
+                    "status": resolution_status,
+                    "canonical_tag": resolved_identity
+                    if resolution_status == "resolved"
+                    else "",
+                    "candidate_hints": list(candidate_hints),
+                }
+            )
             character_entity_names.append(
                 {
                     value
@@ -539,6 +655,9 @@ class PromptPipeline:
                 "resolved_character_count": resolved_count,
                 "fixed_character_count": fixed_character_count,
                 "danbooru_resolved_count": danbooru_resolved_count,
+                "unresolved_character_count": unresolved_character_count,
+                "character_resolution_statuses": character_resolution_statuses,
+                "named_character_detected": bool(plan.characters),
                 "character_slots": character_slots,
                 "interaction_count": len(plan.interactions),
                 "grouped_contact": grouped_contact,
@@ -793,11 +912,37 @@ class PromptPipeline:
                 "[comfyui_agent] prompt builder LLM output:\n%s", llm_content
             )
         llm_failed = bool(llm_error and not str(llm_content or "").strip())
-        llm_content = await self._danbooru_resolver.resolve(
+        character_resolution = await self._danbooru_resolver.resolve_detailed(
             llm_content=llm_content,
             user_prompt=prompt,
             fixed_character=use_fixed_character,
         )
+        if not use_fixed_character and (
+            character_resolution.status == "unresolved"
+            or (character_resolution.explicit_request and not required_core_tags)
+        ):
+            try:
+                candidate_hints = await self._generate_character_candidates_with_llm(
+                    provider_id=provider_id,
+                    user_prompt=prompt,
+                    rejected_content=llm_content,
+                )
+            except Exception as exc:
+                self.logger.warning(
+                    "[comfyui_agent] character candidate planner failed: %s",
+                    exc,
+                )
+                candidate_hints = ()
+            if candidate_hints:
+                character_resolution = await self._danbooru_resolver.resolve_detailed(
+                    llm_content=llm_content,
+                    user_prompt=prompt,
+                    fixed_character=False,
+                    candidate_hints=candidate_hints,
+                )
+        llm_content = character_resolution.text
+        if character_resolution.identity_tags:
+            required_core_tags = character_resolution.identity_tags
         low_cfg_harness = bool(prompt_config.get("low_cfg_harness_enabled", False))
         constraint_raw = ""
         constraint_plan = parse_constraint_plan("")
@@ -863,6 +1008,13 @@ class PromptPipeline:
                 "removed_constraint_tags": list(built.removed_constraint_tags),
                 "constraint_reason": built.constraint_reason,
                 "required_core_tags": list(built.required_core_tags),
+                "named_character_detected": character_resolution.status
+                in {"resolved", "unresolved", "source_unavailable"},
+                "character_resolution_status": character_resolution.status,
+                "character_canonical_tag": character_resolution.canonical_tag,
+                "character_identity_tags": list(character_resolution.identity_tags),
+                "character_candidate_hints": list(character_resolution.candidate_hints),
+                "character_resolution_evidence": list(character_resolution.evidence),
                 "outfit_transfer": outfit_plan.enabled,
                 "outfit_transfer_source": outfit_plan.source_subject,
                 "outfit_transfer_target": outfit_plan.target_character,

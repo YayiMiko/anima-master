@@ -103,6 +103,98 @@ def test_default_prompt_has_no_standard_scene_gate() -> None:
 def test_raw_user_character_name_is_extracted_before_action() -> None:
     assert tags_module._user_character_queries("画若叶睦穿白色礼服") == ["若叶睦"]
     assert tags_module._user_character_queries("若叶睦") == ["若叶睦"]
+    assert tags_module._user_character_queries("鸣潮角色尤诺") == ["尤诺"]
+    assert tags_module._user_character_queries("女孩在晨光中伸手") == []
+    assert tags_module._user_character_queries("画一个女孩在海边") == []
+
+
+def test_generic_candidate_can_use_scoped_dapi_evidence(monkeypatch) -> None:
+    def fetch_records(query, **_kwargs):
+        if query == "wrong_name_(example_work)":
+            return [
+                TagRecord(
+                    name=query,
+                    category=4,
+                    post_count=900,
+                    source="https://safebooru.donmai.us",
+                )
+            ]
+        if query == "correct_name_(example_work)":
+            return [
+                TagRecord(
+                    name=query,
+                    category=0,
+                    post_count=155,
+                    source="https://safebooru.org/dapi",
+                )
+            ]
+        return []
+
+    monkeypatch.setattr(tags_module, "_fetch_tag_records", fetch_records)
+    monkeypatch.setattr(
+        tags_module,
+        "_fetch_stable_identity_tags",
+        lambda *_args, **_kwargs: ("blue hair", "blue eyes", "long hair"),
+    )
+
+    result = resolve_core_tags(
+        "wrong_name_(example_work), 1girl, black hair, red eyes",
+        user_prompt="示例游戏角色伊诺",
+        allow_insert=True,
+        candidate_hints=("correct_name_(example_work)",),
+    )
+
+    assert result.status == "resolved"
+    assert result.canonical_tag == "correct_name_(example_work)"
+    assert result.identity_tags == (
+        "correct_name_(example_work)",
+        "blue hair",
+        "blue eyes",
+        "long hair",
+    )
+    assert result.text.startswith("correct_name_(example_work), 1girl")
+    assert result.evidence
+
+
+def test_stable_identity_tags_are_inferred_from_repeated_solo_posts(
+    monkeypatch,
+) -> None:
+    class Response:
+        status_code = 200
+        text = (
+            '<posts count="5" offset="0">'
+            '<post tags="example_(work) solo blue_hair blue_eyes long_hair smile"/>'
+            '<post tags="example_(work) solo blue_hair blue_eyes long_hair dress"/>'
+            '<post tags="example_(work) solo blue_hair blue_eyes long_hair outdoors"/>'
+            '<post tags="example_(work) solo blue_hair long_hair indoors"/>'
+            '<post tags="example_(work) solo red_hair red_eyes short_hair"/>'
+            "</posts>"
+        )
+
+    monkeypatch.setattr(
+        tags_module.requests,
+        "get",
+        lambda *args, **kwargs: Response(),
+    )
+
+    result = tags_module._fetch_stable_identity_tags(
+        "example_(work)",
+        timeout=1,
+        user_agent="test",
+        cache={},
+    )
+
+    assert result == ("blue hair", "long hair", "blue eyes")
+
+
+def test_common_scoped_free_tags_do_not_request_character_resolution() -> None:
+    assert (
+        tags_module.character_resolution_requested(
+            "looking_at_viewer, depth_of_field, white dress",
+            user_prompt="女孩在晨光中伸手",
+        )
+        is False
+    )
 
 
 def test_empty_lookup_cache_expires_quickly(monkeypatch) -> None:

@@ -253,6 +253,19 @@ class ComfyUIAgentPlugin(Star):
                     "[comfyui_agent] failed to send prompt degradation notice: %s",
                     str(exc)[:500],
                 )
+        if payload.get("ok") and payload.get("character_resolution_warning"):
+            try:
+                await event.send(
+                    event.plain_result(
+                        "未能可靠确认部分现有作品角色的 Danbooru Tag；"
+                        "本次仍会发送结果，但角色外观可能偏离设定。"
+                    )
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[comfyui_agent] failed to send character resolution notice: %s",
+                    str(exc)[:500],
+                )
         result = await self._send_payload(event, payload)
         self._generation_task.record_delivery(
             payload.get("task_id"),

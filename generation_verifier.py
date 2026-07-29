@@ -77,7 +77,17 @@ class GenerationVerifier:
         """
         outcome = VerificationOutcome(payload=payload)
         configured_verify = self._bool("enable_verify", False)
-        if not configured_verify and not multi_person:
+        initial_task = self._task_recorder.read(payload.get("task_id"))
+        prompt_summary = initial_task.get("prompt_summary")
+        if not isinstance(prompt_summary, dict):
+            prompt = initial_task.get("prompt")
+            prompt_summary = (
+                prompt.get("summary")
+                if isinstance(prompt, dict) and isinstance(prompt.get("summary"), dict)
+                else {}
+            )
+        named_character = bool(prompt_summary.get("named_character_detected"))
+        if not configured_verify and not multi_person and not named_character:
             return outcome
 
         pass_score = self._int("verify_pass_score", 7)
@@ -89,8 +99,10 @@ class GenerationVerifier:
             "retry_count": 0,
             "attempts": [],
             "forced_multi_person": bool(multi_person and not configured_verify),
+            "forced_named_character": bool(
+                named_character and not configured_verify and not multi_person
+            ),
         }
-        initial_task = self._task_recorder.read(payload.get("task_id"))
         final_uses_initial_task = True
 
         if not payload.get("ok"):
@@ -112,9 +124,27 @@ class GenerationVerifier:
             self._record_summary(summary, payload, base_task=initial_task)
             return outcome
 
+        identity_parts: list[str] = []
+        canonical_tag = str(prompt_summary.get("character_canonical_tag") or "").strip()
+        identity_tags = [
+            str(tag).strip()
+            for tag in (prompt_summary.get("character_identity_tags") or [])
+            if str(tag).strip()
+        ]
+        if canonical_tag:
+            identity_parts.append(
+                f"{canonical_tag}: {', '.join(identity_tags[1:]) or 'no anchors'}"
+            )
+        for item in prompt_summary.get("character_resolution_statuses") or []:
+            if not isinstance(item, dict):
+                continue
+            item_canonical = str(item.get("canonical_tag") or "").strip()
+            if item_canonical:
+                identity_parts.append(item_canonical)
         llm_call = self._make_verify_llm_call(
             provider_id,
             multi_person=multi_person,
+            character_identity="; ".join(identity_parts[:4]),
         )
         verdict = await anima_verify.verify_image(
             llm_call,
@@ -218,6 +248,7 @@ class GenerationVerifier:
         provider_id: str,
         *,
         multi_person: bool = False,
+        character_identity: str = "",
     ):
         system_prompt = anima_verify.ANIMA_VERIFY_SYSTEM
         if multi_person:
@@ -226,6 +257,12 @@ class GenerationVerifier:
                 "每个角色是否只出现一次；是否出现分屏、漫画格、多视图、克隆或额外人物；"
                 "固定角色的发色、瞳色、种族和标志性配饰是否串到其他角色；"
                 "互动的主动方、承受方和空间位置是否正确。"
+            )
+        if character_identity:
+            system_prompt += (
+                "\n这是已解析到现有作品角色的任务。请检查角色是否可辨认，重点核对"
+                "标志性的发色、瞳色、发型、种族特征和固定配饰；不要因服装或场景"
+                f"变化误判。预期角色及稳定外观锚点：{character_identity}。"
             )
 
         async def llm_call(prompt: str, image_urls=None) -> str:

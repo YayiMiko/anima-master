@@ -34,6 +34,21 @@ def build_strategy_summary(
         "resolved_character_count": prompt_summary.get("resolved_character_count") or 0,
         "fixed_character_count": prompt_summary.get("fixed_character_count") or 0,
         "danbooru_resolved_count": prompt_summary.get("danbooru_resolved_count") or 0,
+        "unresolved_character_count": (
+            prompt_summary.get("unresolved_character_count") or 0
+        ),
+        "named_character_detected": bool(
+            prompt_summary.get("named_character_detected")
+        ),
+        "character_resolution_status": (
+            prompt_summary.get("character_resolution_status") or ""
+        ),
+        "character_canonical_tag": (
+            prompt_summary.get("character_canonical_tag") or ""
+        ),
+        "character_identity_tags": list(
+            prompt_summary.get("character_identity_tags") or []
+        ),
         "character_slots": list(prompt_summary.get("character_slots") or []),
         "interaction_count": prompt_summary.get("interaction_count") or 0,
         "grouped_contact": bool(prompt_summary.get("grouped_contact")),
@@ -69,6 +84,9 @@ def build_verification_brief(verification_summary: dict[str, Any]) -> dict[str, 
     return {
         "enabled": bool(verification_summary.get("enabled")),
         "forced_multi_person": bool(verification_summary.get("forced_multi_person")),
+        "forced_named_character": bool(
+            verification_summary.get("forced_named_character")
+        ),
         "skipped": bool(verification_summary.get("skipped")),
         "passed": verification_summary.get("final_passed"),
         "score": verification_summary.get("final_score"),
@@ -149,6 +167,7 @@ def build_last_task_debug_lines(last_task: dict[str, Any]) -> list[str]:
             f"校正={strategy_summary.get('resolved_character_count', 0)} "
             f"固定={strategy_summary.get('fixed_character_count', 0)} "
             f"在线={strategy_summary.get('danbooru_resolved_count', 0)} "
+            f"未解析={strategy_summary.get('unresolved_character_count', 0)} "
             f"位置={','.join(strategy_summary.get('character_slots') or []) or '无'} "
             f"互动={strategy_summary.get('interaction_count', 0)} "
             f"接触组={strategy_summary.get('grouped_contact', False)} "
@@ -163,6 +182,7 @@ def build_last_task_debug_lines(last_task: dict[str, Any]) -> list[str]:
             "- 自检："
             f"enabled={verification_summary.get('enabled', False)} "
             f"多人强制={verification_summary.get('forced_multi_person', False)} "
+            f"角色强制={verification_summary.get('forced_named_character', False)} "
             f"passed={verification_brief.get('passed')} "
             f"retry={verification_brief.get('retry_count', 0)}"
         ),

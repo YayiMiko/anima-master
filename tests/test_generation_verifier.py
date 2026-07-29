@@ -68,6 +68,25 @@ def test_ordinary_verification_does_not_receive_multi_person_checks() -> None:
     assert "互动的主动方" not in system_prompt
 
 
+def test_named_character_verification_adds_identity_checks() -> None:
+    context = _Context()
+    verifier = _verifier(context)
+
+    asyncio.run(
+        verifier._make_verify_llm_call(
+            "provider",
+            character_identity=(
+                "example_(work): blue hair, blue eyes, long hair"
+            ),
+        )("verify")
+    )
+
+    system_prompt = context.calls[0]["system_prompt"]
+    assert "现有作品角色" in system_prompt
+    assert "标志性的发色、瞳色、发型" in system_prompt
+    assert "example_(work): blue hair, blue eyes, long hair" in system_prompt
+
+
 def test_multi_person_verification_is_forced_when_global_verify_is_disabled():
     class _Recorder:
         def __init__(self):
@@ -108,4 +127,56 @@ def test_multi_person_verification_is_forced_when_global_verify_is_disabled():
     verification = recorder.written[0]["verification_summary"]
     assert verification["enabled"] is True
     assert verification["forced_multi_person"] is True
+    assert verification["skip_reason"] == "generation_failed"
+
+
+def test_named_character_verification_is_forced_when_global_verify_is_disabled():
+    class _Recorder:
+        def __init__(self):
+            self.written = []
+
+        def read(self, task_id):
+            return {
+                "task_id": task_id,
+                "prompt_summary": {
+                    "named_character_detected": True,
+                    "character_canonical_tag": "example_(work)",
+                    "character_identity_tags": [
+                        "example_(work)",
+                        "blue hair",
+                        "blue eyes",
+                    ],
+                },
+            }
+
+        def write(self, task):
+            self.written.append(task)
+
+    recorder = _Recorder()
+    verifier = GenerationVerifier(
+        context=_Context(),
+        task_recorder=recorder,
+        generate_payload=lambda *args, **kwargs: None,
+        logger=_Logger(),
+        get_bool=lambda key, default: False,
+        get_int=lambda key, default: default,
+        get_str=lambda key, default: default,
+    )
+
+    asyncio.run(
+        verifier.verify_and_maybe_retry(
+            object(),
+            {"task_id": "task", "ok": False},
+            user_request="named character",
+            width=1024,
+            height=1536,
+            steps=30,
+            cfg=5.0,
+            negative_prompt=None,
+        )
+    )
+
+    verification = recorder.written[0]["verification_summary"]
+    assert verification["enabled"] is True
+    assert verification["forced_named_character"] is True
     assert verification["skip_reason"] == "generation_failed"
