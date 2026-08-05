@@ -640,6 +640,68 @@
       }
     }
   },
+  "anima_master_multi_person": {
+    "description": "多人生成",
+    "type": "object",
+    "hint": "只影响 /anm 多人：控制候选采样、视觉检查、降级发送和并发。",
+    "items": {
+      "multi_candidate_count": {
+        "description": "多人候选数量",
+        "type": "int",
+        "default": 2,
+        "hint": "可选 1 到 3；首张通过检查时会提前结束。"
+      },
+      "multi_verify_enabled": {
+        "description": "启用多人视觉检查",
+        "type": "bool",
+        "default": true,
+        "hint": "检查人数、单一场景、主要肢体问题、互动方向和角色区分。"
+      },
+      "multi_verify_provider_id": {
+        "description": "多人视觉检查模型",
+        "type": "string",
+        "default": "",
+        "hint": "留空时依次使用通用自检模型、会话看图模型或会话主模型。",
+        "collapsed": true,
+        "condition": {
+          "multi_verify_enabled": true
+        }
+      },
+      "multi_verify_pass_score": {
+        "description": "多人候选合格分数",
+        "type": "int",
+        "default": 6,
+        "hint": "示例：6",
+        "collapsed": true,
+        "condition": {
+          "multi_verify_enabled": true
+        }
+      },
+      "multi_send_degraded_candidate": {
+        "description": "发送未完全合格的最佳候选",
+        "type": "bool",
+        "default": true,
+        "hint": "全部候选都未通过时，仍发送结构最接近要求的一张。"
+      },
+      "multi_show_degraded_notice": {
+        "description": "提示多人候选降级",
+        "type": "bool",
+        "default": false,
+        "hint": "开启后会在发送最佳降级候选前提示用户。",
+        "collapsed": true,
+        "condition": {
+          "multi_send_degraded_candidate": true
+        }
+      },
+      "multi_max_concurrent_generations": {
+        "description": "多人生成并发上限",
+        "type": "int",
+        "default": 1,
+        "hint": "只限制 /anm 多人，避免多个候选组同时争用 ComfyUI。",
+        "collapsed": true
+      }
+    }
+  },
   "anima_master_delivery": {
     "description": "发送与权限",
     "type": "object",

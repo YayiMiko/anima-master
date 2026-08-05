@@ -366,8 +366,8 @@ class PromptPipeline:
             summary: Mutable request summary populated by this branch.
 
         Returns:
-            Completed prompt result, or None when planning fails and the caller
-            should fall back to the ordinary prompt path.
+            Completed prompt result, or None when planning fails and generation
+            must stop without entering the ordinary prompt path.
         """
         configured_characters = fixed_character_tags(prompt_config)
         mentioned_fixed_characters = {
@@ -379,32 +379,68 @@ class PromptPipeline:
             prompt,
             fixed_characters=mentioned_fixed_characters,
         )
-        try:
-            raw_plan = await self._generate_multi_person_plan_with_llm(
-                provider_id=provider_id,
-                plan_prompt=plan_prompt,
-                use_deep_thinking=use_deep_thinking,
-            )
-        except Exception as exc:
-            self.logger.warning("[comfyui_agent] multi-person planner failed: %s", exc)
-            summary.update(
-                {
-                    "multi_person_mode": True,
-                    "multi_person_plan_failed": True,
-                    "multi_person_error": self._shorten(str(exc), 300),
-                }
-            )
-            return None
-        plan = parse_multi_person_plan(raw_plan)
+        raw_plan = ""
+        plan = None
+        planner_error = "invalid_plan"
+        planner_retry_count = 0
+        for attempt in range(2):
+            try:
+                raw_plan = await self._generate_multi_person_plan_with_llm(
+                    provider_id=provider_id,
+                    plan_prompt=plan_prompt,
+                    use_deep_thinking=use_deep_thinking,
+                )
+            except Exception as exc:
+                planner_error = self._shorten(str(exc), 300)
+                self.logger.warning(
+                    "[comfyui_agent] multi-person planner attempt %s failed: %s",
+                    attempt + 1,
+                    exc,
+                )
+            else:
+                candidate = parse_multi_person_plan(raw_plan)
+                if candidate is not None:
+                    allowed_aliases = {
+                        f"CHARACTER {letter}"
+                        for letter in "ABCD"[: len(candidate.characters)]
+                    }
+                    interaction_aliases = {
+                        alias.upper()
+                        for interaction in candidate.interactions
+                        for alias in re.findall(
+                            r"\bCharacter\s+[A-D]\b",
+                            interaction,
+                            flags=re.IGNORECASE,
+                        )
+                    }
+                    if (
+                        candidate.interactions
+                        and interaction_aliases
+                        and not interaction_aliases.issubset(allowed_aliases)
+                    ):
+                        planner_error = "invalid_interaction_aliases"
+                    else:
+                        plan = candidate
+                        break
+                else:
+                    planner_error = "invalid_plan"
+            if attempt == 0:
+                planner_retry_count = 1
+                plan_prompt += (
+                    "\nThe previous response was invalid. Return corrected JSON only. "
+                    "Keep 2 to 4 characters, reference only defined Character aliases "
+                    "inside interactions, and preserve one coherent shared scene."
+                )
         if plan is None:
             self.logger.warning(
-                "[comfyui_agent] multi-person planner returned invalid JSON"
+                "[comfyui_agent] multi-person planner stopped: %s", planner_error
             )
             summary.update(
                 {
                     "multi_person_mode": True,
                     "multi_person_plan_failed": True,
-                    "multi_person_error": "invalid_plan",
+                    "multi_person_error": planner_error,
+                    "multi_person_planner_retry_count": planner_retry_count,
                 }
             )
             return None
@@ -417,35 +453,27 @@ class PromptPipeline:
         unresolved_character_count = 0
         character_resolution_statuses: list[dict[str, Any]] = []
         character_slots: list[str] = []
+        character_roles: list[str] = []
+        emphasized_anchor_count = 0
         used_fixed_names: set[str] = set()
+        fixed_genders: list[str] = []
         aliases = ("Character A", "Character B", "Character C", "Character D")
-        interaction_text = " ".join(plan.interactions)
-        contact_source = f"{prompt} {interaction_text}".lower()
-        grouped_contact = any(
-            marker in contact_source
-            for marker in (
-                "扑倒",
-                "压倒",
-                "按倒",
-                "骑在",
-                "拥抱",
-                "抱住",
-                "亲吻",
-                "接吻",
-                "搂住",
-                "扭打",
-                "摔跤",
-                "pounce",
-                "pin down",
-                "pinning",
-                "on top of",
-                "hug",
-                "embrace",
-                "kiss",
-                "wrestl",
-                "grappl",
+        explicit_position_requested = bool(
+            re.search(
+                r"左边|右边|左侧|右侧|前景|后方|前后站位|"
+                r"\bon\s+the\s+(?:left|right)\b|\bforeground\b|\bbackground\b",
+                prompt,
+                flags=re.IGNORECASE,
             )
         )
+        spatial_mode = plan.spatial_mode
+        if explicit_position_requested:
+            spatial_mode = "explicit_positions"
+        elif plan.interactions:
+            spatial_mode = "shared_contact"
+        elif spatial_mode == "explicit_positions":
+            spatial_mode = "shared_scene"
+        grouped_contact = spatial_mode == "shared_contact"
         for index, character in enumerate(plan.characters):
             character_slots.append(character.slot)
             fixed_name = next(
@@ -467,9 +495,17 @@ class PromptPipeline:
             candidate_hints: tuple[str, ...] = ()
             if fixed_name:
                 used_fixed_names.add(fixed_name)
+                configured_tags = split_tags(configured_characters[fixed_name])
+                normalized_configured_tags = {
+                    tag.lower().replace(" ", "") for tag in configured_tags
+                }
+                if "1girl" in normalized_configured_tags:
+                    fixed_genders.append("girl")
+                elif "1boy" in normalized_configured_tags:
+                    fixed_genders.append("boy")
                 fixed_tags = ", ".join(
                     tag
-                    for tag in split_tags(configured_characters[fixed_name])
+                    for tag in configured_tags
                     if tag.lower()
                     not in {
                         "1girl",
@@ -524,13 +560,119 @@ class PromptPipeline:
                 else:
                     resolved_identity = character.danbooru_candidate
                     unresolved_character_count += 1
+            available_identity_tags = [
+                tag.strip(" ()")
+                for tag in split_tags(fixed_tags or character.appearance)
+                if tag.strip(" ()")
+                and tag.strip(" ()").lower()
+                not in {"1girl", "1 girl", "1boy", "1 boy", "solo"}
+            ]
+            proposed_identity_tags = [
+                str(tag).strip(" ()")
+                for tag in character.identity_anchors
+                if str(tag).strip(" ()")
+            ]
+            if fixed_name or resolution_status == "resolved":
+                fixed_source = re.sub(
+                    r"[^a-z0-9]+",
+                    " ",
+                    (
+                        configured_characters[fixed_name] if fixed_name else fixed_tags
+                    ).lower(),
+                )
+                identity_tags = [
+                    tag
+                    for tag in proposed_identity_tags
+                    if re.sub(r"[^a-z0-9]+", " ", tag.lower()).strip() in fixed_source
+                ][:6]
+            else:
+                identity_tags = proposed_identity_tags[:6]
+            if not identity_tags:
+                identity_tags = available_identity_tags[:6]
+            visual_label = str(character.visual_label or "").strip().lower()
+            if visual_label and (fixed_name or resolution_status == "resolved"):
+                label_terms = re.sub(
+                    r"[^a-z0-9]+",
+                    " ",
+                    visual_label.replace("haired", "hair")
+                    .replace("eyed", "eyes")
+                    .replace("eared", "ears"),
+                ).split()
+                label_terms = [
+                    term
+                    for term in label_terms
+                    if term not in {"girl", "boy", "woman", "man", "person"}
+                ]
+                label_source = re.sub(
+                    r"[^a-z0-9]+",
+                    " ",
+                    (
+                        configured_characters[fixed_name] if fixed_name else fixed_tags
+                    ).lower(),
+                )
+                if not label_terms or any(
+                    term not in label_source for term in label_terms
+                ):
+                    visual_label = ""
+            if not visual_label or re.search(
+                r"\b(?:character\s+[a-d]|first|second|third|fourth|rider|"
+                r"support(?:ing|er)?|left|right|top|bottom)\b",
+                visual_label,
+                flags=re.IGNORECASE,
+            ):
+                descriptors: list[str] = []
+                for tag in identity_tags[:2]:
+                    descriptor = re.sub(r"[()_:]+", " ", tag.lower())
+                    descriptor = re.sub(r"\s+", " ", descriptor).strip()
+                    descriptor = re.sub(r"\s+hair$", "-haired", descriptor)
+                    descriptor = re.sub(r"\s+eyes$", "-eyed", descriptor)
+                    descriptor = re.sub(r"\s+ears$", "-eared", descriptor)
+                    if descriptor:
+                        descriptors.append(descriptor.replace(" ", "-"))
+                gender_label = (
+                    "girl"
+                    if any("girl" in tag.lower() for tag in plan.count_tags)
+                    else "person"
+                )
+                visual_label = " ".join((*descriptors, gender_label)).strip()
+            if not visual_label:
+                visual_label = str(character.role or aliases[index]).strip().lower()
+            if visual_label in character_roles:
+                visual_label = f"{visual_label} {index + 1}"
+            character_roles.append(visual_label)
+
+            emphasized = {
+                re.sub(r"[^a-z0-9]+", " ", str(tag).lower()).strip()
+                for tag in character.emphasized_anchors
+                if str(tag).strip()
+            }
+            rendered_identity_tags = [
+                f"({tag}:1.3)"
+                if re.sub(r"[^a-z0-9]+", " ", tag.lower()).strip() in emphasized
+                else tag
+                for tag in identity_tags
+            ]
+            emphasized_anchor_count += sum(
+                rendered != original
+                for rendered, original in zip(
+                    rendered_identity_tags, identity_tags, strict=True
+                )
+            )
             character_resolution_statuses.append(
                 {
+                    "alias": aliases[index],
+                    "role": visual_label,
                     "name": character.name,
                     "status": resolution_status,
                     "canonical_tag": resolved_identity
                     if resolution_status == "resolved"
                     else "",
+                    "identity_tags": identity_tags,
+                    "emphasized_identity_tags": [
+                        tag
+                        for tag in identity_tags
+                        if re.sub(r"[^a-z0-9]+", " ", tag.lower()).strip() in emphasized
+                    ],
                     "candidate_hints": list(candidate_hints),
                 }
             )
@@ -549,10 +691,13 @@ class PromptPipeline:
             character_blocks.append(
                 render_multi_person_character(
                     character,
-                    alias=aliases[index],
+                    alias=visual_label,
                     resolved_identity=resolved_identity,
-                    fixed_tags=fixed_tags,
+                    fixed_tags=fixed_tags if fixed_name else "",
                     grouped_contact=grouped_contact,
+                    explicit_positions=spatial_mode == "explicit_positions",
+                    identity_anchors=tuple(rendered_identity_tags),
+                    include_pose=not grouped_contact,
                 )
             )
 
@@ -565,10 +710,53 @@ class PromptPipeline:
             "duplicate character",
             "cloned character",
         )
-        common_content = ", ".join(
+        character_count = len(plan.characters)
+        deterministic_count_tags: tuple[str, ...] = ()
+        if len(fixed_genders) == character_count:
+            girl_count = fixed_genders.count("girl")
+            boy_count = fixed_genders.count("boy")
+            deterministic_count_tags = tuple(
+                tag
+                for tag in (
+                    f"{girl_count}girls" if girl_count else "",
+                    f"{boy_count}boys" if boy_count else "",
+                )
+                if tag
+            )
+        if not deterministic_count_tags:
+            deterministic_count_tags = tuple(
+                tag
+                for tag in plan.count_tags
+                if (
+                    (
+                        match := re.fullmatch(
+                            r"\s*(\d+)\s*(girls?|boys?|people|persons?)\s*",
+                            tag,
+                            flags=re.IGNORECASE,
+                        )
+                    )
+                    and int(match.group(1)) == character_count
+                )
+            )[:1] or (f"{character_count}people",)
+        filtered_common_tags = tuple(
             tag
-            for tag in (*plan.count_tags, *plan.common_tags)
+            for tag in plan.common_tags
             if not any(marker in tag.lower() for marker in blocked_positive_markers)
+            and tag.strip().lower() != str(plan.relationship_tag or "").strip().lower()
+            and not re.fullmatch(
+                r"\s*\d+\s*(girls?|boys?|people|persons?)\s*",
+                tag,
+                flags=re.IGNORECASE,
+            )
+        )
+        relationship_tag = str(plan.relationship_tag or "").strip()
+        common_content = ", ".join(
+            (
+                *deterministic_count_tags,
+                *(("duo",) if character_count == 2 else ()),
+                *((relationship_tag,) if relationship_tag else ()),
+                *filtered_common_tags,
+            )
         )
         low_cfg_harness = bool(prompt_config.get("low_cfg_harness_enabled", False))
         constraint_raw = ""
@@ -616,26 +804,72 @@ class PromptPipeline:
             normalized = re.sub(r"\s+([,.;:!?])", r"\1", normalized)
             normalized_interactions.append(normalized)
 
-        character_aliases = ", ".join(aliases[: len(plan.characters)])
-        scene_guard = (
-            f"A single unified full-frame composition contains exactly "
-            f"{len(plan.characters)} distinct people: {character_aliases}. "
-            "All are visible together in the same camera view and the same moment."
-        )
-        composition_guard = (
-            f"{character_aliases} form one shared close-contact action group "
-            "inside the same full-frame camera view."
-            if grouped_contact
-            else (
-                f"{character_aliases} share one continuous physical environment "
-                "inside the same full-frame camera view."
+        normalized_aliases = {
+            alias.upper()
+            for interaction in normalized_interactions
+            for alias in re.findall(
+                r"\bCharacter\s+[A-D]\b",
+                interaction,
+                flags=re.IGNORECASE,
             )
-        )
-        narrative_blocks = (
-            scene_guard,
-            *character_blocks,
-            *normalized_interactions,
-            composition_guard,
+        }
+        allowed_aliases = {alias.upper() for alias in aliases[: len(plan.characters)]}
+        if normalized_interactions and (
+            not normalized_aliases.issubset(allowed_aliases)
+            or len(normalized_aliases) < 2
+        ):
+            summary.update(
+                {
+                    "multi_person_mode": True,
+                    "multi_person_plan_failed": True,
+                    "multi_person_error": "invalid_interaction_aliases",
+                    "multi_person_planner_retry_count": planner_retry_count,
+                }
+            )
+            return None
+
+        display_interactions: list[str] = []
+        for interaction in normalized_interactions:
+            displayed = interaction
+            for alias, role in zip(
+                aliases[: len(plan.characters)], character_roles, strict=True
+            ):
+                displayed = re.sub(
+                    rf"\b{re.escape(alias)}\b",
+                    f"the {role}",
+                    displayed,
+                    flags=re.IGNORECASE,
+                )
+            display_interactions.append(displayed)
+
+        scene_guard = "The composition shows one shared continuous moment."
+        relative_position = ""
+        if spatial_mode == "explicit_positions" and len(plan.characters) == 2:
+            slot_aliases = {
+                character.slot: f"the {character_roles[index]}"
+                for index, character in enumerate(plan.characters)
+            }
+            if {"left", "right"}.issubset(slot_aliases):
+                relative_position = (
+                    f"{slot_aliases['left']} stands immediately beside "
+                    f"{slot_aliases['right']}, to {slot_aliases['right']}'s left, "
+                    "while both remain in the same central group."
+                )
+            elif {"foreground", "background"}.issubset(slot_aliases):
+                relative_position = (
+                    f"{slot_aliases['foreground']} stands slightly in front of "
+                    f"{slot_aliases['background']} while both remain together in "
+                    "the same continuous scene."
+                )
+        narrative_blocks = tuple(
+            block
+            for block in (
+                *character_blocks,
+                *display_interactions,
+                relative_position,
+                scene_guard,
+            )
+            if block
         )
         built = build_final_prompt(
             user_prompt=prompt,
@@ -651,6 +885,7 @@ class PromptPipeline:
             {
                 "multi_person_mode": True,
                 "multi_person_plan_failed": False,
+                "multi_person_planner_retry_count": planner_retry_count,
                 "planned_character_count": len(plan.characters),
                 "resolved_character_count": resolved_count,
                 "fixed_character_count": fixed_character_count,
@@ -659,8 +894,13 @@ class PromptPipeline:
                 "character_resolution_statuses": character_resolution_statuses,
                 "named_character_detected": bool(plan.characters),
                 "character_slots": character_slots,
+                "character_roles": character_roles,
                 "interaction_count": len(plan.interactions),
+                "relationship_tag": relationship_tag,
+                "emphasized_anchor_count": emphasized_anchor_count,
                 "grouped_contact": grouped_contact,
+                "spatial_mode": spatial_mode,
+                "explicit_position_requested": explicit_position_requested,
                 "interaction_aliases_normalized": (
                     tuple(normalized_interactions) != plan.interactions
                 ),
@@ -821,6 +1061,17 @@ class PromptPipeline:
             )
             if multi_result is not None:
                 return multi_result
+            summary.setdefault("multi_person_mode", True)
+            summary.setdefault("multi_person_plan_failed", True)
+            summary.setdefault("multi_person_error", "invalid_plan")
+            summary.update(
+                {
+                    "skipped_reason": "multi_person_plan_failed",
+                    "final_prompt_head": "",
+                    "final_prompt_chars": 0,
+                }
+            )
+            return PromptPipelineResult("", summary)
         outfit_summary = ""
         outfit_summary_source = ""
         reference_tag_text = (

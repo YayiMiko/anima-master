@@ -45,6 +45,14 @@ class Verdict:
     score: int = 10
     issues: list[str] = field(default_factory=list)
     fix_hint: str = ""
+    checks: dict[str, bool] = field(default_factory=dict)
+    visible_person_count: int | None = None
+    layout: str = ""
+    identity_match: str = ""
+    identity_confidence: float = 0.0
+    interaction_direction: str = ""
+    direction_confidence: float = 0.0
+    major_anatomy_issue: bool = False
     skipped: bool = False
     error: str = ""
 
@@ -72,6 +80,7 @@ async def verify_image(
     image_path: str,
     user_request: str,
     pass_score: int = 7,
+    require_facts: bool = False,
 ) -> Verdict:
     """Ask a vision LLM whether ``image_path`` satisfies ``user_request``.
 
@@ -84,20 +93,38 @@ async def verify_image(
         image_path: Local path of the generated image to review.
         user_request: The user's original (Chinese) drawing request.
         pass_score: Minimum score (0-10) required to pass.
+        require_facts: Whether to retry the vision response once when a
+            multi-person fact object is missing.
 
     Returns:
         A :class:`Verdict` describing the outcome.
     """
     prompt = f"用户的原始画图请求（中文）：\n{user_request}\n\n请审查这张图片。"
-    try:
-        reply = await llm_call(prompt=prompt, image_urls=[image_path])
-    except Exception as exc:  # noqa: BLE001 - provider may not support vision
-        return Verdict(passed=True, skipped=True, error=f"{type(exc).__name__}: {exc}")
-
-    try:
-        data = _extract_json(reply)
-    except Exception as exc:  # noqa: BLE001 - unparseable judgement -> skip
-        return Verdict(passed=True, skipped=True, error=f"{type(exc).__name__}: {exc}")
+    data: dict = {}
+    last_error: Exception | None = None
+    for attempt in range(2 if require_facts else 1):
+        current_prompt = prompt
+        if attempt:
+            current_prompt += (
+                "\n\n上次遗漏了 multi_facts。请重新观察图片并严格按要求的 JSON "
+                "结构返回可直接观察到的事实，不要沿用上次结论。"
+            )
+        try:
+            reply = await llm_call(prompt=current_prompt, image_urls=[image_path])
+            candidate = _extract_json(reply)
+        except Exception as exc:  # noqa: BLE001 - provider may not support vision
+            last_error = exc
+            continue
+        data = candidate
+        if not require_facts or isinstance(candidate.get("multi_facts"), dict):
+            break
+    if not data:
+        error = last_error or ValueError("no verification JSON")
+        return Verdict(
+            passed=True,
+            skipped=True,
+            error=f"{type(error).__name__}: {error}",
+        )
 
     try:
         score = int(data.get("score", 10))
@@ -110,6 +137,40 @@ async def verify_image(
         else []
     )
     fix_hint = str(data.get("fix_hint") or "").strip()
+    checks_raw = data.get("multi_checks")
+    checks = (
+        {
+            str(key): value
+            for key, value in checks_raw.items()
+            if isinstance(value, bool)
+        }
+        if isinstance(checks_raw, dict)
+        else {}
+    )
+    facts_raw = data.get("multi_facts")
+    facts = facts_raw if isinstance(facts_raw, dict) else {}
+    try:
+        visible_person_count = int(facts.get("visible_person_count"))
+    except (TypeError, ValueError):
+        visible_person_count = None
+    layout = str(facts.get("layout") or "").strip().lower()
+    identity_match = str(facts.get("identity_match") or "").strip().lower()
+    interaction_direction = (
+        str(facts.get("interaction_direction") or "").strip().lower()
+    )
+    try:
+        identity_confidence = min(
+            1.0, max(0.0, float(facts.get("identity_confidence") or 0.0))
+        )
+    except (TypeError, ValueError):
+        identity_confidence = 0.0
+    try:
+        direction_confidence = min(
+            1.0, max(0.0, float(facts.get("direction_confidence") or 0.0))
+        )
+    except (TypeError, ValueError):
+        direction_confidence = 0.0
+    major_anatomy_issue = facts.get("major_anatomy_issue") is True
 
     # Trust an explicit pass flag, but also enforce the score threshold so a
     # model that says pass=true with a low score still fails.
@@ -118,5 +179,17 @@ async def verify_image(
         passed = explicit_pass and score >= pass_score
     else:
         passed = score >= pass_score
-
-    return Verdict(passed=passed, score=score, issues=issues, fix_hint=fix_hint)
+    return Verdict(
+        passed=passed,
+        score=score,
+        issues=issues,
+        fix_hint=fix_hint,
+        checks=checks,
+        visible_person_count=visible_person_count,
+        layout=layout,
+        identity_match=identity_match,
+        identity_confidence=identity_confidence,
+        interaction_direction=interaction_direction,
+        direction_confidence=direction_confidence,
+        major_anatomy_issue=major_anatomy_issue,
+    )

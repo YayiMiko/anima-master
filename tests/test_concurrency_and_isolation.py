@@ -291,3 +291,43 @@ def test_image_ack_timeout_emits_plain_text_notice(
     assert [kind for kind, _text in event.sent] == ["image", "plain"]
     assert "回执超时" in event.sent[-1][1]
     assert payload["delivery"]["status"] == "ack_timeout"
+
+
+def test_delivery_sends_the_verifier_selected_output_first(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    first = tmp_path / "first.png"
+    selected = tmp_path / "selected.png"
+    first.write_bytes(b"first")
+    selected.write_bytes(b"selected")
+
+    class _SendEvent:
+        def __init__(self) -> None:
+            self.sent: list[str] = []
+
+        def chain_result(self, chain):
+            return chain[0]
+
+        async def send(self, result: str) -> None:
+            self.sent.append(result)
+
+    monkeypatch.setattr(
+        runtime_module.Comp.Image,
+        "fromFileSystem",
+        staticmethod(lambda path: path),
+    )
+    runtime = ComfyUIRuntime.__new__(ComfyUIRuntime)
+    runtime._bool = lambda _key, default: default
+    runtime._int = lambda _key, default: default
+    runtime.logger = _Logger()
+    event = _SendEvent()
+    payload = {
+        "ok": True,
+        "outputs": [str(first), str(selected)],
+        "selected_output_path": str(selected),
+    }
+
+    asyncio.run(runtime.send_payload(event, payload))
+
+    assert event.sent == [str(selected)]

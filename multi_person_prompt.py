@@ -18,6 +18,10 @@ class MultiPersonCharacter:
     expression: str
     pose: str
     props: tuple[str, ...]
+    role: str = ""
+    visual_label: str = ""
+    identity_anchors: tuple[str, ...] = ()
+    emphasized_anchors: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -29,6 +33,8 @@ class MultiPersonPlan:
     characters: tuple[MultiPersonCharacter, ...]
     interactions: tuple[str, ...]
     composition: str
+    spatial_mode: str
+    relationship_tag: str = ""
 
 
 MULTI_PERSON_NEGATIVE_TAGS = (
@@ -68,6 +74,12 @@ _UNSAFE_COMPOSITION_MARKERS = (
     "bottom right",
 )
 
+_SAFE_SPATIAL_MODES = {
+    "shared_contact",
+    "shared_scene",
+    "explicit_positions",
+}
+
 
 def build_multi_person_plan_prompt(
     user_prompt: str,
@@ -95,7 +107,7 @@ def build_multi_person_plan_prompt(
 
 Use the user's requested identities, count, clothing, expressions, props, positions, and relationships. You may freely design compatible mutable details, background, lighting, and atmosphere when the user leaves them open.
 
-Separate every person into an independent semantic block. Use stable spatial labels such as left, right, center, foreground, or background. For two people, prefer left and right unless the user explicitly requests foreground and background. When the requested action requires overlapping bodies or close physical contact, the slot values are bookkeeping only and must not describe separate regions of the image. Never use top_left, top_right, bottom_left, bottom_right, upper, lower, panel, or "side of the image".
+Separate every person into an independent semantic block. Position slots are bookkeeping only and must never describe separate regions, panels, views, or sides of the image. Prefer one shared central group. Use explicit positions only when the user directly asks for left/right or foreground/background placement. Never use top_left, top_right, bottom_left, bottom_right, upper, lower, panel, or "side of the image".
 
 For an existing named character, preserve the user's written name in "name" and provide the most likely Danbooru character tag in "danbooru_candidate". For an original or generic person, leave "danbooru_candidate" empty.
 
@@ -110,6 +122,10 @@ Return JSON only with this exact shape:
       "slot": "left",
       "name": "character name from the user",
       "danbooru_candidate": "romanized_character_tag",
+      "role": "short semantic role such as rider or supporting girl",
+      "visual_label": "distinctive visible label such as white-haired fox girl",
+      "identity_anchors": ["3 to 6 short appearance tags"],
+      "emphasized_anchors": ["0 to 3 explicitly requested unusual traits"],
       "appearance": "Visible identity traits for a non-fixed character only; empty for a locally saved character.",
       "clothing": "One concise English clothing phrase.",
       "expression": "One concise English expression phrase.",
@@ -127,9 +143,11 @@ Return JSON only with this exact shape:
       "props": []
     }}
   ],
+  "relationship_tag": "holding hands",
   "interactions": [
     "Character A is holding Character B's hand."
   ],
+  "spatial_mode": "shared_contact",
   "composition": "A single unified full-frame composition using one camera view."
 }}
 
@@ -137,13 +155,19 @@ Rules:
 - Include exactly 2 to 4 character objects.
 - count_tags must agree with the number and genders requested by the user.
 - common_tags contain only shared scene, framing, camera, lighting, atmosphere, and count tags.
+- relationship_tag is one short Danbooru-style relationship or action tag and appears immediately after the count tags in the final prompt.
 - Do not put character names or character-specific appearance in common_tags.
+- role is optional semantic bookkeeping and is not used to identify a person in the final interaction sentence.
+- visual_label must be a unique 2 to 6 word visible description derived from identity_anchors, such as "white-haired fox girl" or "silver-haired vampire girl". Do not use names, ordinal labels, rider, supporter, top, bottom, left, or right as visual_label.
+- identity_anchors must contain only 3 to 6 concise visible identity traits. For locally saved characters, select them only from the saved defining tags.
+- emphasized_anchors may contain at most 3 identity_anchors that the user explicitly requested and that are unusual, contrastive, or likely to be confused between people. Never invent emphasis.
 - For locally saved characters, appearance must be empty and saved defining tags must never be contradicted.
 - Do not output quality tags, safety tags, artist tags, Markdown, or explanations.
 - Keep character fields and relationships visually concrete.
 - Preserve the user's explicit interaction direction and gaze direction.
 - Put the complete directed relationship in exactly one interactions entry. Character pose fields must not repeat the relationship.
 - Refer to people inside interactions exclusively as Character A, Character B, Character C, or Character D. Never use their names, translated names, or Danbooru tags there.
+- spatial_mode must be shared_contact for physical interaction, shared_scene for a non-contact group, or explicit_positions only when the user explicitly requests relative positions.
 - Prefer a single coherent moment rather than multiple competing actions.
 - composition must use affirmative language to request one unified full-frame camera view.
 
@@ -211,6 +235,12 @@ def parse_multi_person_plan(text: str) -> MultiPersonPlan | None:
                 expression=_clean_text(item.get("expression"), 240),
                 pose=_clean_text(item.get("pose"), 400),
                 props=_string_tuple(item.get("props"), 12, 120),
+                role=_clean_text(item.get("role"), 80),
+                visual_label=_clean_text(item.get("visual_label"), 100),
+                identity_anchors=_string_tuple(item.get("identity_anchors"), 6, 100),
+                emphasized_anchors=_string_tuple(
+                    item.get("emphasized_anchors"), 3, 100
+                ),
             )
         )
 
@@ -218,6 +248,10 @@ def parse_multi_person_plan(text: str) -> MultiPersonPlan | None:
     common_tags = _string_tuple(data.get("common_tags"), 50, 100)
     interactions = _string_tuple(data.get("interactions"), 1, 500)
     composition = _clean_text(data.get("composition"), 700)
+    spatial_mode = _clean_text(data.get("spatial_mode"), 40).lower()
+    relationship_tag = _clean_text(data.get("relationship_tag"), 120)
+    if spatial_mode not in _SAFE_SPATIAL_MODES:
+        spatial_mode = "shared_contact" if interactions else "shared_scene"
     if any(marker in composition.lower() for marker in _UNSAFE_COMPOSITION_MARKERS):
         composition = ""
     return MultiPersonPlan(
@@ -226,6 +260,8 @@ def parse_multi_person_plan(text: str) -> MultiPersonPlan | None:
         characters=tuple(characters),
         interactions=interactions,
         composition=composition,
+        spatial_mode=spatial_mode,
+        relationship_tag=relationship_tag,
     )
 
 
@@ -236,6 +272,9 @@ def render_multi_person_character(
     resolved_identity: str = "",
     fixed_tags: str = "",
     grouped_contact: bool = False,
+    explicit_positions: bool = False,
+    identity_anchors: tuple[str, ...] = (),
+    include_pose: bool = True,
 ) -> str:
     """Render one character as an Anima-friendly natural-language block.
 
@@ -246,36 +285,38 @@ def render_multi_person_character(
         fixed_tags: Locally saved fixed-character tags, when available.
         grouped_contact: Whether to omit independent spatial placement because
             the characters form one overlapping physical interaction.
+        explicit_positions: Whether the user explicitly requested relative
+            placement.
+        identity_anchors: Compact validated identity traits for this person.
+        include_pose: Whether to include the per-character pose.
 
     Returns:
         A concise English block with stable spatial ownership.
     """
-    label = (
-        f"Within the shared close-contact group, {alias}"
-        if grouped_contact
-        else f"On the {character.slot}, {alias}"
-    )
+    label = str(alias or character.visual_label or character.role).strip()
+    if explicit_positions and character.slot:
+        label = f"{character.slot} {label}"
     identity = str(resolved_identity or character.danbooru_candidate or "").strip()
-    parts: list[str] = []
-    if identity:
-        parts.append(f"{label} is {identity}")
-    elif character.name:
-        parts.append(f"{label} is the character named {character.name}")
-    else:
-        parts.append(f"{label} is a distinct person")
-    if fixed_tags:
-        parts.append(f"{alias}'s authoritative defining tags are: {fixed_tags}")
-    elif character.appearance:
-        parts.append(f"{alias}'s appearance is: {character.appearance}")
+    details: list[str] = []
+    if identity and not fixed_tags:
+        details.append(identity)
+    if identity_anchors:
+        details.extend(identity_anchors)
+    elif fixed_tags:
+        details.extend(
+            part.strip(" ()") for part in fixed_tags.split(",") if part.strip(" ()")
+        )
+    if not identity_anchors and not fixed_tags and character.appearance:
+        details.append(character.appearance)
     if character.clothing:
-        parts.append(f"{alias} wears: {character.clothing}")
+        details.append(character.clothing)
     if character.expression:
-        parts.append(f"{alias}'s expression is: {character.expression}")
-    if character.pose:
-        parts.append(f"{alias}'s pose is: {character.pose}")
+        details.append(character.expression)
+    if include_pose and character.pose:
+        details.append(character.pose)
     if character.props:
-        parts.append(f"{alias}'s props are: {', '.join(character.props)}")
-    return ". ".join(part.rstrip(" .") for part in parts if part.strip()) + "."
+        details.extend(character.props)
+    return f"{label}: {', '.join(part for part in details if part)}."
 
 
 def _string_tuple(value: Any, limit: int, item_limit: int) -> tuple[str, ...]:

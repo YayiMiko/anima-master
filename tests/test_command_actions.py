@@ -97,7 +97,7 @@ def test_generate_action_rejects_unavailable_size_before_generation():
     assert calls == []
 
 
-def test_multi_person_action_uses_horizontal_default_and_request_flag():
+def test_multi_person_action_uses_square_default_and_request_flag():
     calls = []
 
     async def generate(event, prompt, **kwargs):
@@ -121,8 +121,8 @@ def test_multi_person_action_uses_horizontal_default_and_request_flag():
         (
             "左边若叶睦，右边千早爱音，两人牵手",
             {
-                "width": 1216,
-                "height": 832,
+                "width": 1024,
+                "height": 1024,
                 "negative_prompt": (
                     f"{DEFAULT_NEGATIVE_PROMPT}, "
                     f"{', '.join(MULTI_PERSON_NEGATIVE_TAGS)}"
@@ -166,4 +166,33 @@ def test_multi_person_action_preserves_explicit_vertical_size():
                 "multi_person": True,
             },
         )
+    ]
+
+
+def test_multi_person_action_chooses_layout_aware_defaults():
+    calls = []
+
+    async def generate(event, prompt, **kwargs):
+        calls.append((prompt, kwargs["width"], kwargs["height"]))
+
+    handler = _handler(
+        config={
+            "allowed_sizes": [
+                "1024x1024",
+                "1152x896",
+                "1216x832",
+                "1024x1536",
+            ]
+        },
+        generate=generate,
+    )
+
+    asyncio.run(handler.handle_action(object(), "multi_person", "两个女孩并肩站立"))
+    asyncio.run(handler.handle_action(object(), "multi_person", "狐娘骑在少女肩膀上"))
+    asyncio.run(handler.handle_action(object(), "multi_person", "三人组成乐队合影"))
+
+    assert calls == [
+        ("两个女孩并肩站立", 1152, 896),
+        ("狐娘骑在少女肩膀上", 1024, 1536),
+        ("三人组成乐队合影", 1216, 832),
     ]

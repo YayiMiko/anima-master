@@ -421,11 +421,62 @@ class CommandActionHandler:
             if not prompt:
                 return "请在尺寸后面描述至少两个人物。"
             if size is None and sizes:
+                prompt_lower = prompt.lower()
+                three_or_more = bool(
+                    re.search(
+                        r"(?:三|四|3|4)\s*(?:人|个|名|girls?|boys?|people)|"
+                        r"\b(?:3|4)(?:girls?|boys?|people)\b",
+                        prompt_lower,
+                    )
+                )
+                vertically_stacked = any(
+                    marker in prompt_lower
+                    for marker in (
+                        "骑在肩",
+                        "骑肩",
+                        "肩膀上",
+                        "背着",
+                        "抱起",
+                        "扑倒",
+                        "压在",
+                        "上下叠",
+                        "on the shoulders",
+                        "piggyback",
+                        "carrying",
+                        "on top of",
+                        "stacked",
+                    )
+                )
+                physical_contact = any(
+                    marker in prompt_lower
+                    for marker in (
+                        "牵手",
+                        "拥抱",
+                        "接吻",
+                        "搂着",
+                        "抱着",
+                        "挽着",
+                        "holding hands",
+                        "hugging",
+                        "embracing",
+                        "kissing",
+                        "arm around",
+                    )
+                )
+                target = (
+                    (1216, 832)
+                    if three_or_more
+                    else (1024, 1536)
+                    if vertically_stacked
+                    else (1024, 1024)
+                    if physical_contact
+                    else (1152, 896)
+                )
                 size = min(
                     sizes,
                     key=lambda candidate: (
-                        abs((candidate[0] / candidate[1]) - 1.5),
-                        abs(candidate[0] * candidate[1] - 1024 * 1024),
+                        abs((candidate[0] / candidate[1]) - (target[0] / target[1])),
+                        abs(candidate[0] * candidate[1] - target[0] * target[1]),
                     ),
                 )
             await self._generate(

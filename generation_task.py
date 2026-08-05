@@ -78,6 +78,8 @@ class GenerationTaskRunner:
         cfg: float | None = None,
         negative_prompt: str | None = None,
         multi_person: bool = False,
+        prepared_prompt: str | None = None,
+        prepared_prompt_summary: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Run one generation request and persist a task summary.
 
@@ -90,6 +92,9 @@ class GenerationTaskRunner:
             cfg: Optional CFG override.
             negative_prompt: Optional negative prompt override.
             multi_person: Whether to use structured multi-person prompt planning.
+            prepared_prompt: Previously validated final prompt reused by a
+                multi-person verification retry.
+            prepared_prompt_summary: Summary paired with prepared_prompt.
 
         Returns:
             Payload returned by the ComfyUI helper, or an early failure payload.
@@ -140,33 +145,51 @@ class GenerationTaskRunner:
             self._task_recorder.mark_failure(task, payload["error"])
             self._persist_task(task)
             return payload
-        prompt = await self._augment_reference_image(event, prompt)
-        if prompt is None:
-            image_input_summary = dict(self._image_inputs.last_summary)
+        if prepared_prompt is not None:
+            prompt = str(prepared_prompt).strip()
+            prompt_summary = dict(prepared_prompt_summary or {})
+            prompt_summary["multi_person_prepared_retry"] = True
+        else:
+            prompt = await self._augment_reference_image(event, prompt)
+            if prompt is None:
+                image_input_summary = dict(self._image_inputs.last_summary)
+                payload = {
+                    "ok": False,
+                    "error": "reference_image_not_found",
+                    "task_id": task["task_id"],
+                    "image_input_summary": image_input_summary,
+                }
+                self._task_recorder.mark_reference_missing(task, image_input_summary)
+                self._persist_task(task)
+                return payload
+            if reference_requested:
+                self._task_recorder.mark_reference_context(
+                    task,
+                    image_input_summary=dict(self._image_inputs.last_summary),
+                    reference_context_summary=dict(
+                        self._reference_context.last_summary
+                    ),
+                    applied=prompt != original_prompt,
+                )
+            prompt = self._augment_quoted_spell(event, prompt)
+            prompt = await self._build_prompt(
+                event,
+                prompt,
+                multi_person=multi_person,
+            )
+            prompt_summary = dict(self._prompt_summary())
+        self._task_recorder.mark_prompt_built(task, prompt_summary)
+        if multi_person and (
+            not prompt or prompt_summary.get("multi_person_plan_failed")
+        ):
             payload = {
                 "ok": False,
-                "error": "reference_image_not_found",
+                "error": "multi_person_plan_failed",
                 "task_id": task["task_id"],
-                "image_input_summary": image_input_summary,
             }
-            self._task_recorder.mark_reference_missing(task, image_input_summary)
+            self._task_recorder.mark_failure(task, payload["error"])
             self._persist_task(task)
             return payload
-        if reference_requested:
-            self._task_recorder.mark_reference_context(
-                task,
-                image_input_summary=dict(self._image_inputs.last_summary),
-                reference_context_summary=dict(self._reference_context.last_summary),
-                applied=prompt != original_prompt,
-            )
-        prompt = self._augment_quoted_spell(event, prompt)
-        prompt = await self._build_prompt(
-            event,
-            prompt,
-            multi_person=multi_person,
-        )
-        prompt_summary = dict(self._prompt_summary())
-        self._task_recorder.mark_prompt_built(task, prompt_summary)
         args = ["generate", "--prompt", prompt]
         if width:
             args.extend(["--width", str(int(width))])
@@ -182,6 +205,9 @@ class GenerationTaskRunner:
             args.extend(["--negative-prompt", str(negative_prompt)])
         payload = await self._run_tool(args)
         payload["task_id"] = task["task_id"]
+        if multi_person:
+            payload["_prepared_prompt"] = prompt
+            payload["_prepared_prompt_summary"] = prompt_summary
         if prompt_summary.get("llm_failed"):
             payload["prompt_degraded"] = True
             payload["prompt_degraded_reason"] = str(

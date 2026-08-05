@@ -126,6 +126,20 @@
       ]
     },
     {
+      "key": "anima_master_multi_person",
+      "description": "多人生成",
+      "hint": "只影响 /anm 多人：控制候选采样、视觉检查、降级发送和并发。",
+      "items": [
+        "multi_candidate_count",
+        "multi_verify_enabled",
+        "multi_verify_provider_id",
+        "multi_verify_pass_score",
+        "multi_send_degraded_candidate",
+        "multi_show_degraded_notice",
+        "multi_max_concurrent_generations"
+      ]
+    },
+    {
       "key": "anima_master_delivery",
       "description": "发送与权限",
       "hint": "控制图片是否发回聊天，以及哪些用户可以使用插件。",

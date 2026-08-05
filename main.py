@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from contextvars import ContextVar
 from pathlib import Path
@@ -73,6 +74,9 @@ class ComfyUIAgentPlugin(Star):
         ):
             config.save_config(replace_config=group_config(raw_config, schema_path))
         self.config = apply_config_preset(raw_config)
+        self._multi_generation_semaphore = asyncio.Semaphore(
+            max(1, self._int("multi_max_concurrent_generations", 1))
+        )
         self._danbooru_tag_cache: dict[str, Any] = {}
         self._last_prompt_summary: ContextVar[dict[str, Any]] = ContextVar(
             f"anima_prompt_summary_{id(self)}",
@@ -195,6 +199,8 @@ class ComfyUIAgentPlugin(Star):
         cfg: float | None = None,
         negative_prompt: str | None = None,
         multi_person: bool = False,
+        prepared_prompt: str | None = None,
+        prepared_prompt_summary: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         payload = await self._generation_task.generate_payload(
             event,
@@ -205,6 +211,8 @@ class ComfyUIAgentPlugin(Star):
             cfg=cfg,
             negative_prompt=negative_prompt,
             multi_person=multi_person,
+            prepared_prompt=prepared_prompt,
+            prepared_prompt_summary=prepared_prompt_summary,
         )
         verified = await self._services.generation_verifier.verify_and_maybe_retry(
             event,
@@ -230,48 +238,70 @@ class ComfyUIAgentPlugin(Star):
         negative_prompt: str | None = None,
         multi_person: bool = False,
     ) -> str:
-        payload = await self._generate_payload(
-            event,
-            prompt,
-            width=width,
-            height=height,
-            steps=steps,
-            cfg=cfg,
-            negative_prompt=negative_prompt,
-            multi_person=multi_person,
-        )
-        if payload.get("prompt_degraded"):
-            try:
-                await event.send(
-                    event.plain_result(
-                        "提示词优化服务不可用，本次已使用原始提示词继续生成；"
-                        "结果可能不符合 Danbooru Tag 预期。"
+        if multi_person:
+            await self._multi_generation_semaphore.acquire()
+        try:
+            payload = await self._generate_payload(
+                event,
+                prompt,
+                width=width,
+                height=height,
+                steps=steps,
+                cfg=cfg,
+                negative_prompt=negative_prompt,
+                multi_person=multi_person,
+            )
+            if payload.get("prompt_degraded"):
+                try:
+                    await event.send(
+                        event.plain_result(
+                            "提示词优化服务不可用，本次已使用原始提示词继续生成；"
+                            "结果可能不符合 Danbooru Tag 预期。"
+                        )
                     )
-                )
-            except Exception as exc:
-                logger.warning(
-                    "[comfyui_agent] failed to send prompt degradation notice: %s",
-                    str(exc)[:500],
-                )
-        if payload.get("ok") and payload.get("character_resolution_warning"):
-            try:
-                await event.send(
-                    event.plain_result(
-                        "未能可靠确认部分现有作品角色的 Danbooru Tag；"
-                        "本次仍会发送结果，但角色外观可能偏离设定。"
+                except Exception as exc:
+                    logger.warning(
+                        "[comfyui_agent] failed to send prompt degradation notice: %s",
+                        str(exc)[:500],
                     )
-                )
-            except Exception as exc:
-                logger.warning(
-                    "[comfyui_agent] failed to send character resolution notice: %s",
-                    str(exc)[:500],
-                )
-        result = await self._send_payload(event, payload)
-        self._generation_task.record_delivery(
-            payload.get("task_id"),
-            payload.get("delivery"),
-        )
-        return result
+            if payload.get("ok") and payload.get("character_resolution_warning"):
+                try:
+                    await event.send(
+                        event.plain_result(
+                            "未能可靠确认部分现有作品角色的 Danbooru Tag；"
+                            "本次仍会发送结果，但角色外观可能偏离设定。"
+                        )
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "[comfyui_agent] failed to send character resolution notice: %s",
+                        str(exc)[:500],
+                    )
+            if (
+                payload.get("ok")
+                and payload.get("verification_warning")
+                and self._bool("multi_show_degraded_notice", False)
+            ):
+                try:
+                    await event.send(
+                        event.plain_result(
+                            "多人候选均未完全通过结构检查，已发送其中最接近要求的一张。"
+                        )
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "[comfyui_agent] failed to send multi-person degradation notice: %s",
+                        str(exc)[:500],
+                    )
+            result = await self._send_payload(event, payload)
+            self._generation_task.record_delivery(
+                payload.get("task_id"),
+                payload.get("delivery"),
+            )
+            return result
+        finally:
+            if multi_person:
+                self._multi_generation_semaphore.release()
 
     async def _edit(self, event: AstrMessageEvent, prompt: str) -> str:
         return await self._action_handler.edit(event, prompt)

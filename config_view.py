@@ -75,6 +75,15 @@ CONFIG_FIELD_GROUPS: dict[str, tuple[str, ...]] = {
         "debug_image_reference_enabled",
         "debug_send_payload_enabled",
     ),
+    "multi_person": (
+        "multi_candidate_count",
+        "multi_verify_enabled",
+        "multi_verify_provider_id",
+        "multi_verify_pass_score",
+        "multi_send_degraded_candidate",
+        "multi_show_degraded_notice",
+        "multi_max_concurrent_generations",
+    ),
 }
 
 
@@ -136,6 +145,7 @@ def build_config_debug_lines(
         f"- 图生图：{_bool(config, 'img2img_enabled', False)}",
         f"- 发送到聊天：{_bool(config, 'send_result_to_chat', True)} / 最多 {_int(config, 'max_send_images', 1)} 张",
         f"- 生成后自检：{_bool(config, 'enable_verify', False)} / 分数线 {_int(config, 'verify_pass_score', 7)} / 最多重画 {_int(config, 'max_verify_retry', 1)} 次",
+        f"- 多人候选：{_int(config, 'multi_candidate_count', 2)} 张 / 自检 {_bool(config, 'multi_verify_enabled', True)} / 分数线 {_int(config, 'multi_verify_pass_score', 6)} / 降级发送 {_bool(config, 'multi_send_degraded_candidate', True)} / 并发 {_int(config, 'multi_max_concurrent_generations', 1)}",
         f"- ComfyUI：{_str(config, 'comfyui_base_url', 'http://127.0.0.1:8188')}",
         f"- 工作流：{_str(config, 'custom_workflow_path') if _bool(config, 'custom_workflow_enabled', False) else _str(config, 'workflow', 'anima_t2i')}",
         f"- 默认尺寸：{_int(config, 'width', 1024)}x{_int(config, 'height', 1536)}",

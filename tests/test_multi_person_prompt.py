@@ -9,13 +9,13 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
+from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
 from multi_person_prompt import (  # noqa: E402
     MultiPersonCharacter,
     build_multi_person_plan_prompt,
     parse_multi_person_plan,
     render_multi_person_character,
 )
-from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
 from prompt_pipeline import PromptPipeline  # noqa: E402
 
 
@@ -56,6 +56,10 @@ def _plan_json(*, conflicting_fixed_appearance: bool = False) -> str:
             "characters": [
                 {
                     "slot": "left",
+                    "role": "calm guitarist",
+                    "visual_label": "green-eyed guitarist",
+                    "identity_anchors": ["green eyes"],
+                    "emphasized_anchors": ["green eyes"],
                     "name": "若叶睦",
                     "danbooru_candidate": "mutsumi_wakaba",
                     "appearance": (
@@ -68,6 +72,9 @@ def _plan_json(*, conflicting_fixed_appearance: bool = False) -> str:
                 },
                 {
                     "slot": "right",
+                    "role": "cheerful friend",
+                    "visual_label": "pink-haired friend",
+                    "identity_anchors": ["pink hair"],
                     "name": "千早爱音",
                     "danbooru_candidate": "anon_chihaya",
                     "appearance": "pink hair",
@@ -81,6 +88,7 @@ def _plan_json(*, conflicting_fixed_appearance: bool = False) -> str:
                 "Character B is holding Character A's hand.",
                 "A second competing action that must be discarded.",
             ],
+            "relationship_tag": "holding hands",
             "composition": "Both characters appear once in one continuous scene.",
         },
         ensure_ascii=False,
@@ -128,7 +136,7 @@ def test_character_renderer_uses_fixed_tags_as_authoritative_identity() -> None:
         MultiPersonCharacter(
             slot="left",
             name="狐莉",
-            danbooru_candidate="",
+            danbooru_candidate="wrong_guessed_name",
             appearance="orange hair, blue eyes",
             clothing="black dress",
             expression="smiling",
@@ -139,10 +147,12 @@ def test_character_renderer_uses_fixed_tags_as_authoritative_identity() -> None:
         fixed_tags="white hair, red eyes, fox ears",
     )
 
-    assert "On the left, Character A is the character named 狐莉" in block
+    assert block.startswith("Character A:")
+    assert "wrong_guessed_name" not in block
+    assert "On the left" not in block
     assert "white hair, red eyes, fox ears" in block
     assert "orange hair" not in block
-    assert "Character A wears: black dress" in block
+    assert "black dress" in block
 
 
 def test_plan_prompt_marks_fixed_character_tags_as_authoritative() -> None:
@@ -220,12 +230,17 @@ def test_multi_person_pipeline_builds_hybrid_prompt_and_resolves_each_character(
     assert result.summary["interaction_count"] == 1
     assert result.summary["hybrid_prompt"] is True
     assert "2girls" in result.final_prompt
-    assert "On the left, Character A is verified_mutsumi_wakaba" in (
+    assert "green-eyed girl:" in result.final_prompt
+    assert "(green eyes:1.3)" in result.final_prompt
+    assert "On the left" not in result.final_prompt
+    assert "On the right" not in result.final_prompt
+    assert "the pink-haired girl is holding the green-eyed girl's hand." in (
         result.final_prompt
     )
-    assert "Character B is holding Character A's hand." in result.final_prompt
     assert "A second competing action" not in result.final_prompt
-    assert "exactly 2 distinct people" in result.final_prompt
+    assert "2girls, duo, holding hands" in result.final_prompt
+    assert "Character A" not in result.final_prompt
+    assert "third person" not in result.final_prompt
     assert len(resolver.calls) == 2
 
 
@@ -292,11 +307,14 @@ def test_multi_person_pipeline_protects_fixed_character_appearance():
 def test_close_contact_uses_one_group_and_aliases_without_forbidden_concepts():
     plan = json.dumps(
         {
-            "count_tags": ["2girls"],
+            "count_tags": ["1girl", "1boy"],
             "common_tags": ["medium shot", "indoors", "split screen"],
             "characters": [
                 {
                     "slot": "left",
+                    "role": "pouncing fox girl",
+                    "visual_label": "white-haired fox girl",
+                    "identity_anchors": ["fox ears", "white hair"],
                     "name": "狐莉",
                     "danbooru_candidate": "huli",
                     "appearance": "",
@@ -307,6 +325,9 @@ def test_close_contact_uses_one_group_and_aliases_without_forbidden_concepts():
                 },
                 {
                     "slot": "right",
+                    "role": "girl underneath",
+                    "visual_label": "silver-haired vampire girl",
+                    "identity_anchors": ["silver hair", "red eyes"],
                     "name": "团子",
                     "danbooru_candidate": "tuanzi",
                     "appearance": "",
@@ -317,6 +338,7 @@ def test_close_contact_uses_one_group_and_aliases_without_forbidden_concepts():
                 },
             ],
             "interactions": ["狐莉 is pouncing on top of 团子."],
+            "relationship_tag": "pouncing",
             "composition": (
                 "Both characters are clearly separated by vertical positions."
             ),
@@ -353,6 +375,7 @@ def test_close_contact_uses_one_group_and_aliases_without_forbidden_concepts():
     config = {
         "chiyo_preset": "",
         "prompt_optimize_enabled": True,
+        "default_artist_tags": "@artist one, @artist two",
         "fixed_characters": {
             "狐莉": "1girl, fox girl, white hair, fox ears, solo",
             "团子": "1girl, vampire, silver hair, red eyes, solo",
@@ -382,16 +405,80 @@ def test_close_contact_uses_one_group_and_aliases_without_forbidden_concepts():
     assert result.summary["grouped_contact"] is True
     assert result.summary["interaction_aliases_normalized"] is True
     assert result.summary["composition_source"] == "deterministic"
-    assert "Within the shared close-contact group, Character A" in (result.final_prompt)
-    assert "Within the shared close-contact group, Character B" in (result.final_prompt)
-    assert "Character A is pouncing on top of Character B." in result.final_prompt
+    assert "white-haired fox girl: fox ears, white hair" in result.final_prompt
+    assert "silver-haired vampire girl: silver hair, red eyes" in result.final_prompt
+    assert "the white-haired fox girl is pouncing on top of the silver-haired vampire girl." in (
+        result.final_prompt
+    )
     assert "On the left" not in result.final_prompt
     assert "On the right" not in result.final_prompt
     assert "狐莉 is" not in result.final_prompt
-    assert "团子" not in result.final_prompt
+    assert "团子 is" not in result.final_prompt
     assert "split screen" not in result.final_prompt.lower()
     assert "panel" not in result.final_prompt.lower()
     assert "clearly separated by vertical positions" not in result.final_prompt
+    assert "2girls" in result.final_prompt
+    assert "1boy" not in result.final_prompt
+    assert "Strict identity separation" not in result.final_prompt
+    assert "@artist one, @artist two" in result.final_prompt
+    assert len(result.final_prompt) < 1200
+    assert result.summary["character_resolution_statuses"][0]["alias"] == (
+        "Character A"
+    )
+    assert (
+        "fox ears"
+        in result.summary["character_resolution_statuses"][0]["identity_tags"]
+    )
+
+
+def test_invalid_interaction_alias_retries_then_stops_without_ordinary_fallback():
+    data = json.loads(_plan_json())
+    data["interactions"] = ["Character A embraces Character C."]
+    invalid_plan = json.dumps(data)
+
+    class _Context:
+        def __init__(self):
+            self.calls = 0
+
+        async def get_current_chat_provider_id(self, umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.calls += 1
+            return _Response(invalid_plan)
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, prompt):
+            return ()
+
+        async def resolve_detailed(self, **kwargs):
+            raise AssertionError(
+                "character resolution must not run for an invalid plan"
+            )
+
+    context = _Context()
+    config = {"chiyo_preset": "", "prompt_optimize_enabled": True}
+    pipeline = PromptPipeline(
+        context=context,
+        config=config,
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda key, default: bool(config.get(key, default)),
+        get_int=lambda key, default: int(config.get(key, default)),
+        get_float=lambda key, default: float(config.get(key, default)),
+        get_str=lambda key, default: str(config.get(key, default)),
+        shorten=lambda text, limit: text[:limit],
+    )
+
+    result = asyncio.run(
+        pipeline.build(_Event(), "two characters embracing", multi_person=True)
+    )
+
+    assert context.calls == 2
+    assert result.final_prompt == ""
+    assert result.summary["multi_person_plan_failed"] is True
+    assert result.summary["multi_person_error"] == "invalid_interaction_aliases"
 
 
 def test_turbo_constraints_do_not_modify_multi_person_narrative_blocks():
@@ -467,4 +554,6 @@ def test_turbo_constraints_do_not_modify_multi_person_narrative_blocks():
     assert result.summary["low_cfg_harness"] is True
     assert result.summary["constraint_mode"] is True
     assert "autumn street" not in result.final_prompt
-    assert "Character B is holding Character A's hand." in result.final_prompt
+    assert "the pink-haired girl is holding the green-eyed girl's hand." in (
+        result.final_prompt
+    )

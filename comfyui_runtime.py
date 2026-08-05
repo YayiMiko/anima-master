@@ -149,6 +149,10 @@ class ComfyUIRuntime:
             return "ComfyUI 工作流执行失败"
         if detail == "no image found in history":
             return "ComfyUI 完成了任务但没有产出图片"
+        if detail == "multi_person_plan_failed":
+            return "多人场景规划连续失败，已停止生成以避免回退成单人图片"
+        if detail == "multi_person_verification_failed":
+            return "多人图片在重试后仍未通过人物数量、统一场景或角色一致性检查，失败图片未发送"
         if detail == "comfyui_offline":
             return "ComfyUI 未启动或无法连接。请先启动 ComfyUI，或在插件配置里开启“由 AstrBot 启动 ComfyUI”并填写启动命令"
         if detail == "startup_command_not_configured":
@@ -197,6 +201,12 @@ class ComfyUIRuntime:
         outputs = [
             str(item) for item in payload.get("outputs", []) if Path(str(item)).exists()
         ]
+        selected_output = str(payload.get("selected_output_path") or "").strip()
+        if selected_output and Path(selected_output).exists():
+            outputs = [
+                selected_output,
+                *[item for item in outputs if item != selected_output],
+            ]
         if not outputs:
             message = "ComfyUI 完成了任务，但没有拿到可发送的图片。"
             payload["delivery"] = no_output_delivery(message)
