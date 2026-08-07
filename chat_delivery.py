@@ -84,13 +84,14 @@ def skipped_delivery(outputs: list[str], message: str) -> dict[str, Any]:
 def ack_timeout_delivery(
     outputs: list[str], output: str, exc: Exception, message: str
 ) -> dict[str, Any]:
-    """Build delivery state for platform ACK timeout."""
+    """Build an uncertain delivery state for platform ACK timeout."""
     return {
-        "status": "ack_timeout",
+        "status": "delivery_uncertain",
         "generated": True,
-        "sent": False,
+        "sent": None,
         "ack_timeout": True,
         "send_failed": False,
+        "notice_suppressed": True,
         "outputs": outputs,
         "last_output": output,
         "error": _error_text(exc)[:500],

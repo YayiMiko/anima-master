@@ -232,20 +232,10 @@ class ComfyUIRuntime:
                             output,
                             wording[:500],
                         )
-                        message = (
-                            "ComfyUI 已生成图片，但聊天平台发送回执超时："
-                            + ", ".join(outputs)
-                        )
+                        message = "图片已生成；聊天平台回执超时，发送状态不确定。"
                         payload["delivery"] = ack_timeout_delivery(
                             outputs, output, exc, message
                         )
-                        try:
-                            await event.send(event.plain_result(message))
-                        except Exception as notice_exc:
-                            self.logger.warning(
-                                "[comfyui_agent] failed to send ACK-timeout notice: %s",
-                                str(notice_exc)[:500],
-                            )
                         return message
                     self.logger.warning(
                         "[comfyui_agent] image generated but sending failed. path=%s error=%s: %s",

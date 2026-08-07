@@ -62,9 +62,7 @@ def test_chat_image_actions_never_fall_back_to_global_latest() -> None:
         event_image_input=no_image,
         build_prompt=lambda *_args, **_kwargs: asyncio.sleep(0, result="prompt"),
         format_spell_payload=lambda _payload: "",
-        get_bool=lambda key, default: (
-            True if key == "img2img_enabled" else default
-        ),
+        get_bool=lambda key, default: True if key == "img2img_enabled" else default,
         shorten=lambda text, limit: text[:limit],
     )
 
@@ -122,9 +120,7 @@ def test_task_writes_remain_valid_json_under_concurrency(tmp_path: Path) -> None
     for index in range(20):
         task = recorder.build_generation_start(
             event=_Event(),
-            started_at=datetime.fromisoformat(
-                f"2026-07-28T10:00:00.{index:06d}"
-            ),
+            started_at=datetime.fromisoformat(f"2026-07-28T10:00:00.{index:06d}"),
             original_prompt=str(index),
             reference_requested=False,
             width=1024,
@@ -176,9 +172,7 @@ def test_manifest_appends_remain_complete_under_concurrency(
     records = [json.loads(line) for line in lines]
     assert len(records) == len(targets)
     json.loads(
-        (inputs / "20260728" / "session" / "latest.json").read_text(
-            encoding="utf-8"
-        )
+        (inputs / "20260728" / "session" / "latest.json").read_text(encoding="utf-8")
     )
 
 
@@ -211,10 +205,7 @@ def test_output_names_are_unique(tmp_path: Path) -> None:
         {"view_image_bytes": lambda self, image, timeout: b"image"},
     )()
 
-    outputs = [
-        runner.download_image({"filename": "result.png"}, 1)
-        for _ in range(20)
-    ]
+    outputs = [runner.download_image({"filename": "result.png"}, 1) for _ in range(20)]
 
     assert len(set(outputs)) == len(outputs)
     assert all(path.read_bytes() == b"image" for path in outputs)
@@ -253,7 +244,7 @@ def test_image_send_failure_emits_plain_text_notice(tmp_path: Path) -> None:
     assert payload["delivery"]["status"] == "send_failed"
 
 
-def test_image_ack_timeout_emits_plain_text_notice(
+def test_image_ack_timeout_is_recorded_without_chat_notice(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -288,9 +279,10 @@ def test_image_ack_timeout_emits_plain_text_notice(
 
     asyncio.run(runtime.send_payload(event, payload))
 
-    assert [kind for kind, _text in event.sent] == ["image", "plain"]
-    assert "回执超时" in event.sent[-1][1]
-    assert payload["delivery"]["status"] == "ack_timeout"
+    assert [kind for kind, _text in event.sent] == ["image"]
+    assert payload["delivery"]["status"] == "delivery_uncertain"
+    assert payload["delivery"]["sent"] is None
+    assert payload["delivery"]["notice_suppressed"] is True
 
 
 def test_delivery_sends_the_verifier_selected_output_first(
