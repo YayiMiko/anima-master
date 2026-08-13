@@ -75,12 +75,12 @@ def test_advanced_example_uses_the_builtin_template() -> None:
 
 def test_builtin_template_prioritizes_one_pass_visual_quality() -> None:
     assert "一幅完整、协调、具有视觉吸引力的画面" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "可以自由决定服装细节、姿态、构图、镜头、背景" in (
+    assert "可以自由决定服装细节、姿态、构图、镜头、光影" in (
         DEFAULT_LLM_PROMPT_TEMPLATE
     )
-    assert "以最终图像协调、精致、有表现力和好看为优先" in (
-        DEFAULT_LLM_PROMPT_TEMPLATE
-    )
+    assert "用户未明确要求地点、环境或背景时" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "不要自行创造场景" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "以最终图像协调、精致、有表现力和好看为优先" in (DEFAULT_LLM_PROMPT_TEMPLATE)
     assert "不需要机械追求固定 Tag 数量" in DEFAULT_LLM_PROMPT_TEMPLATE
     assert "保持用户明确指定的角色、主体、人数" in DEFAULT_LLM_PROMPT_TEMPLATE
     assert "40-55" not in DEFAULT_LLM_PROMPT_TEMPLATE

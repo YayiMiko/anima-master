@@ -34,6 +34,7 @@ class MultiPersonPlan:
     interactions: tuple[str, ...]
     composition: str
     spatial_mode: str
+    background_mode: str
     relationship_tag: str = ""
 
 
@@ -85,6 +86,7 @@ def build_multi_person_plan_prompt(
     user_prompt: str,
     *,
     fixed_characters: dict[str, str] | None = None,
+    original_user_prompt: str = "",
 ) -> str:
     """Build the structured planning request for a multi-person scene.
 
@@ -92,6 +94,7 @@ def build_multi_person_plan_prompt(
         user_prompt: Original user request after command and size parsing.
         fixed_characters: Locally configured character names and authoritative
             defining tags found in the request.
+        original_user_prompt: User text before reference-context expansion.
 
     Returns:
         Prompt asking the LLM for a bounded JSON scene plan.
@@ -105,7 +108,7 @@ def build_multi_person_plan_prompt(
     )
     return f"""Plan one coherent Anima image containing 2 to 4 people.
 
-Use the user's requested identities, count, clothing, expressions, props, positions, and relationships. You may freely design compatible mutable details, background, lighting, and atmosphere when the user leaves them open.
+Use the user's requested identities, count, clothing, expressions, props, positions, and relationships. Decide background_mode only from the Original user text below. Reference-image tags, quoted spell tags, and search context in the Expanded request do not count as an explicit background request. Do not invent a scene when the user leaves the background open.
 
 Separate every person into an independent semantic block. Position slots are bookkeeping only and must never describe separate regions, panels, views, or sides of the image. Prefer one shared central group. Use explicit positions only when the user directly asks for left/right or foreground/background placement. Never use top_left, top_right, bottom_left, bottom_right, upper, lower, panel, or "side of the image".
 
@@ -148,6 +151,7 @@ Return JSON only with this exact shape:
     "Character A is holding Character B's hand."
   ],
   "spatial_mode": "shared_contact",
+  "background_mode": "default_portrait",
   "composition": "A single unified full-frame composition using one camera view."
 }}
 
@@ -155,6 +159,7 @@ Rules:
 - Include exactly 2 to 4 character objects.
 - count_tags must agree with the number and genders requested by the user.
 - common_tags contain only shared scene, framing, camera, lighting, atmosphere, and count tags.
+- background_mode must be explicit_scene only when the user explicitly requests a location, environment, weather scene, or background. Otherwise it must be default_portrait and common_tags must use full body, centered, simple background, and white background without inventing a location.
 - relationship_tag is one short Danbooru-style relationship or action tag and appears immediately after the count tags in the final prompt.
 - Do not put character names or character-specific appearance in common_tags.
 - role is optional semantic bookkeeping and is not used to identify a person in the final interaction sentence.
@@ -173,7 +178,10 @@ Rules:
 
 {fixed_note}
 
-User request:
+Original user text for background intent:
+{str(original_user_prompt or user_prompt).strip()}
+
+Expanded request for all other visual details:
 {user_prompt}
 """
 
@@ -249,9 +257,12 @@ def parse_multi_person_plan(text: str) -> MultiPersonPlan | None:
     interactions = _string_tuple(data.get("interactions"), 1, 500)
     composition = _clean_text(data.get("composition"), 700)
     spatial_mode = _clean_text(data.get("spatial_mode"), 40).lower()
+    background_mode = _clean_text(data.get("background_mode"), 40).lower()
     relationship_tag = _clean_text(data.get("relationship_tag"), 120)
     if spatial_mode not in _SAFE_SPATIAL_MODES:
         spatial_mode = "shared_contact" if interactions else "shared_scene"
+    if background_mode not in {"default_portrait", "explicit_scene"}:
+        return None
     if any(marker in composition.lower() for marker in _UNSAFE_COMPOSITION_MARKERS):
         composition = ""
     return MultiPersonPlan(
@@ -261,6 +272,7 @@ def parse_multi_person_plan(text: str) -> MultiPersonPlan | None:
         interactions=interactions,
         composition=composition,
         spatial_mode=spatial_mode,
+        background_mode=background_mode,
         relationship_tag=relationship_tag,
     )
 

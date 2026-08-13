@@ -196,7 +196,9 @@ def test_prompt_pipeline_uses_default_creative_generation():
     )
 
     assert result.summary.get("danbooru_fast_path") is not True
-    assert result.summary["llm_content_tag_count"] == 52
+    assert result.summary["llm_content_tag_count"] == 56
+    assert result.summary["background_mode"] == "default_portrait"
+    assert "white background" in result.final_prompt
     assert len(context.calls) == 1
     assert "以最终图像协调、精致、有表现力和好看为优先" in context.calls[0]["prompt"]
     assert "默认采用自由创作策略" in context.calls[0]["system_prompt"]
@@ -451,7 +453,6 @@ def test_last_task_debug_lines_use_strategy_summary():
     assert "角色：狐莉" in text
     assert "raw=True" in text
     assert (
-        "自检：enabled=True 多人强制=False 角色强制=False passed=True retry=0"
-        in text
+        "自检：enabled=True 多人强制=False 角色强制=False passed=True retry=0" in text
     )
     assert "阶段事件：provider=ok，prompt_llm=ok" in text

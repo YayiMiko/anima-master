@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 try:
+    from .prompt_background import DEFAULT_PORTRAIT, apply_default_portrait_tags
     from .prompt_constraints import PromptConstraintPlan, apply_prompt_constraints
     from .prompt_presets import (
         DEFAULT_CHARACTER_TAGS,
@@ -20,6 +21,7 @@ try:
         join_prompt_parts,
     )
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from prompt_background import DEFAULT_PORTRAIT, apply_default_portrait_tags
     from prompt_constraints import PromptConstraintPlan, apply_prompt_constraints
     from prompt_presets import (
         DEFAULT_CHARACTER_TAGS,
@@ -66,6 +68,7 @@ def build_final_prompt(
     narrative_blocks: tuple[str, ...] = (),
     suppress_fixed_character: bool = False,
     force_multi_character: bool = False,
+    background_mode: str = "",
 ) -> PromptBuildResult:
     config = apply_config_preset(config)
     raw_mode, raw_prompt = strip_raw_prefix(user_prompt)
@@ -145,6 +148,8 @@ def build_final_prompt(
     )
     constraint_result = apply_prompt_constraints(content, constraint_plan)
     content = constraint_result.content_tags
+    if background_mode == DEFAULT_PORTRAIT:
+        content = apply_default_portrait_tags(content)
     parts = [quality]
     if required_core_tags:
         parts.append(", ".join(required_core_tags))

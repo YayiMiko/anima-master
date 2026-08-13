@@ -21,6 +21,10 @@ try:
         filter_outfit_tags,
         preferred_search_prompt,
     )
+    from .prompt_background import (
+        DEFAULT_PORTRAIT,
+        extract_background_mode,
+    )
     from .prompt_builder import (
         build_final_prompt,
     )
@@ -52,6 +56,10 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         extract_reference_tag_text,
         filter_outfit_tags,
         preferred_search_prompt,
+    )
+    from prompt_background import (
+        DEFAULT_PORTRAIT,
+        extract_background_mode,
     )
     from prompt_builder import (
         build_final_prompt,
@@ -165,7 +173,7 @@ class PromptPipeline:
             )
         creative_rule = (
             "默认采用自由创作策略：在保留用户明确要求和角色身份的前提下，"
-            "可以主动发展统一主题并补充有助于最终画面表现的可见内容；"
+            "可以主动发展统一主题并补充有助于最终画面表现的可见内容，但不得在用户未提背景时创造场景；"
             "以协调、精致和好看为优先，不机械追求固定tag数量。"
         )
         kwargs: dict[str, Any] = {
@@ -176,6 +184,8 @@ class PromptPipeline:
                 "请在内部充分推理和校验参考对象的视觉特征，但不要输出思考过程。"
                 "只输出英文 danbooru tags，用英文逗号分隔。"
                 "不要解释，不要 Markdown，不要输出质量词或画师词。"
+                "严格按用户原始文字判断背景；未提背景时使用白底立绘。"
+                "按用户是否明确要求场景，在最后输出且只输出一个背景控制标记。"
                 f"{character_rule}"
                 f"{creative_rule}"
             ),
@@ -355,6 +365,7 @@ class PromptPipeline:
         prompt_config: dict[str, Any],
         use_deep_thinking: bool,
         summary: dict[str, Any],
+        original_user_prompt: str = "",
     ) -> PromptPipelineResult | None:
         """Build a hybrid tag and natural-language prompt for 2–4 people.
 
@@ -364,6 +375,7 @@ class PromptPipeline:
             prompt_config: Effective preset-aware plugin configuration.
             use_deep_thinking: Whether the provider should use reasoning mode.
             summary: Mutable request summary populated by this branch.
+            original_user_prompt: User text before reference-context expansion.
 
         Returns:
             Completed prompt result, or None when planning fails and generation
@@ -378,6 +390,7 @@ class PromptPipeline:
         plan_prompt = build_multi_person_plan_prompt(
             prompt,
             fixed_characters=mentioned_fixed_characters,
+            original_user_prompt=original_user_prompt,
         )
         raw_plan = ""
         plan = None
@@ -749,6 +762,18 @@ class PromptPipeline:
                 flags=re.IGNORECASE,
             )
         )
+        if plan.background_mode == DEFAULT_PORTRAIT:
+            filtered_common_tags = tuple(
+                dict.fromkeys(
+                    (
+                        *filtered_common_tags,
+                        "full body",
+                        "centered",
+                        "simple background",
+                        "white background",
+                    )
+                )
+            )
         relationship_tag = str(plan.relationship_tag or "").strip()
         common_content = ", ".join(
             (
@@ -900,6 +925,7 @@ class PromptPipeline:
                 "emphasized_anchor_count": emphasized_anchor_count,
                 "grouped_contact": grouped_contact,
                 "spatial_mode": spatial_mode,
+                "background_mode": plan.background_mode,
                 "explicit_position_requested": explicit_position_requested,
                 "interaction_aliases_normalized": (
                     tuple(normalized_interactions) != plan.interactions
@@ -948,6 +974,7 @@ class PromptPipeline:
         mode: str = "txt2img",
         *,
         multi_person: bool = False,
+        original_user_prompt: str = "",
     ) -> PromptPipelineResult:
         """Build the final prompt and summary for one generation request.
 
@@ -956,11 +983,13 @@ class PromptPipeline:
             user_prompt: User prompt after reference-image augmentation.
             mode: Generation mode, such as `txt2img` or `img2img`.
             multi_person: Whether `/anm 多人` requested structured planning.
+            original_user_prompt: User text before reference-context augmentation.
 
         Returns:
             Final prompt plus a serializable summary dict.
         """
         original_prompt = str(user_prompt or "").strip()
+        background_intent_prompt = str(original_user_prompt or original_prompt).strip()
         legacy_creative_flag_re = re.compile(
             r"(?<!\S)--(?:自由发挥|自由拓展|创意拓展|创意扩展|creative)"
             r"(?=$|\s|[,，;；:：])",
@@ -1058,6 +1087,7 @@ class PromptPipeline:
                 prompt_config=prompt_config,
                 use_deep_thinking=research_plan.use_deep_thinking,
                 summary=summary,
+                original_user_prompt=background_intent_prompt,
             )
             if multi_result is not None:
                 return multi_result
@@ -1116,6 +1146,7 @@ class PromptPipeline:
             outfit_transfer_rule=build_outfit_transfer_block(
                 outfit_plan, outfit_summary
             ),
+            original_theme=background_intent_prompt,
         )
         if self._bool("debug_prompt_enabled", False):
             self.logger.info(
@@ -1162,6 +1193,15 @@ class PromptPipeline:
             self.logger.info(
                 "[comfyui_agent] prompt builder LLM output:\n%s", llm_content
             )
+        background_mode = ""
+        background_mode_source = "not_applicable"
+        if mode == "txt2img":
+            llm_content, background_mode = extract_background_mode(llm_content)
+            if background_mode:
+                background_mode_source = "llm_marker"
+            else:
+                background_mode = DEFAULT_PORTRAIT
+                background_mode_source = "missing_marker_default"
         llm_failed = bool(llm_error and not str(llm_content or "").strip())
         character_resolution = await self._danbooru_resolver.resolve_detailed(
             llm_content=llm_content,
@@ -1219,6 +1259,7 @@ class PromptPipeline:
             config=prompt_config,
             required_core_tags=required_core_tags,
             constraint_plan=constraint_plan,
+            background_mode=background_mode,
         )
         initial_input_tag_count = len(split_tags(llm_content))
         content_tag_count = len(split_tags(built.content_tags))
@@ -1253,6 +1294,8 @@ class PromptPipeline:
                 "sensual_mode": built.used_sensual_mode,
                 "default_style": built.used_default_style,
                 "low_cfg_harness": low_cfg_harness,
+                "background_mode": background_mode or "unresolved",
+                "background_mode_source": background_mode_source,
                 "constraint_mode": built.constraint_mode,
                 "weighted_style_tags": list(built.weighted_style_tags),
                 "constraint_tags": list(built.constraint_tags),

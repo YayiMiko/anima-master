@@ -2,6 +2,14 @@ from __future__ import annotations
 
 import hashlib
 
+try:
+    from .prompt_background import (
+        DEFAULT_PORTRAIT_MARKER,
+        EXPLICIT_SCENE_MARKER,
+    )
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from prompt_background import DEFAULT_PORTRAIT_MARKER, EXPLICIT_SCENE_MARKER
+
 DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面提示词的 AI 画师。
 
 请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将结果输出为英文 Danbooru-style tags。
@@ -13,7 +21,8 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
 - 不要输出画师 tags；质量词和画师组会由程序另行拼接。
 - 尽量使用模型容易理解的可见画面描述。
 - 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。
-- 除上述明确要求外，可以自由决定服装细节、姿态、构图、镜头、背景、环境、光影、色彩、氛围、前景和特效。
+- 除上述明确要求外，可以自由决定服装细节、姿态、构图、镜头、光影、色彩、氛围和特效。
+- 用户未明确要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。
 - 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。
 - 不要为了数量重复同义词；画面已经完整时即可停止。
 - 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。
@@ -28,6 +37,20 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
 
 用户原始要求：
 {theme}"""
+
+
+BACKGROUND_POLICY_TEMPLATE = """
+
+-----------
+背景与立绘策略（此规则追加在自定义模板之后，必须遵守）：
+- 只根据下方“用户原始文字”判断用户是否明确要求了地点、环境或背景；不要把参考图、引用法术、图片反推或搜索摘要中的场景误当成用户要求。
+- 若用户明确要求地点、环境、天气场景或保留原背景：保留该场景，不要添加 white background，并在输出末尾追加控制标记 {explicit_marker}。
+- 若用户没有明确要求背景：按单张角色立绘生成，使用 simple background、white background，并选择与用户动作及镜头相容的 full body/upper body、居中构图、姿势和视线；不要自行创造室内、街道、自然景观、建筑、家具或前景道具，并在输出末尾追加控制标记 {default_marker}。
+- 两个控制标记只能选择一个。控制标记供程序读取，不属于 Danbooru tag，必须放在最后一项。
+
+用户原始文字：
+{original_theme}
+"""
 
 
 LEGACY_BUILTIN_TEMPLATE_HASHES = {
@@ -52,6 +75,7 @@ def build_llm_prompt(
     mode: str = "txt2img",
     prompt_builder_template: str = "",
     outfit_transfer_rule: str = "",
+    original_theme: str = "",
 ) -> str:
     """Build the prompt sent to the chat LLM for Danbooru tag generation.
 
@@ -64,6 +88,7 @@ def build_llm_prompt(
         mode: Generation mode such as `txt2img` or `img2img`.
         prompt_builder_template: Optional custom prompt template.
         outfit_transfer_rule: Optional outfit-transfer instructions.
+        original_theme: User text before reference-image or quoted-spell expansion.
 
     Returns:
         Complete instruction text for the prompt-building LLM.
@@ -149,6 +174,12 @@ def build_llm_prompt(
         prompt = template.format(**values)
     except Exception:
         prompt = DEFAULT_LLM_PROMPT_TEMPLATE.format(**values)
+    if mode == "txt2img":
+        prompt += BACKGROUND_POLICY_TEMPLATE.format(
+            original_theme=str(original_theme or theme).strip(),
+            default_marker=DEFAULT_PORTRAIT_MARKER,
+            explicit_marker=EXPLICIT_SCENE_MARKER,
+        )
     return prompt
 
 

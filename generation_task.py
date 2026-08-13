@@ -176,6 +176,7 @@ class GenerationTaskRunner:
                 event,
                 prompt,
                 multi_person=multi_person,
+                original_user_prompt=original_prompt,
             )
             prompt_summary = dict(self._prompt_summary())
         self._task_recorder.mark_prompt_built(task, prompt_summary)

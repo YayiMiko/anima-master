@@ -89,6 +89,7 @@ def _plan_json(*, conflicting_fixed_appearance: bool = False) -> str:
                 "A second competing action that must be discarded.",
             ],
             "relationship_tag": "holding hands",
+            "background_mode": "explicit_scene",
             "composition": "Both characters appear once in one continuous scene.",
         },
         ensure_ascii=False,
@@ -339,6 +340,7 @@ def test_close_contact_uses_one_group_and_aliases_without_forbidden_concepts():
             ],
             "interactions": ["狐莉 is pouncing on top of 团子."],
             "relationship_tag": "pouncing",
+            "background_mode": "explicit_scene",
             "composition": (
                 "Both characters are clearly separated by vertical positions."
             ),
@@ -407,8 +409,9 @@ def test_close_contact_uses_one_group_and_aliases_without_forbidden_concepts():
     assert result.summary["composition_source"] == "deterministic"
     assert "white-haired fox girl: fox ears, white hair" in result.final_prompt
     assert "silver-haired vampire girl: silver hair, red eyes" in result.final_prompt
-    assert "the white-haired fox girl is pouncing on top of the silver-haired vampire girl." in (
-        result.final_prompt
+    assert (
+        "the white-haired fox girl is pouncing on top of the silver-haired vampire girl."
+        in (result.final_prompt)
     )
     assert "On the left" not in result.final_prompt
     assert "On the right" not in result.final_prompt

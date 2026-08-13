@@ -171,12 +171,14 @@ class ComfyUIAgentPlugin(Star):
         mode: str = "txt2img",
         *,
         multi_person: bool = False,
+        original_user_prompt: str = "",
     ) -> str:
         result = await self._prompt_pipeline.build(
             event,
             user_prompt,
             mode,
             multi_person=multi_person,
+            original_user_prompt=original_user_prompt,
         )
         self._last_prompt_summary.set(dict(result.summary))
         return result.final_prompt
