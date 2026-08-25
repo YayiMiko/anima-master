@@ -265,6 +265,18 @@ def _http_get_json(
             "Accept": "application/json,text/plain,*/*",
         },
     )
+    if response.status_code == 403 and user_agent != "curl/8.0":
+        # Donmai's CDN intermittently challenges application-style user agents
+        # while allowing its public read-only API with a curl-compatible agent.
+        response = requests.get(
+            url,
+            params=params,
+            timeout=timeout,
+            headers={
+                "User-Agent": "curl/8.0",
+                "Accept": "application/json,text/plain,*/*",
+            },
+        )
     if response.status_code != 200:
         return None
     content_type = response.headers.get("content-type", "")
@@ -626,12 +638,12 @@ def _resolve_evidence_candidates(
         normalized = _normalize_query(candidate)
         if not re.fullmatch(r"[a-z0-9_.'():-]{3,100}", normalized):
             continue
-        scoped_identity = bool(
-            re.fullmatch(
-                r"[a-z0-9_.'-]{2,}_\([a-z0-9_.' :-]{2,}\)",
-                normalized,
-            )
+        scoped_match = re.fullmatch(
+            r"([a-z0-9_.'-]{2,})_\(([a-z0-9_.' :-]{2,})\)",
+            normalized,
         )
+        scoped_identity = bool(scoped_match)
+        verified_candidate = False
         for query in _candidate_queries(normalized):
             records = _fetch_tag_records(
                 query,
@@ -645,6 +657,7 @@ def _resolve_evidence_candidates(
                 exact = record_name == normalized
                 if record.category == CHARACTER_CATEGORY:
                     score = 100 + (30 if exact else 0)
+                    verified_candidate = True
                 elif (
                     exact
                     and scoped_identity
@@ -663,6 +676,50 @@ def _resolve_evidence_candidates(
                     f"source={record.source}|category={record.category}"
                 )
                 scored.append((score, record, detail))
+        if verified_candidate or not scoped_match:
+            continue
+
+        # Danbooru often abbreviates a work title inside the disambiguation
+        # suffix. Search the stable character-name portion, then require title
+        # token overlap so popularity cannot select an unrelated namesake.
+        candidate_name = scoped_match.group(1)
+        candidate_work_terms = {
+            term
+            for term in re.split(r"[^a-z0-9]+", scoped_match.group(2))
+            if len(term) >= 3
+        }
+        for record in _fetch_autocomplete_records(
+            candidate_name,
+            donmai_base_urls=donmai_base_urls,
+            timeout=timeout,
+            user_agent=user_agent,
+            cache=cache,
+        ):
+            if record.category != CHARACTER_CATEGORY or record.deprecated:
+                continue
+            record_name = _normalize_query(record.name)
+            record_match = re.fullmatch(
+                r"([a-z0-9_.'-]{2,})_\(([a-z0-9_.' :-]{2,})\)",
+                record_name,
+            )
+            if not record_match or record_match.group(1) != candidate_name:
+                continue
+            record_work_terms = {
+                term
+                for term in re.split(r"[^a-z0-9]+", record_match.group(2))
+                if len(term) >= 3
+            }
+            overlap = candidate_work_terms & record_work_terms
+            if candidate_work_terms and not overlap:
+                continue
+            score = 90 + 12 * len(overlap)
+            score += min(20, len(str(max(1, record.post_count))))
+            detail = (
+                f"{record.name}|score={score}|count={record.post_count}|"
+                f"source={record.source}|category={record.category}|"
+                f"fallback=name_autocomplete|work_overlap={'+'.join(sorted(overlap))}"
+            )
+            scored.append((score, record, detail))
     if not scored:
         return None, ()
     scored.sort(key=lambda item: (item[0], item[1].post_count), reverse=True)
@@ -897,7 +954,7 @@ def resolve_core_tags(
                     existing.add(_normalize_query(best.name))
                     inserted.append((best.name, best.post_count, best.source))
 
-        if not inserted:
+        if not inserted and not evidence:
             for raw_name in _user_character_queries(user_prompt):
                 best = _best_character(
                     [raw_name],

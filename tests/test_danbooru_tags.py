@@ -16,6 +16,39 @@ from danbooru_tags import TagRecord, resolve_core_tags  # noqa: E402
 from prompt_templates import build_llm_prompt  # noqa: E402
 
 
+def test_donmai_json_retries_cdn_403_with_curl_agent(monkeypatch) -> None:
+    """Retry a Donmai CDN challenge with its accepted curl-compatible agent."""
+    calls: list[str] = []
+
+    class Response:
+        def __init__(self, status_code, text, content_type):
+            self.status_code = status_code
+            self.text = text
+            self.headers = {"content-type": content_type}
+
+        def json(self):
+            return [{"name": "example_character", "category": 4}]
+
+    def get(*_args, **kwargs):
+        user_agent = kwargs["headers"]["User-Agent"]
+        calls.append(user_agent)
+        if user_agent != "curl/8.0":
+            return Response(403, "challenge", "text/html")
+        return Response(200, '[{"name":"example_character"}]', "application/json")
+
+    monkeypatch.setattr(tags_module.requests, "get", get)
+
+    payload = tags_module._http_get_json(
+        "https://danbooru.donmai.us/tags.json",
+        params={"search[name_matches]": "example_character"},
+        timeout=2,
+        user_agent="AstrBotAnimaMaster",
+    )
+
+    assert payload == [{"name": "example_character", "category": 4}]
+    assert calls == ["AstrBotAnimaMaster", "curl/8.0"]
+
+
 def test_safebooru_dapi_parses_character_category(monkeypatch) -> None:
     class Response:
         status_code = 200
@@ -154,6 +187,71 @@ def test_generic_candidate_can_use_scoped_dapi_evidence(monkeypatch) -> None:
     )
     assert result.text.startswith("correct_name_(example_work), 1girl")
     assert result.evidence
+
+
+def test_scoped_candidate_recovers_abbreviated_work_suffix(monkeypatch) -> None:
+    """Resolve a character when Danbooru shortens the candidate's work suffix."""
+    monkeypatch.setattr(
+        tags_module,
+        "_fetch_tag_records",
+        lambda query, **_kwargs: (
+            [
+                TagRecord(
+                    name=query,
+                    category=0,
+                    post_count=1,
+                    source="https://safebooru.org/dapi",
+                )
+            ]
+            if query == "murasame_(senren_banka)"
+            else []
+        ),
+    )
+    monkeypatch.setattr(
+        tags_module,
+        "_fetch_autocomplete_records",
+        lambda query, **_kwargs: (
+            [
+                TagRecord(
+                    name="murasame_(kantai_collection)",
+                    category=4,
+                    post_count=5000,
+                    source="autocomplete",
+                ),
+                TagRecord(
+                    name="murasame_(senren)",
+                    category=4,
+                    post_count=900,
+                    source="autocomplete",
+                ),
+            ]
+            if query == "murasame"
+            else []
+        ),
+    )
+    monkeypatch.setattr(
+        tags_module,
+        "_fetch_stable_identity_tags",
+        lambda *_args, **_kwargs: ("white hair", "red eyes", "animal ears"),
+    )
+
+    result = resolve_core_tags(
+        "murasame_senren_banka, 1girl, snowing",
+        user_prompt="千恋万花角色丛雨站在雪原",
+        allow_insert=True,
+        candidate_hints=("murasame_(senren_banka)",),
+    )
+
+    assert result.status == "resolved"
+    assert result.canonical_tag == "murasame_(senren)"
+    assert result.text.startswith("murasame_(senren), 1girl")
+    assert result.identity_tags == (
+        "murasame_(senren)",
+        "white hair",
+        "red eyes",
+        "animal ears",
+    )
+    assert any("fallback=name_autocomplete" in item for item in result.evidence)
 
 
 def test_stable_identity_tags_are_inferred_from_repeated_solo_posts(
