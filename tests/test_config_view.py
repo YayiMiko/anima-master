@@ -7,7 +7,7 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from config_view import CONFIG_FIELD_GROUPS, build_config_debug_lines  # noqa: E402
+from config_view import build_config_debug_lines  # noqa: E402
 
 
 def test_config_debug_lines_show_core_user_state(tmp_path: Path):
@@ -43,13 +43,6 @@ def test_config_debug_lines_show_core_user_state(tmp_path: Path):
     assert "默认尺寸：1024x1536" in text
     assert "生成后自检：True / 分数线 8 / 最多重画 2 次" in text
     assert "上次任务：暂无" in text
-
-
-def test_config_field_groups_cover_debug_and_comfyui_sections():
-    assert "comfyui_base_url" in CONFIG_FIELD_GROUPS["comfyui"]
-    assert "workflow" in CONFIG_FIELD_GROUPS["comfyui"]
-    assert "enable_verify" in CONFIG_FIELD_GROUPS["verify_debug"]
-    assert "debug_prompt_enabled" in CONFIG_FIELD_GROUPS["verify_debug"]
 
 
 def test_config_debug_lines_show_effective_turbo_profile(tmp_path: Path):

@@ -2,17 +2,17 @@
   "sections": [
     {
       "key": "anima_master_basic",
-      "description": "预设与恢复",
-      "hint": "用于恢复默认配置，或快速应用千代预设。",
+      "description": "基础设置",
+      "hint": "从这里开始。选择一套预设可以快速配置好画师、模型和参数。",
       "items": [
-        "reset_to_defaults",
-        "chiyo_preset"
+        "chiyo_preset",
+        "reset_to_defaults"
       ]
     },
     {
       "key": "anima_master_comfyui_connection",
       "description": "ComfyUI 连接",
-      "hint": "用于连接 ComfyUI。通常请先用绘世启动器、ComfyUI portable 或自己的方式启动 ComfyUI；AstrBot 在服务器时请填写本机的局域网或 Tailscale 地址。只有 AstrBot 和 ComfyUI 同机时，才建议开启“由 AstrBot 启动 ComfyUI”。",
+      "hint": "让插件连上你的 ComfyUI。",
       "items": [
         "comfyui_base_url",
         "workflow",
@@ -20,9 +20,9 @@
         "custom_workflow_path",
         "custom_workflow_override_parameters",
         "timeout",
+        "poll_interval",
         "storage_retention_days",
         "manifest_max_records",
-        "poll_interval",
         "auto_start",
         "startup_command",
         "startup_workdir",
@@ -36,7 +36,7 @@
     {
       "key": "anima_master_models",
       "description": "模型文件",
-      "hint": "首次配置时请对照 ComfyUI 下拉框确认；这里只填文件名，不填路径。如果状态检查显示模型不可用，优先检查这里。",
+      "hint": "填 ComfyUI 下拉框里显示的文件名，只填文件名，不填路径。",
       "items": [
         "unet_name",
         "clip_name",
@@ -46,7 +46,7 @@
     {
       "key": "anima_master_rendering",
       "description": "出图参数",
-      "hint": "控制默认尺寸、采样步数、CFG、采样器和调度器。",
+      "hint": "每次出图的默认尺寸和采样设置。",
       "items": [
         "width",
         "height",
@@ -60,7 +60,7 @@
     {
       "key": "anima_master_default_prompt",
       "description": "默认提示词",
-      "hint": "控制每次生图都会自动加入的正面质量词和负面提示词。",
+      "hint": "每次出图都会自动加到提示词里的正负面词。",
       "items": [
         "quality_prefix",
         "negative_prompt"
@@ -68,8 +68,8 @@
     },
     {
       "key": "anima_master_prompting",
-      "description": "自然语言优化",
-      "hint": "控制中文描述转 Danbooru tags 的方式，以及是否启用联网搜索与深度思考。",
+      "description": "提示词生成",
+      "hint": "把中文描述转成画图标签的相关设置。",
       "items": [
         "prompt_optimize_enabled",
         "prompt_builder_provider_id",
@@ -81,13 +81,30 @@
         "prompt_builder_search_query_template",
         "prompt_builder_deep_thinking_enabled",
         "prompt_builder_reasoning_effort",
+        "low_cfg_harness_enabled",
         "prompt_builder_template"
       ]
     },
     {
+      "key": "anima_master_style",
+      "description": "角色与画风",
+      "hint": "固定角色、画师预设和画风，以及涩气表现力相关设置。",
+      "items": [
+        "fixed_characters",
+        "artist_presets",
+        "active_artist_preset",
+        "default_artist_tags",
+        "style_tags",
+        "style_presets",
+        "active_style_preset",
+        "sensual_mode_enabled",
+        "sensual_mode_markers"
+      ]
+    },
+    {
       "key": "anima_master_tag_lookup",
-      "description": "联网校正角色 Tag",
-      "hint": "用于校正少量角色核心 tag；只在需要时访问 Donmai / Danbooru。",
+      "description": "角色检索",
+      "hint": "用于校正现有作品角色的标签。只在需要时访问 Donmai / Danbooru。",
       "items": [
         "danbooru_core_tag_lookup_enabled",
         "danbooru_tag_base_urls",
@@ -97,38 +114,20 @@
       ]
     },
     {
-      "key": "anima_master_style",
-      "description": "角色与风格",
-      "hint": "用于角色、画师预设和风格，以及涩气表现力相关设置。",
+      "key": "anima_master_verify",
+      "description": "生成校验",
+      "hint": "生成后用视觉模型检查图片，不合格会重画。",
       "items": [
-        "fixed_characters",
-        "artist_presets",
-        "active_artist_preset",
-        "default_artist_tags",
-        "style_presets",
-        "active_style_preset",
-        "style_tags",
-        "sensual_mode_enabled",
-        "sensual_mode_markers"
-      ]
-    },
-    {
-      "key": "anima_master_experimental",
-      "description": "实验与附加功能",
-      "hint": "包含图生图、放大和去背景等附加能力；不影响基础文生图。",
-      "items": [
-        "img2img_enabled",
-        "prompt_optimize_img2img_enabled",
-        "edit_denoise",
-        "max_image_side",
-        "upscale_factor",
-        "remove_bg_model"
+        "enable_verify",
+        "verify_provider_id",
+        "verify_pass_score",
+        "max_verify_retry"
       ]
     },
     {
       "key": "anima_master_multi_person",
       "description": "多人生成",
-      "hint": "只影响 /anm 多人：控制候选采样、视觉检查、降级发送和并发。",
+      "hint": "只影响 /anm 多人：候选采样、视觉检查和并发。",
       "items": [
         "multi_candidate_count",
         "multi_verify_enabled",
@@ -142,7 +141,7 @@
     {
       "key": "anima_master_delivery",
       "description": "发送与权限",
-      "hint": "控制图片是否发回聊天，以及哪些用户可以使用插件。",
+      "hint": "图片是否发回聊天，以及谁可以使用插件。",
       "items": [
         "send_result_to_chat",
         "max_send_images",
@@ -151,9 +150,22 @@
       ]
     },
     {
+      "key": "anima_master_experimental",
+      "description": "可选功能",
+      "hint": "图生图、放大、去背景等附加能力，不影响基础文生图。",
+      "items": [
+        "img2img_enabled",
+        "prompt_optimize_img2img_enabled",
+        "edit_denoise",
+        "max_image_side",
+        "upscale_factor",
+        "remove_bg_model"
+      ]
+    },
+    {
       "key": "anima_master_debug",
-      "description": "排查问题",
-      "hint": "只在排查问题时临时开启，平时建议保持关闭。",
+      "description": "调试",
+      "hint": "只在排查问题时临时开启，平时保持关闭。",
       "items": [
         "debug_prompt_enabled",
         "debug_image_reference_enabled",

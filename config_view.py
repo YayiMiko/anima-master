@@ -27,66 +27,6 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     )
 
 
-CONFIG_FIELD_GROUPS: dict[str, tuple[str, ...]] = {
-    "basic": (
-        "prompt_optimize_enabled",
-        "chiyo_preset",
-        "admin_only",
-        "allowed_sender_ids",
-    ),
-    "prompt": (
-        "prompt_builder_template",
-        "prompt_builder_provider_id",
-        "prompt_builder_web_search_enabled",
-        "prompt_builder_deep_thinking_enabled",
-        "prompt_builder_reasoning_effort",
-        "danbooru_core_tag_lookup_enabled",
-    ),
-    "character_style": (
-        "fixed_characters",
-        "artist_presets",
-        "active_artist_preset",
-        "default_artist_tags",
-    ),
-    "comfyui": (
-        "comfyui_base_url",
-        "workflow",
-        "width",
-        "height",
-        "steps",
-        "cfg",
-        "sampler_name",
-        "scheduler",
-        "unet_name",
-        "clip_name",
-        "vae_name",
-    ),
-    "output": (
-        "send_result_to_chat",
-        "max_send_images",
-        "img2img_enabled",
-    ),
-    "verify_debug": (
-        "enable_verify",
-        "verify_provider_id",
-        "verify_pass_score",
-        "max_verify_retry",
-        "debug_prompt_enabled",
-        "debug_image_reference_enabled",
-        "debug_send_payload_enabled",
-    ),
-    "multi_person": (
-        "multi_candidate_count",
-        "multi_verify_enabled",
-        "multi_verify_provider_id",
-        "multi_verify_pass_score",
-        "multi_send_degraded_candidate",
-        "multi_show_degraded_notice",
-        "multi_max_concurrent_generations",
-    ),
-}
-
-
 def _bool(config: dict[str, Any], key: str, default: bool) -> bool:
     return bool(config.get(key, default))
 
