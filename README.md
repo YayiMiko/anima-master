@@ -117,22 +117,32 @@ pip install -r requirements.txt
 
 ## 配置
 
-配置页按使用频率分组，较少使用的项目收进「更多配置」。首次使用先看「ComfyUI 连接」和「出图参数」。
+配置页按使用顺序分组，从「连上 ComfyUI」到「出图」。首次使用先看「基础设置」「ComfyUI 连接」和「模型文件」。
+
+### 基础设置
+
+- `chiyo_preset`：一键套用一套画师、模型和参数（千代base / aesthetic / turbo）。会把狐莉加入角色，只有指令里提到狐莉才会用到。
+- `reset_to_defaults`：打开并保存后恢复默认配置，之后自动关闭。
 
 ### ComfyUI 连接
 
 | 参数 | 说明 |
 |---|---|
-| `comfyui_base_url` | AstrBot 能访问到的 ComfyUI 地址，默认 `http://127.0.0.1:8188` |
-| `workflow` | 工作流预设，默认 `anima_t2i` |
-| `custom_workflow_enabled` | 是否改用自定义 ComfyUI API 工作流（默认关闭） |
-| `custom_workflow_path` | 自定义工作流 JSON 路径；千代turbo 自动使用 `variants/turbo/` |
-| `timeout` | 等待生成完成的最长时间 |
-| `storage_retention_days` | 输入 / 输出图片与任务状态文件的保留天数（`0` 关闭按时间清理） |
-| `manifest_max_records` | 输入图片清单压缩后保留的最大有效记录数，默认 `5000` |
-| `poll_interval` | 查询 ComfyUI 生成状态的间隔 |
-| `auto_start` | ComfyUI 离线且收到绘图请求时尝试启动（不是开机自启） |
-| `startup_command` | 开启 `auto_start` 时必填，须能直接启动 ComfyUI 服务 |
+| `comfyui_base_url` | ComfyUI 地址，默认 `http://127.0.0.1:8188` |
+| `workflow` | 插件内置工作流，保持默认 `anima_t2i` 即可 |
+| `custom_workflow_enabled` | 使用自定义 ComfyUI 工作流（默认关闭） |
+| `custom_workflow_path` | 自定义工作流 JSON 路径 |
+| `timeout` | 单次生成超时（秒），默认 `300` |
+| `poll_interval` | 状态查询间隔（秒），默认 `2` |
+| `storage_retention_days` | 输入 / 输出与任务记录保留天数（`0` 关闭按时间清理） |
+| `auto_start` | ComfyUI 离线时尝试用 `startup_command` 启动（仅同机可用） |
+| `startup_command` | 开启 `auto_start` 后必填，须能直接启动 ComfyUI 服务 |
+
+### 模型文件
+
+| 参数 | 说明 |
+|---|---|
+| `unet_name` / `clip_name` / `vae_name` | 主模型 / 文本编码器 / VAE 文件名，与 ComfyUI 下拉框一致，只填文件名 |
 
 ### 出图参数
 
@@ -140,60 +150,91 @@ pip install -r requirements.txt
 |---|---|
 | `width` / `height` | 默认尺寸（会与 `allowed_sizes` 一起生效） |
 | `allowed_sizes` | 允许的尺寸列表 |
-| `steps` | 采样步数 |
-| `cfg` | CFG 强度 |
+| `steps` | 采样步数，默认 `30` |
+| `cfg` | CFG 强度，默认 `5` |
 | `sampler_name` / `scheduler` | 采样器与调度器 |
-| `unet_name` / `clip_name` / `vae_name` | 模型文件名（与 ComfyUI 下拉框一致） |
-| `quality_prefix` | 固定拼接在正面提示词前的质量词 |
-| `negative_prompt` | 默认负面提示词 |
 
-### 自然语言优化
+### 默认提示词
 
 | 参数 | 说明 |
 |---|---|
-| `prompt_optimize_enabled` | 是否让聊天模型优化自然语言提示词 |
-| `prompt_builder_provider_id` | 优化模型 Provider ID；留空用会话主模型 |
-| `prompt_builder_max_tokens` | 优化模型最大输出长度 |
+| `quality_prefix` | 每次自动加在正面提示词前的质量词 |
+| `negative_prompt` | 默认负面提示词 |
+
+### 提示词生成
+
+| 参数 | 说明 |
+|---|---|
+| `prompt_optimize_enabled` | 是否让聊天模型把中文描述转成标签（默认开启） |
+| `prompt_builder_provider_id` | 优化模型；留空用会话主模型 |
 | `prompt_builder_max_content_tags` | 标签数量上限，默认 `65`（不含质量词、固定角色、画师预设、画风预设） |
-| `prompt_builder_web_search_enabled` | 允许在需要时联网搜索（需 Tavily key） |
-| `prompt_builder_deep_thinking_enabled` | 是否启用深度思考 |
-| `prompt_builder_template` | 主提示词模板（一般无需改） |
+| `prompt_builder_web_search_enabled` | 指令写「联网搜索」时联网（需 Tavily key） |
+| `prompt_builder_deep_thinking_enabled` | 指令写「深度思考」时尝试启用 |
+| `prompt_builder_template` | 提示词模板，一般不用改 |
 
 ### 角色与画风
 
 | 参数 | 说明 |
 |---|---|
-| `fixed_characters` | 固定角色预设，格式 `角色名=tags` |
+| `fixed_characters` | 固定角色，格式 `角色名=tags` |
 | `artist_presets` / `active_artist_preset` | 画师预设列表与当前启用的 |
 | `default_artist_tags` | 未启用画师预设时的备用画师标签 |
 | `style_presets` / `active_style_preset` / `style_tags` | 画风预设与当前画风 |
-| `sensual_mode_enabled` | 涩气表现力优化 |
-| `sensual_mode_markers` | 触发涩气表现力优化的关键词 |
+| `sensual_mode_enabled` / `sensual_mode_markers` | 涩气表现力优化与触发词 |
+
+### 角色检索
+
+| 参数 | 说明 |
+|---|---|
+| `danbooru_core_tag_lookup_enabled` | 识别到疑似角色名时上网查规范标签 |
+| `danbooru_tag_base_urls` | 查询地址（逗号分隔） |
+
+### 生成校验
+
+| 参数 | 说明 |
+|---|---|
+| `enable_verify` | 生成后用视觉模型自检，不合格会重画（默认关闭） |
+| `verify_provider_id` | 自检模型；留空自动选择 |
+| `verify_pass_score` | 合格分数，默认 `7` |
+| `max_verify_retry` | 最多重画次数，默认 `1` |
 
 ### 多人生成
 
 | 参数 | 说明 |
 |---|---|
-| `multi_candidate_count` | 候选张数 |
-| `multi_verify_enabled` | 是否做图片结构校验 |
-| `multi_verify_provider_id` | 图片校验模型 |
-| `multi_send_degraded_candidate` | 校验未通过时是否发送最接近的一张 |
-| `multi_max_concurrent_generations` | 多人并发上限 |
+| `multi_candidate_count` | 候选张数，默认 `2` |
+| `multi_verify_enabled` | 多人视觉检查（人数 / 场景 / 主要肢体 / 互动方向 / 角色区分） |
+| `multi_verify_provider_id` | 视觉检查模型 |
+| `multi_send_degraded_candidate` | 全部未通过时仍发送最接近的一张 |
+| `multi_max_concurrent_generations` | 多人并发上限，默认 `1` |
 
 ### 发送与权限
 
 | 参数 | 说明 |
 |---|---|
 | `send_result_to_chat` | 是否把图片发回聊天 |
-| `max_send_images` | 最多发送几张 |
+| `max_send_images` | 最多发送几张，默认 `1` |
 | `admin_only` | 是否仅管理员可用 |
 | `allowed_sender_ids` | 允许使用的用户 ID 列表 |
 
-### 其它
+### 可选功能
 
-- `reset_to_defaults`：一键恢复默认配置（保存后在下一次插件加载时执行一次，随后自动关闭）。
-- `chiyo_preset`：选择千代预设（见下）。
-- 调试项：`debug_prompt_enabled` / `debug_image_reference_enabled` / `debug_send_payload_enabled`，仅排查问题时临时开启，注意日志及 `last_task.json` 可能记录较长提示词。
+| 参数 | 说明 |
+|---|---|
+| `img2img_enabled` | 启用图生图 / 改图（默认关闭） |
+| `prompt_optimize_img2img_enabled` | 改图时优化提示词 |
+| `edit_denoise` | 改图重绘强度，默认 `0.55` |
+| `max_image_side` | 输入图最长边，默认 `1024` |
+| `upscale_factor` | 默认放大倍率，默认 `2.0` |
+| `remove_bg_model` | 去背景模型 |
+
+### 调试
+
+| 参数 | 说明 |
+|---|---|
+| `debug_prompt_enabled` | 保存提示词日志 |
+| `debug_image_reference_enabled` | 保存引用图解析日志 |
+| `debug_send_payload_enabled` | 保存发送过程日志 |
 
 > 深度自定义可对照 `docs/advanced-config.example.jsonc`，或本机注释模板 `data/config/astrbot_plugin_anima_master_config.example.jsonc`。真正生效的运行文件是 `data/config/astrbot_plugin_anima_master_config.json`（标准 JSON，不能写注释）。
 
