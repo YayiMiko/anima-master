@@ -30,7 +30,11 @@ if hasattr(sys.stdout, "reconfigure"):
 def _find_astrbot_root() -> Path:
     candidates = (Path.cwd().resolve(), *Path(__file__).resolve().parents)
     for candidate in candidates:
-        if (candidate / "astrbot").is_dir() and (candidate / "data").is_dir():
+        has_runtime = (candidate / "astrbot").is_dir() or (
+            candidate / ".astrbot"
+        ).exists()
+        has_runtime = has_runtime or (candidate / "data" / "config").is_dir()
+        if has_runtime and (candidate / "data").is_dir():
             return candidate
     return Path(__file__).resolve().parents[1]
 
@@ -148,7 +152,13 @@ def status(args) -> None:
         f"{width}x{height}"
         for width, height in allowed_sizes(config, DEFAULT_CONFIG["allowed_sizes"])
     ]
-    result(build_status_payload(config, size_options))
+    result(
+        build_status_payload(
+            config,
+            size_options,
+            include_capabilities=not args.quick,
+        )
+    )
 
 
 def recent(args) -> None:
@@ -229,6 +239,11 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("status")
+    p.add_argument(
+        "--quick",
+        action="store_true",
+        help="只检查 ComfyUI API 存活，不读取模型和节点能力",
+    )
     p.set_defaults(func=status)
 
     p = sub.add_parser("recent")

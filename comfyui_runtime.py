@@ -84,6 +84,7 @@ class ComfyUIRuntime:
             get_int=self._int,
             get_str=self._str,
             run_status=lambda: self.run_tool(["status"]),
+            run_health=lambda: self.run_tool(["status", "--quick"]),
         )
 
     async def run_python_tool(
@@ -154,7 +155,19 @@ class ComfyUIRuntime:
         if detail == "multi_person_verification_failed":
             return "多人图片在重试后仍未通过人物数量、统一场景或角色一致性检查，失败图片未发送"
         if detail == "comfyui_offline":
+            status = payload.get("status")
+            if isinstance(status, dict):
+                issue = str(status.get("connection_issue") or "")
+                hint = str(status.get("connection_hint") or "")
+                if issue == "api_read_timeout":
+                    return (
+                        "ComfyUI API 暂时无响应，可能正在加载模型或处理任务；请稍后重试"
+                    )
+                if hint:
+                    return hint
             return "ComfyUI 未启动或无法连接。请先启动 ComfyUI，或在插件配置里开启“由 AstrBot 启动 ComfyUI”并填写启动命令"
+        if detail == "comfyui_capability_check_failed":
+            return "ComfyUI API 已在线，但模型或节点能力检查未通过；请使用 /anm 状态 查看缺失项"
         if detail == "startup_command_not_configured":
             return "ComfyUI 未启动，且“由 AstrBot 启动 ComfyUI”没有填写启动命令。请先手动启动 ComfyUI，或关闭该开关"
         if detail == "auto_start_not_permitted":

@@ -130,6 +130,22 @@ class GenerationTaskRunner:
         ready = await self._ensure_ready(event)
         if not ready.get("ok"):
             ready["task_id"] = task["task_id"]
+            status = ready.get("status")
+            if isinstance(status, dict):
+                task["comfyui_status"] = {
+                    key: status.get(key)
+                    for key in (
+                        "comfyui_api_reachable",
+                        "capabilities_checked",
+                        "unet_available",
+                        "clip_available",
+                        "vae_available",
+                        "connection_issue",
+                        "connection_hint",
+                        "error",
+                    )
+                    if key in status
+                }
             self._task_recorder.mark_failure(
                 task, ready.get("error") or "comfyui_not_ready"
             )

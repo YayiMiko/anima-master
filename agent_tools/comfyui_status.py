@@ -8,6 +8,17 @@ from urllib.parse import urlparse
 import requests
 from comfyui_http import ComfyUIHttpClient
 
+CAPABILITY_NODE_NAMES = (
+    "UNETLoader",
+    "CLIPLoader",
+    "VAELoader",
+    "LoadImage",
+    "VAEEncode",
+    "ImageScale",
+    "ImageScaleBy",
+    "BiRefNetRMBG",
+)
+
 
 def _connection_issue(error: Exception, mode: str) -> tuple[str, str]:
     """Classify a ComfyUI connection error.
@@ -56,9 +67,21 @@ def _connection_issue(error: Exception, mode: str) -> tuple[str, str]:
 
 
 def build_status_payload(
-    config: dict[str, Any], allowed_sizes: list[str]
+    config: dict[str, Any],
+    allowed_sizes: list[str],
+    *,
+    include_capabilities: bool = True,
 ) -> dict[str, Any]:
-    """Return the JSON payload for the ComfyUI helper status command."""
+    """Return ComfyUI health and optional model capability state.
+
+    Args:
+        config: Effective plugin configuration.
+        allowed_sizes: Configured generation size labels.
+        include_capabilities: Whether to validate models and workflow nodes.
+
+    Returns:
+        Machine-readable ComfyUI status payload.
+    """
     base_url = str(config.get("comfyui_base_url") or "").strip()
     parsed_base_url = urlparse(base_url)
     comfyui_host = parsed_base_url.hostname or ""
@@ -86,7 +109,6 @@ def build_status_payload(
     try:
         client = ComfyUIHttpClient(config)
         stats = client.get_json("/system_stats", timeout=10)
-        object_info = client.get_json("/object_info", timeout=20)
         devices = stats.get("devices", []) if isinstance(stats, dict) else []
         device = devices[0] if devices else {}
         payload.update(
@@ -95,6 +117,21 @@ def build_status_payload(
                 "gpu": device.get("name"),
                 "vram_total_mb": int(device.get("vram_total", 0) / 1024 / 1024),
                 "vram_free_mb": int(device.get("vram_free", 0) / 1024 / 1024),
+                "comfyui_api_reachable": True,
+            }
+        )
+        if not include_capabilities:
+            payload["capabilities_checked"] = False
+            return payload
+
+        object_info: dict[str, Any] = {}
+        for node_name in CAPABILITY_NODE_NAMES:
+            node_info = client.get_json(f"/object_info/{node_name}", timeout=10)
+            if isinstance(node_info, dict):
+                object_info.update(node_info)
+        payload.update(
+            {
+                "capabilities_checked": True,
                 "unet_available": config.get("unet_name")
                 in _available_models(object_info, "UNETLoader", "unet_name"),
                 "clip_available": config.get("clip_name")
@@ -107,7 +144,6 @@ def build_status_payload(
                 ),
                 "upscale_available": "ImageScaleBy" in object_info,
                 "remove_bg_available": "BiRefNetRMBG" in object_info,
-                "comfyui_api_reachable": True,
             }
         )
     except Exception as exc:
@@ -116,7 +152,7 @@ def build_status_payload(
             {
                 "ok": False,
                 "error": f"{type(exc).__name__}: {exc}",
-                "comfyui_api_reachable": False,
+                "comfyui_api_reachable": bool(payload["comfyui_api_reachable"]),
                 "connection_issue": issue,
                 "connection_hint": hint,
             }

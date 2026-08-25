@@ -17,7 +17,11 @@ from image_prompt_extractors import (
 def _find_astrbot_root() -> Path:
     candidates = (Path.cwd().resolve(), *Path(__file__).resolve().parents)
     for candidate in candidates:
-        if (candidate / "astrbot").is_dir() and (candidate / "data").is_dir():
+        has_runtime = (candidate / "astrbot").is_dir() or (
+            candidate / ".astrbot"
+        ).exists()
+        has_runtime = has_runtime or (candidate / "data" / "config").is_dir()
+        if has_runtime and (candidate / "data").is_dir():
             return candidate
     return Path(__file__).resolve().parents[1]
 
