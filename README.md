@@ -1,6 +1,6 @@
 # Anima 绘图大师
 
-一个 **AstrBot** 插件，把聊天里的自然语言转成适合 **本地 ComfyUI / Anima 工作流** 的 Danbooru 标签，再把生成的图片发回聊天。一条 `/anm` 命令就完成「描述 → 优化 → 出图 → 发回」整个流程。
+一个 **AstrBot** 插件，把聊天里的自然语言变成适合 **本地 ComfyUI / Anima 工作流** 的 Danbooru tags，并把生成结果发回聊天。它把「中文描述 → 提示词优化 → ComfyUI 出图 → 发回群里」整条链路做成一个 `/anm` 指令。
 
 ```text
 /anm 一个女孩，白色裙子，立绘，简单背景
@@ -10,18 +10,18 @@
 
 ## 功能特性
 
-- **文生图**：自然语言自动优化成 Danbooru 标签，交给本地 ComfyUI 工作流出图。
+- **文生图**：自然语言自动优化为 Danbooru tags，交由本地 ComfyUI 工作流出图。
 - **多人画面**：`/anm 多人` 生成 2–4 人画面，逐人拆解身份、外观、服装、表情、动作与道具，并补全位置与互动关系。
-- **原样模式**：`/anm 无优化` 跳过提示词优化，完全按你写的标签直接出图。
-- **固定角色**：把角色名和它对应的标签一起保存，指令中命中名字时自动引用；没点名不会自动套用。
+- **原样 tags 模式**：`/anm 无优化` 跳过提示词优化，完全按你写的 tags 直通工作流。
+- **固定角色**：保存角色名到 tags，指令中命中名字时自动引用；未点名不会自动套用。
 - **画师组与画风**：独立保存并切换画师组（`artist:` 串）与画风组，也支持「不使用默认画风」。
-- **联网校正角色标签**：少量联网搜索补充角色外观与服装参考，再用 Danbooru / Safebooru 角色分类校正，让角色外观更稳定。
+- **联网校正角色 Tag**：少量联网搜索补充角色外观/服装参考，再用 Danbooru / Safebooru 角色分类校正，稳定外观锚点。
 - **图片法术解析**：读取图片内嵌的生成信息（Prompt / 参数）。
 - **视觉模型反推**：根据图片内容反推 Danbooru tags。
 - **图片参考**：引用或直接发图后，可在生图描述里写「参考这张图」「同款衣服」等。
 - **千代预设**：一键应用 `千代base` / `千代aesthetic` / `千代turbo` 三套画师、模型与参数组合。
 - **由 AstrBot 启动 ComfyUI**：ComfyUI 离线且收到绘图请求时，可用 `startup_command` 尝试拉起。
-- **0.8.0 背景策略**：自然语言生图在没写场景时，单人和多人优化路径默认用 `simple background, white background` 的居中立绘构图；明确写了背景就保留原场景。原样模式和图生图不受这个规则影响。
+- **0.8.0 背景策略**：自然语言生图在未指定场景时，单人与多人优化路径默认采用 `simple background, white background` 的居中立绘构图；明确指定背景时保留原场景。原样模式与图生图不受此规则强制改写。
 
 > 图生图、放大、去背景仍在开发中，默认关闭，不作为稳定主功能。
 
@@ -30,9 +30,9 @@
 ## 工作原理
 
 1. 用户发送 `/anm <描述>`。自然语言描述交给聊天模型（`prompt_builder_provider_id`，留空用会话主模型）。
-2. 模型把它整理成 Danbooru 标签；固定角色、画师组、画风、质量词与负面词由插件在最终提示词前后自动补上。
-3. 命中现有作品角色时，先让模型给出罗马字形式的角色标签作候选，再用 Danbooru / Safebooru 角色分类校正；`/anm 多人` 会额外做一次图片结构校验。
-4. 插件把最终提示词、尺寸、Steps、CFG 等提交给 ComfyUI `/prompt`，轮询生成结果，校验后把图片发回聊天。
+2. 模型把它整理成 Danbooru tags；固定角色、画师组、画风、质量词与负面词由插件在最终 Prompt 前后拼接。
+3. 命中现有作品角色时，先给罗马字角色 tag 候选，再用 Danbooru / Safebooru 角色分类校正；`multi_person` 会额外做一次图片结构校验。
+4. 插件把最终 Prompt、尺寸、Steps、CFG 等送入 ComfyUI `/prompt`，轮询生成结果，校验后把图片发回聊天。
 5. 生成失败可重试；提示词优化或角色校正不可用时自动降级，不会中断出图。
 
 ---
@@ -83,7 +83,7 @@ pip install -r requirements.txt
 |---|---|
 | `/anm 生图 <描述>` | 自然语言生图（也支持省略「生图」直接 `/anm <描述>`） |
 | `/anm 多人 <描述>` | 生成 2–4 人画面，按人物分组与互动关系构图 |
-| `/anm 无优化 <tags>` | 跳过提示词优化，直接按你给的标签出图（等同 `/anm 原样`） |
+| `/anm 无优化 <tags>` | 跳过 LLM 优化，直接按 tags 出图（等同 `/anm 原样`） |
 | `/anm 改图 <要求>` | 引用图片后整图重绘 / 风格化（需开启 `img2img_enabled`） |
 | `/anm 解析法术` | 读取图片内嵌的生成信息（提示词 / 参数） |
 | `/anm 反推` | 根据图片内容反推 Danbooru tags |
@@ -98,7 +98,7 @@ pip install -r requirements.txt
 | `/anm 删除画师组 <名称>` | 删除画师组 |
 | `/anm 帮助` | 查看指令表 |
 
-> `放大`、`抠图`、`去背景` 仍在开发中，默认会返回「暂不可用」。
+> `放大`、`抠图`、`去背景` 仍为开发中能力，默认返回「暂不可用」。
 
 ### 每次指定尺寸
 
@@ -154,7 +154,7 @@ pip install -r requirements.txt
 | `prompt_optimize_enabled` | 是否让聊天模型优化自然语言提示词 |
 | `prompt_builder_provider_id` | 优化模型 Provider ID；留空用会话主模型 |
 | `prompt_builder_max_tokens` | 优化模型最大输出长度 |
-| `prompt_builder_max_content_tags` | 提示词内容段的标签数量上限，默认 `65`（不含质量词、固定角色、画师组、画风） |
+| `prompt_builder_max_content_tags` | LLM 内容段硬上限，默认 `65`（不含质量词、固定角色、画师组、画风） |
 | `prompt_builder_web_search_enabled` | 允许在需要时联网搜索（需 Tavily key） |
 | `prompt_builder_deep_thinking_enabled` | 是否启用深度思考 |
 | `prompt_builder_template` | 主提示词模板（一般无需改） |
@@ -165,7 +165,7 @@ pip install -r requirements.txt
 |---|---|
 | `fixed_characters` | 固定角色预设，格式 `角色名=tags` |
 | `artist_presets` / `active_artist_preset` | 画师组列表与当前启用项 |
-| `default_artist_tags` | 未启用画师组时的备用画师标签 |
+| `default_artist_tags` | 未启用画师组时的备用画师 tags |
 | `style_presets` / `active_style_preset` / `style_tags` | 画风组与当前画风 |
 | `sensual_mode_enabled` | 涩气表现力优化 |
 | `sensual_mode_markers` | 触发涩气表现力优化的关键词 |
@@ -217,26 +217,26 @@ pip install -r requirements.txt
 狐莉=1 girl, solo, fox girl, white hair, heterochromia, fang, black choker
 ```
 
-之后只有在指令里明确点到角色名时，才会拼上该角色的标签；没点名不会自动套用。已保存角色的固定标签是判定外观身份的标准，就算模型规划出和它冲突的发色、瞳色或种族，插件也只保留可变部分，丢掉这些冲突外观。
+之后在指令中明确提到角色名时才会拼接该角色 tags；没点名不会自动套用。已保存角色的固定 Tag 是外观身份的唯一依据，即使 LLM 规划了冲突的发色、瞳色或种族特征，插件也会丢弃冲突外观，只保留可变部分。
 
 ### 画师与画风
 
-启用画师组后，先拼当前画师组的标签，再拼画风组（用于媒介、上色、渲染）。`default_artist_tags` 只在没启用画师组时作为后备。某次不想用画师标签，可在指令里写：
+启用画师组后，先拼接当前画师组 tags，再拼当前画风组（用于媒介、上色、渲染）。`default_artist_tags` 仅在未启用画师组时作为备用。某次不想用画师 tags，可在指令里写：
 
 ```text
 不使用默认画风
 no artist tags
 ```
 
-### 现成标签
+### 现成 tags
 
-普通 `/anm` 会把现成的标签串也交给 LLM 重新设计。想完全保留时用 `/anm 无优化`：
+普通 `/anm` 会把现成 Tag 串也交给 LLM 重新设计。需要完全保留时用 `/anm 无优化`：
 
 ```text
 /anm 无优化 masterpiece, best quality, 1girl, solo, white dress, simple background
 ```
 
-`无优化` 完全按原样使用后面的提示词，不拼接质量词、固定角色、画师组或画风，也不清理标签。
+`无优化` 完全按原样使用后续提示词，不拼接质量词、固定角色、画师组或画风，也不做内容 Tag 清理。
 
 ### 图片参考与法术
 
@@ -261,7 +261,7 @@ no artist tags
 | 千代aesthetic | `anima_aestheticV11` | 3 | 都不注入 |
 | 千代turbo | `anima_baseV10` + `anima-turbo-lora-v0.2` | 1 | 使用当前配置 |
 
-千代turbo 使用 `variants/turbo/workflows/comfyui_00051_api.json`，固定 10 步、`euler`、`simple`，并启用针对 CFG 1 的二次约束规划。选择「未启用」会恢复启用前的值。
+千代turbo 使用 `variants/turbo/workflows/comfyui_00051_api.json`，固定 10 步、`euler`、`simple`，并启用面向 CFG 1 的二次约束规划。选择「未启用」会恢复启用前的值。
 
 ---
 
@@ -285,7 +285,7 @@ no artist tags
 
 ### 新角色画不像
 
-本地模型不一定认识新角色或冷门角色。可开启联网搜索补充更具体的外观、服装、配色和标志物，或在 `fixed_characters` 里手动添加角色的标签。
+本地模型不一定认识新角色或冷门角色。可开启联网搜索补充更具体的外观、服装、配色和标志物，或在 `fixed_characters` 中手动添加角色 tags。
 
 ### 法术解析读不到提示词
 
