@@ -106,7 +106,17 @@ COMMAND_ENTRIES: tuple[CommandEntry, ...] = (
         "- /anm 添加角色 <名称>=<tags>：新增或覆盖角色",
         True,
     ),
-    CommandEntry("list_artist_presets", ("查看画师预设", "查看画师组", "列出画师预设", "列出画师组", "画师预设列表", "画师组列表")),
+    CommandEntry(
+        "list_artist_presets",
+        (
+            "查看画师预设",
+            "查看画师组",
+            "列出画师预设",
+            "列出画师组",
+            "画师预设列表",
+            "画师组列表",
+        ),
+    ),
     CommandEntry(
         "use_artist_preset",
         (
@@ -122,8 +132,21 @@ COMMAND_ENTRIES: tuple[CommandEntry, ...] = (
         "- /anm 切换画师预设 <名称>：切换当前画师预设",
         True,
     ),
-    CommandEntry("delete_artist_preset", ("删除画师预设", "删除画师组", "移除画师预设", "移除画师组")),
-    CommandEntry("set_artist_tags", ("设置画师预设", "设置画师组", "设置新的画师预设", "设置新的画师组", "画师预设", "画师组")),
+    CommandEntry(
+        "delete_artist_preset",
+        ("删除画师预设", "删除画师组", "移除画师预设", "移除画师组"),
+    ),
+    CommandEntry(
+        "set_artist_tags",
+        (
+            "设置画师预设",
+            "设置画师组",
+            "设置新的画师预设",
+            "设置新的画师组",
+            "画师预设",
+            "画师组",
+        ),
+    ),
     CommandEntry(
         "create_artist_preset",
         (
@@ -147,7 +170,16 @@ COMMAND_ENTRIES: tuple[CommandEntry, ...] = (
     ),
     CommandEntry(
         "append_artist_tags",
-        ("追加画师预设", "追加画师组", "添加画师预设", "添加画师组", "加入画师预设", "加入画师组", "加入新的画师预设", "加入新的画师组"),
+        (
+            "追加画师预设",
+            "追加画师组",
+            "添加画师预设",
+            "添加画师组",
+            "加入画师预设",
+            "加入画师组",
+            "加入新的画师预设",
+            "加入新的画师组",
+        ),
     ),
 )
 
