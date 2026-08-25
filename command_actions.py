@@ -154,12 +154,12 @@ class CommandActionHandler:
         presets = artist_presets(self.config)
         presets[name] = tags
         self._persist_artist_presets(presets, active=name)
-        return f"已保存并启用画师组“{name}”：\n" + self._shorten(tags, 800)
+        return f"已保存并启用画师预设“{name}”：\n" + self._shorten(tags, 800)
 
     def create_artist_preset(self, prompt: str) -> str:
         parsed = self._parse_name_tags(prompt)
         if not parsed:
-            return "请使用“名称=tags”的格式。例：/anm 创建画师组 千代风格=@artist_a, @artist_b,"
+            return "请使用“名称=tags”的格式。例：/anm 创建画师预设 千代风格=@artist_a, @artist_b,"
         name, tags = parsed
         return self._save_artist_preset(name, tags)
 
@@ -179,7 +179,7 @@ class CommandActionHandler:
 
         tags = self._normalize_tag_text(prompt)
         if not tags:
-            return "请写画师 tags，或使用“名称=tags”。例：/anm 创建画师组 千代=@artist_a, @artist_b,"
+            return "请写画师 tags，或使用“名称=tags”。例：/anm 创建画师预设 千代=@artist_a, @artist_b,"
         self._persist_config_key("default_artist_tags", tags)
         self._persist_config_key("active_artist_preset", "")
         return "已设置默认画师 tags，并切回默认画师 tags：\n" + self._shorten(tags, 800)
@@ -192,18 +192,18 @@ class CommandActionHandler:
             merged = merge_tag_text(presets.get(name), tags)
             presets[name] = merged
             self._persist_artist_presets(presets, active=name)
-            return f"已追加并启用画师组“{name}”：\n" + self._shorten(merged, 800)
+            return f"已追加并启用画师预设“{name}”：\n" + self._shorten(merged, 800)
 
         addition = self._normalize_tag_text(prompt)
         if not addition:
-            return "请写要追加的画师 tags，或使用“名称=tags”。例：/anm 追加画师组 千代=@artist_a,"
+            return "请写要追加的画师 tags，或使用“名称=tags”。例：/anm 追加画师预设 千代=@artist_a,"
         active = active_artist_preset_name(self.config)
         if active:
             presets = artist_presets(self.config)
             merged = merge_tag_text(presets.get(active), addition)
             presets[active] = merged
             self._persist_artist_presets(presets, active=active)
-            return f"已追加当前画师组“{active}”：\n" + self._shorten(merged, 800)
+            return f"已追加当前画师预设“{active}”：\n" + self._shorten(merged, 800)
         merged = merge_tag_text(self.config.get("default_artist_tags"), addition)
         self._persist_config_key("default_artist_tags", merged)
         return "已追加默认画师 tags：\n" + self._shorten(merged, 800)
@@ -211,26 +211,26 @@ class CommandActionHandler:
     def use_artist_preset(self, prompt: str) -> str:
         name = str(prompt or "").strip()
         if not name:
-            return "请写要启用的画师组名称。例：/anm 切换画师组 千代"
-        if name in {"默认", "默认画师", "默认画师组", "default"}:
+            return "请写要启用的画师预设名称。例：/anm 切换画师预设 千代"
+        if name in {"默认", "默认画师", "默认画师预设", "默认画师组", "default"}:
             self._persist_config_key("active_artist_preset", "")
             return "已切回默认画师 tags。"
         presets = artist_presets(self.config)
         if name not in presets:
-            return f"没有找到画师组“{name}”。可用画师组：{', '.join(sorted(presets)) if presets else '无'}"
+            return f"没有找到画师预设“{name}”。可用画师预设：{', '.join(sorted(presets)) if presets else '无'}"
         self._persist_config_key("active_artist_preset", name)
-        return f"已启用画师组“{name}”：\n" + self._shorten(presets[name], 800)
+        return f"已启用画师预设“{name}”：\n" + self._shorten(presets[name], 800)
 
     def list_artist_presets(self) -> str:
         presets = artist_presets(self.config)
         active = active_artist_preset_name(self.config)
         default_tags = str(self.config.get("default_artist_tags") or "").strip()
-        lines = ["画师组："]
+        lines = ["画师预设："]
         lines.append(
             f"- 默认画师 tags：{'已配置' if default_tags else '未配置'}{'（当前）' if not active else ''}"
         )
         if not presets:
-            lines.append("- 已保存的画师组：无")
+            lines.append("- 已保存的画师预设：无")
         else:
             for name in sorted(presets):
                 marker = "（当前）" if name == active else ""
@@ -239,9 +239,9 @@ class CommandActionHandler:
             [
                 "",
                 "用法：",
-                "/anm 创建画师组 名称=@artist_a, @artist_b,",
-                "/anm 切换画师组 名称",
-                "/anm 删除画师组 名称",
+                "/anm 创建画师预设 名称=@artist_a, @artist_b,",
+                "/anm 切换画师预设 名称",
+                "/anm 删除画师预设 名称",
             ]
         )
         return "\n".join(lines)
@@ -249,14 +249,14 @@ class CommandActionHandler:
     def delete_artist_preset(self, prompt: str) -> str:
         name = str(prompt or "").strip()
         if not name:
-            return "请写要删除的画师组名称。例：/anm 删除画师组 千代"
+            return "请写要删除的画师预设名称。例：/anm 删除画师预设 千代"
         presets = artist_presets(self.config)
         if name not in presets:
-            return f"没有找到画师组“{name}”。"
+            return f"没有找到画师预设“{name}”。"
         presets.pop(name, None)
         active = active_artist_preset_name(self.config)
         self._persist_artist_presets(presets, active="" if active == name else active)
-        return f"已删除画师组“{name}”。" + (
+        return f"已删除画师预设“{name}”。" + (
             " 当前已切回默认画师 tags。" if active == name else ""
         )
 

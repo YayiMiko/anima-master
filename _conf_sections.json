@@ -99,7 +99,7 @@
     {
       "key": "anima_master_style",
       "description": "角色与风格",
-      "hint": "用于角色、画师组和风格，以及涩气表现力相关设置。",
+      "hint": "用于角色、画师预设和风格，以及涩气表现力相关设置。",
       "items": [
         "fixed_characters",
         "artist_presets",

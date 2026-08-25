@@ -8,7 +8,7 @@
   "reset_to_defaults": false,
 
   // 千代预设：""（未启用）/ "base" / "aesthetic" / "turbo"。
-  // 任一预设都会把对应的千代画师组写入 default_artist_tags，并把“狐莉”加入 fixed_characters。
+  // 任一预设都会把对应的千代画师预设写入 default_artist_tags，并把“狐莉”加入 fixed_characters。
   // aesthetic 另外覆盖 unet_name=anima_aestheticV11、cfg=3，且不注入质量词与负面词。
   // turbo 使用 Turbo LoRA 工作流、10 步、CFG 1、euler/simple 与低 CFG 提示词约束。
   "chiyo_preset": "",
@@ -97,7 +97,7 @@
   // 默认画师 / 画风 tags。用户说“不用我的风格 / 不要画师词”时会绕开。
   "default_artist_tags": "",
 
-  // 画风 tags，会拼接在当前画师组之后。
+  // 画风 tags，会拼接在当前画师预设之后。
   "style_tags": "",
 
   // 开启后，命中相关关键词时会让 LLM 自行写得更有边界表现力。
@@ -166,7 +166,7 @@
   "startup_poll_interval": 3,
 
   // 主提示词模板。留空会使用插件内置模板。
-  "prompt_builder_template": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将结果输出为英文 Danbooru-style tags。\n\n输出要求：\n- 只输出一行英文 tags，使用英文逗号分隔。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 除上述明确要求外，可以自由决定服装细节、姿态、构图、镜头、背景、环境、光影、色彩、氛围、前景和特效。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n{character_rule}\n{search_block}\n{outfit_transfer_rule}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n用户原始要求：\n{theme}",
+  "prompt_builder_template": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将结果输出为英文 Danbooru-style tags。\n\n输出要求：\n- 只输出一行英文 tags，使用英文逗号分隔。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师预设会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 除上述明确要求外，可以自由决定服装细节、姿态、构图、镜头、背景、环境、光影、色彩、氛围、前景和特效。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n{character_rule}\n{search_block}\n{outfit_transfer_rule}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n用户原始要求：\n{theme}",
 
   // 调试项默认关闭。只在排查问题时再开。
   "debug_prompt_enabled": false,

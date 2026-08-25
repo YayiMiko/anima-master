@@ -26,7 +26,7 @@
           "千代aesthetic",
           "千代turbo"
         ],
-        "hint": "选择后补入对应的千代画师组，并把“狐莉”加入角色列表；狐莉只会在明确提到时使用。千代base 使用 anima_baseV10 与 CFG 5；千代aesthetic 使用 anima_aestheticV11、CFG 3，且不加质量词和负面词；千代turbo 使用 Turbo LoRA 工作流、10 步、CFG 1、euler/simple，并启用低 CFG 提示词约束。保存并重载插件后，模型、参数和提示词字段会同步显示预设值；选择“未启用”可恢复启用前的值。"
+        "hint": "选择后补入对应的千代画师预设，并把“狐莉”加入角色列表；狐莉只会在明确提到时使用。千代base 使用 anima_baseV10 与 CFG 5；千代aesthetic 使用 anima_aestheticV11、CFG 3，且不加质量词和负面词；千代turbo 使用 Turbo LoRA 工作流、10 步、CFG 1、euler/simple，并启用低 CFG 提示词约束。保存并重载插件后，模型、参数和提示词字段会同步显示预设值；选择“未启用”可恢复启用前的值。"
       }
     }
   },
@@ -332,7 +332,7 @@
         "description": "内容 Tag 数量上限",
         "type": "int",
         "default": 65,
-        "hint": "只限制 LLM 生成内容段的技术上限，不计质量词、固定角色、画师组和画风；默认上限为 65，不要求达到固定数量。",
+        "hint": "只限制 LLM 生成内容段的技术上限，不计质量词、固定角色、画师预设和画风；默认上限为 65，不要求达到固定数量。",
         "collapsed": true,
         "condition": {
           "prompt_optimize_enabled": true
@@ -405,7 +405,7 @@
       "prompt_builder_template": {
         "description": "自然语言优化模板",
         "type": "string",
-        "default": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将结果输出为英文 Danbooru-style tags。\n\n输出要求：\n- 只输出一行英文 tags，使用英文逗号分隔。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 除上述明确要求外，可以自由决定服装细节、姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未明确要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n{character_rule}\n{search_block}\n{outfit_transfer_rule}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n用户原始要求：\n{theme}",
+        "default": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将结果输出为英文 Danbooru-style tags。\n\n输出要求：\n- 只输出一行英文 tags，使用英文逗号分隔。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师预设会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 除上述明确要求外，可以自由决定服装细节、姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未明确要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n{character_rule}\n{search_block}\n{outfit_transfer_rule}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n用户原始要求：\n{theme}",
         "hint": "决定插件如何把中文需求改写成 tags；普通用户不需要修改。详见 docs/prompting.md。",
         "collapsed": true,
         "condition": {
@@ -470,7 +470,7 @@
   "anima_master_style": {
     "description": "角色与风格",
     "type": "object",
-    "hint": "用于角色、画师组和风格，以及涩气表现力相关设置。",
+    "hint": "用于角色、画师预设和风格，以及涩气表现力相关设置。",
     "items": {
       "fixed_characters": {
         "description": "角色",
@@ -483,33 +483,33 @@
         }
       },
       "artist_presets": {
-        "description": "已保存的画师组",
+        "description": "已保存的画师预设",
         "type": "list",
         "default": [],
-        "hint": "每行一个画师组，格式：名称=tags。推荐在聊天里用 /anm 创建画师组 名称=tags 添加。示例：千代base=@artist_a, @artist_b,",
+        "hint": "每行一个画师预设，格式：名称=tags。推荐在聊天里用 /anm 创建画师预设 名称=tags 添加。示例：千代base=@artist_a, @artist_b,",
         "collapsed": true,
         "items": {
           "type": "string"
         }
       },
       "active_artist_preset": {
-        "description": "启用的画师组",
+        "description": "启用的画师预设",
         "type": "string",
         "default": "",
-        "hint": "必须与已保存的画师组名称完全一致。推荐在聊天里用 /anm 切换画师组 名称；手填时注意不要多空格。优先级高于默认画师 tags。示例：千代base"
+        "hint": "必须与已保存的画师预设名称完全一致。推荐在聊天里用 /anm 切换画师预设 名称；手填时注意不要多空格。优先级高于默认画师 tags。示例：千代base"
       },
       "default_artist_tags": {
         "description": "备用画师 tags",
         "type": "string",
         "default": "",
-        "hint": "通常不用填；只有未启用画师组时才会读取这里。示例：@artist_a, @artist_b,",
+        "hint": "通常不用填；只有未启用画师预设时才会读取这里。示例：@artist_a, @artist_b,",
         "collapsed": true
       },
       "style_tags": {
         "description": "画风",
         "type": "string",
         "default": "",
-        "hint": "填写媒介、上色和渲染 tags；会拼接在当前画师组之后。默认留空。示例：anime coloring, cel shading, glossy highlights,",
+        "hint": "填写媒介、上色和渲染 tags；会拼接在当前画师预设之后。默认留空。示例：anime coloring, cel shading, glossy highlights,",
         "collapsed": true
       },
       "style_presets": {

@@ -52,6 +52,12 @@ def test_parse_spell_and_reverse():
 
 
 def test_parse_artist_and_character_commands():
+    assert parse_hard_route("/anm 创建画师预设 千代=@a, @b") == (
+        "create_artist_preset",
+        "千代=@a, @b",
+    )
+    assert parse_hard_route("/anm 切换画师预设 千代") == ("use_artist_preset", "千代")
+    # 旧命令名仍作为别名保留
     assert parse_hard_route("/anm 创建画师组 千代=@a, @b") == (
         "create_artist_preset",
         "千代=@a, @b",
@@ -69,8 +75,8 @@ def test_help_text_uses_catalog_visibility():
     assert "/anm 生图 <描述>" in text
     assert "/anm 多人 <描述>" in text
     assert "/anm 无优化 <tags>" in text
-    assert "/anm 创建画师组" in text
-    assert "/anm 切换画师组" in text
+    assert "/anm 创建画师预设" in text
+    assert "/anm 切换画师预设" in text
     assert "/anm 添加角色" in text
     assert "--尺寸 1216x832" in text
     assert "--自由发挥" not in text

@@ -427,6 +427,7 @@ class ComfyUIAgentPlugin(Star):
     @comfyui_group.command(
         "artist",
         alias={
+            "创建画师预设",
             "创建画师组",
         },
     )
@@ -438,7 +439,7 @@ class ComfyUIAgentPlugin(Star):
             )
         )
 
-    @comfyui_group.command("append_artist", alias={"追加画师组"})
+    @comfyui_group.command("append_artist", alias={"追加画师预设", "追加画师组"})
     async def cmd_append_artist_tags(self, event: AstrMessageEvent, prompt: GreedyStr):
         event.stop_event()
         yield event.plain_result(
@@ -447,7 +448,7 @@ class ComfyUIAgentPlugin(Star):
             )
         )
 
-    @comfyui_group.command("use_artist", alias={"切换画师组"})
+    @comfyui_group.command("use_artist", alias={"切换画师预设", "切换画师组"})
     async def cmd_use_artist_preset(self, event: AstrMessageEvent, prompt: GreedyStr):
         event.stop_event()
         yield event.plain_result(
@@ -456,14 +457,14 @@ class ComfyUIAgentPlugin(Star):
             )
         )
 
-    @comfyui_group.command("list_artist", alias={"查看画师组"})
+    @comfyui_group.command("list_artist", alias={"查看画师预设", "查看画师组"})
     async def cmd_list_artist_presets(self, event: AstrMessageEvent):
         event.stop_event()
         yield event.plain_result(
             await self._handle_action(event, "list_artist_presets", "")
         )
 
-    @comfyui_group.command("delete_artist", alias={"删除画师组"})
+    @comfyui_group.command("delete_artist", alias={"删除画师预设", "删除画师组"})
     async def cmd_delete_artist_preset(
         self, event: AstrMessageEvent, prompt: GreedyStr
     ):

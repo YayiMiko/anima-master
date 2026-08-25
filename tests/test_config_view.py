@@ -36,7 +36,7 @@ def test_config_debug_lines_show_core_user_state(tmp_path: Path):
     text = "\n".join(lines)
 
     assert "千代预设：千代base" in text
-    assert "当前画师组：千代base" in text
+    assert "当前画师预设：千代base" in text
     assert "角色：" in text and "狐莉" in text
     assert "ComfyUI：http://127.0.0.1:8188" in text
     assert "工作流：my_workflow" in text
