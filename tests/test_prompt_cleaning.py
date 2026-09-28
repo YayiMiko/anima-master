@@ -7,8 +7,8 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from prompt_builder import build_final_prompt  # noqa: E402
-from tag_cleaner import clean_content_tags  # noqa: E402
+from anima.prompts.prompt_builder import build_final_prompt  # noqa: E402
+from anima.prompts.tag_cleaner import clean_content_tags  # noqa: E402
 
 
 def _config() -> dict:

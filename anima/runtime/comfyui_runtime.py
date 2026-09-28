@@ -21,7 +21,7 @@ try:
     )
     from .comfyui_startup import ComfyUIStartupManager
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from chat_delivery import (
+    from anima.runtime.chat_delivery import (
         ack_timeout_delivery,
         is_ack_timeout,
         no_output_delivery,
@@ -30,7 +30,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         sent_delivery,
         skipped_delivery,
     )
-    from comfyui_startup import ComfyUIStartupManager
+    from anima.runtime.comfyui_startup import ComfyUIStartupManager
 
 try:
     from aiocqhttp.exceptions import ActionFailed

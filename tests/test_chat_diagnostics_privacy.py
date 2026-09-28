@@ -8,10 +8,10 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from deployment_diagnostics import compact_status_text, diagnostic_text  # noqa: E402
-from llm_tool_bridge import LLMToolBridge  # noqa: E402
-from task_state import TaskRecorder  # noqa: E402
-from task_summary import build_last_task_debug_lines  # noqa: E402
+from anima.runtime.deployment_diagnostics import compact_status_text, diagnostic_text  # noqa: E402
+from anima.runtime.llm_tool_bridge import LLMToolBridge  # noqa: E402
+from anima.runtime.task_state import TaskRecorder  # noqa: E402
+from anima.runtime.task_summary import build_last_task_debug_lines  # noqa: E402
 
 
 PRIVATE_URL = "http://100.68.56.22:8188"

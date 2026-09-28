@@ -14,12 +14,12 @@ for import_path in (PLUGIN_DIR, TOOLS_DIR):
         sys.path.insert(0, str(import_path))
 
 from comfyui_history import ComfyUIHistoryRunner  # noqa: E402
-from command_actions import CommandActionHandler  # noqa: E402
-import comfyui_runtime as runtime_module  # noqa: E402
-from comfyui_runtime import ComfyUIRuntime  # noqa: E402
-from generation_task import GenerationTaskRunner  # noqa: E402
-from image_manifest import ImageInputManifest  # noqa: E402
-from task_state import TaskRecorder  # noqa: E402
+from anima.commands.command_actions import CommandActionHandler  # noqa: E402
+import anima.runtime.comfyui_runtime as runtime_module  # noqa: E402
+from anima.runtime.comfyui_runtime import ComfyUIRuntime  # noqa: E402
+from anima.runtime.generation_task import GenerationTaskRunner  # noqa: E402
+from anima.images.image_manifest import ImageInputManifest  # noqa: E402
+from anima.runtime.task_state import TaskRecorder  # noqa: E402
 
 
 class _Logger:

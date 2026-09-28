@@ -43,13 +43,13 @@ try:
     from .prompt_templates import build_llm_prompt
     from .tag_cleaner import split_tags
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from danbooru_resolver import DanbooruResolver
-    from multi_person_prompt import (
+    from anima.prompts.danbooru_resolver import DanbooruResolver
+    from anima.prompts.multi_person_prompt import (
         build_multi_person_plan_prompt,
         parse_multi_person_plan,
         render_multi_person_character,
     )
-    from outfit_transfer import (
+    from anima.prompts.outfit_transfer import (
         build_outfit_summary_prompt,
         build_outfit_transfer_block,
         detect_outfit_transfer,
@@ -57,27 +57,27 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         filter_outfit_tags,
         preferred_search_prompt,
     )
-    from prompt_background import (
+    from anima.prompts.prompt_background import (
         DEFAULT_PORTRAIT,
         extract_background_mode,
     )
-    from prompt_builder import (
+    from anima.prompts.prompt_builder import (
         build_final_prompt,
     )
-    from prompt_constraints import (
+    from anima.prompts.prompt_constraints import (
         build_constraint_plan_prompt,
         parse_constraint_plan,
     )
-    from prompt_presets import (
+    from anima.prompts.prompt_presets import (
         apply_config_preset,
         fixed_character_tags,
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
     )
-    from prompt_research import PromptResearcher
-    from prompt_templates import build_llm_prompt
-    from tag_cleaner import split_tags
+    from anima.prompts.prompt_research import PromptResearcher
+    from anima.prompts.prompt_templates import build_llm_prompt
+    from anima.prompts.tag_cleaner import split_tags
 
 
 @dataclass(frozen=True)

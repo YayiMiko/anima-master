@@ -5,7 +5,7 @@ from typing import Any
 try:
     from .deployment_diagnostics import safe_error_summary
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from deployment_diagnostics import safe_error_summary
+    from anima.runtime.deployment_diagnostics import safe_error_summary
 
 
 def _as_dict(value: Any) -> dict[str, Any]:

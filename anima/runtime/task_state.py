@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .prompt_presets import (
+    from ..prompts.prompt_presets import (
         active_artist_preset_name,
         active_artist_tags,
         apply_config_preset,
@@ -16,7 +16,7 @@ try:
     )
     from .task_summary import build_last_task_debug_lines, build_strategy_summary
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from prompt_presets import (
+    from anima.prompts.prompt_presets import (
         active_artist_preset_name,
         active_artist_tags,
         apply_config_preset,
@@ -24,7 +24,10 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         chiyo_profile_display_name,
         fixed_character_tags,
     )
-    from task_summary import build_last_task_debug_lines, build_strategy_summary
+    from anima.runtime.task_summary import (
+        build_last_task_debug_lines,
+        build_strategy_summary,
+    )
 
 
 def _bool(config: dict[str, Any], key: str, default: bool) -> bool:

@@ -9,11 +9,11 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-import danbooru_tags as tags_module  # noqa: E402
-import danbooru_resolver as resolver_module  # noqa: E402
-from danbooru_resolver import DanbooruResolver  # noqa: E402
-from danbooru_tags import TagRecord, resolve_core_tags  # noqa: E402
-from prompt_templates import build_llm_prompt  # noqa: E402
+import anima.prompts.danbooru_tags as tags_module  # noqa: E402
+import anima.prompts.danbooru_resolver as resolver_module  # noqa: E402
+from anima.prompts.danbooru_resolver import DanbooruResolver  # noqa: E402
+from anima.prompts.danbooru_tags import TagRecord, resolve_core_tags  # noqa: E402
+from anima.prompts.prompt_templates import build_llm_prompt  # noqa: E402
 
 
 def test_donmai_json_retries_cdn_403_with_curl_agent(monkeypatch) -> None:

@@ -8,8 +8,8 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-import generation_verifier as verifier_module  # noqa: E402
-from generation_verifier import GenerationVerifier  # noqa: E402
+import anima.runtime.generation_verifier as verifier_module  # noqa: E402
+from anima.runtime.generation_verifier import GenerationVerifier  # noqa: E402
 
 
 class _Context:
@@ -362,9 +362,7 @@ def test_multi_person_selects_best_earlier_candidate(monkeypatch):
         generate_payload=generate_payload,
         logger=_Logger(),
         get_bool=lambda key, default: True,
-        get_int=lambda key, default: (
-            3 if key == "multi_candidate_count" else default
-        ),
+        get_int=lambda key, default: 3 if key == "multi_candidate_count" else default,
         get_str=lambda key, default: (
             "provider" if key == "verify_provider_id" else default
         ),

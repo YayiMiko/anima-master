@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .prompt_presets import (
+    from ..prompts.prompt_presets import (
         active_artist_preset_name,
         active_artist_tags,
         active_style_tags,
@@ -15,7 +15,7 @@ try:
         style_presets,
     )
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from prompt_presets import (
+    from anima.prompts.prompt_presets import (
         active_artist_preset_name,
         active_artist_tags,
         active_style_tags,

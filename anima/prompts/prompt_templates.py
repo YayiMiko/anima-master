@@ -8,7 +8,10 @@ try:
         EXPLICIT_SCENE_MARKER,
     )
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from prompt_background import DEFAULT_PORTRAIT_MARKER, EXPLICIT_SCENE_MARKER
+    from anima.prompts.prompt_background import (
+        DEFAULT_PORTRAIT_MARKER,
+        EXPLICIT_SCENE_MARKER,
+    )
 
 DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面提示词的 AI 画师。
 

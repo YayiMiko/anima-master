@@ -6,7 +6,7 @@ from typing import Any
 try:
     from .deployment_diagnostics import compact_status_text
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from deployment_diagnostics import compact_status_text
+    from anima.runtime.deployment_diagnostics import compact_status_text
 
 
 class LLMToolBridge:

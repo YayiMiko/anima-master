@@ -5,12 +5,15 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .prompt_templates import (
+    from ..prompts.prompt_templates import (
         DEFAULT_LLM_PROMPT_TEMPLATE,
         is_legacy_builtin_template,
     )
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from prompt_templates import DEFAULT_LLM_PROMPT_TEMPLATE, is_legacy_builtin_template
+    from anima.prompts.prompt_templates import (
+        DEFAULT_LLM_PROMPT_TEMPLATE,
+        is_legacy_builtin_template,
+    )
 
 
 RESET_TO_DEFAULTS_KEY = "reset_to_defaults"

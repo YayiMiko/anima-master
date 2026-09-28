@@ -9,32 +9,32 @@ from astrbot.core.utils.astrbot_path import get_astrbot_root
 
 try:
     from .comfyui_runtime import ComfyUIRuntime
-    from .command_actions import CommandActionHandler
-    from .danbooru_resolver import DanbooruResolver
+    from ..commands.command_actions import CommandActionHandler
+    from ..prompts.danbooru_resolver import DanbooruResolver
     from .generation_task import GenerationTaskRunner
     from .generation_verifier import GenerationVerifier
-    from .image_inputs import ImageInputResolver
+    from ..images.image_inputs import ImageInputResolver
     from .llm_tool_bridge import LLMToolBridge
-    from .message_context import MessageContextBuilder
-    from .prompt_pipeline import PromptPipeline
-    from .prompt_research import PromptResearcher
-    from .reference_context import ReferenceContextBuilder
+    from ..images.message_context import MessageContextBuilder
+    from ..prompts.prompt_pipeline import PromptPipeline
+    from ..prompts.prompt_research import PromptResearcher
+    from ..images.reference_context import ReferenceContextBuilder
     from .storage_retention import StorageRetentionManager
     from .task_state import TaskRecorder
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from comfyui_runtime import ComfyUIRuntime
-    from command_actions import CommandActionHandler
-    from danbooru_resolver import DanbooruResolver
-    from generation_task import GenerationTaskRunner
-    from generation_verifier import GenerationVerifier
-    from image_inputs import ImageInputResolver
-    from llm_tool_bridge import LLMToolBridge
-    from message_context import MessageContextBuilder
-    from prompt_pipeline import PromptPipeline
-    from prompt_research import PromptResearcher
-    from reference_context import ReferenceContextBuilder
-    from storage_retention import StorageRetentionManager
-    from task_state import TaskRecorder
+    from anima.runtime.comfyui_runtime import ComfyUIRuntime
+    from anima.commands.command_actions import CommandActionHandler
+    from anima.prompts.danbooru_resolver import DanbooruResolver
+    from anima.runtime.generation_task import GenerationTaskRunner
+    from anima.runtime.generation_verifier import GenerationVerifier
+    from anima.images.image_inputs import ImageInputResolver
+    from anima.runtime.llm_tool_bridge import LLMToolBridge
+    from anima.images.message_context import MessageContextBuilder
+    from anima.prompts.prompt_pipeline import PromptPipeline
+    from anima.prompts.prompt_research import PromptResearcher
+    from anima.images.reference_context import ReferenceContextBuilder
+    from anima.runtime.storage_retention import StorageRetentionManager
+    from anima.runtime.task_state import TaskRecorder
 
 
 @dataclass(frozen=True)
@@ -103,7 +103,7 @@ def resolve_service_paths() -> ServicePaths:
         Resolved path bundle for plugin services.
     """
     root = Path(get_astrbot_root())
-    plugin_dir = Path(__file__).resolve().parent
+    plugin_dir = Path(__file__).resolve().parents[2]
     tool = plugin_dir / "agent_tools" / "comfyui_agent.py"
     prompt_tool = plugin_dir / "agent_tools" / "image_prompt_agent.py"
     if not tool.exists():

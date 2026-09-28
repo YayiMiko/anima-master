@@ -12,35 +12,35 @@ from astrbot.core.star.filter.command import GreedyStr
 from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
 
 try:
-    from .command_router import parse_hard_route
-    from .config_defaults import (
+    from .anima.commands.command_router import parse_hard_route
+    from .anima.runtime.config_defaults import (
         flatten_config,
         group_config,
         maybe_migrate_to_grouped_config,
         maybe_reset_to_defaults,
         migrate_prompt_defaults,
     )
-    from .prompt_presets import (
+    from .anima.prompts.prompt_presets import (
         apply_config_preset,
         maybe_materialize_chiyo_preset,
         resolve_chiyo_profile,
     )
-    from .service_container import build_services
+    from .anima.runtime.service_container import build_services
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from command_router import parse_hard_route
-    from config_defaults import (
+    from anima.commands.command_router import parse_hard_route
+    from anima.runtime.config_defaults import (
         flatten_config,
         group_config,
         maybe_migrate_to_grouped_config,
         maybe_reset_to_defaults,
         migrate_prompt_defaults,
     )
-    from prompt_presets import (
+    from anima.prompts.prompt_presets import (
         apply_config_preset,
         maybe_materialize_chiyo_preset,
         resolve_chiyo_profile,
     )
-    from service_container import build_services
+    from anima.runtime.service_container import build_services
 
 
 class ComfyUIAgentPlugin(Star):

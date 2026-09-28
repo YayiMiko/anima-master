@@ -7,9 +7,14 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from capability_catalog import CAPABILITY_ENTRIES, capability_ids, chat_actions, llm_tool_entries
-from command_actions import CommandActionHandler
-from llm_tool_bridge import LLMToolBridge
+from anima.commands.capability_catalog import (  # noqa: E402
+    CAPABILITY_ENTRIES,
+    capability_ids,
+    chat_actions,
+    llm_tool_entries,
+)
+from anima.commands.command_actions import CommandActionHandler  # noqa: E402
+from anima.runtime.llm_tool_bridge import LLMToolBridge  # noqa: E402
 
 
 class _Recorder:

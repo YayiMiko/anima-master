@@ -10,8 +10,8 @@ for path in (PLUGIN_DIR, AGENT_TOOLS_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from prompt_builder import build_final_prompt  # noqa: E402
-from prompt_presets import (  # noqa: E402
+from anima.prompts.prompt_builder import build_final_prompt  # noqa: E402
+from anima.prompts.prompt_presets import (  # noqa: E402
     CHIYO_BASE_CONFIG_SNAPSHOT_KEY,
     CHIYO_VISIBLE_OVERRIDE_KEYS,
     apply_config_preset,

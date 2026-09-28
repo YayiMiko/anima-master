@@ -8,10 +8,10 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from command_actions import CommandActionHandler  # noqa: E402
-from command_catalog import COMMAND_ENTRIES  # noqa: E402
-from multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS  # noqa: E402
-from prompt_presets import DEFAULT_NEGATIVE_PROMPT  # noqa: E402
+from anima.commands.command_actions import CommandActionHandler  # noqa: E402
+from anima.commands.command_catalog import COMMAND_ENTRIES  # noqa: E402
+from anima.prompts.multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS  # noqa: E402
+from anima.prompts.prompt_presets import DEFAULT_NEGATIVE_PROMPT  # noqa: E402
 
 
 class _Recorder:

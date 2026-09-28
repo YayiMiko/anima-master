@@ -7,9 +7,9 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from command_actions import CommandActionHandler  # noqa: E402
-from prompt_builder import build_final_prompt  # noqa: E402
-from prompt_presets import (  # noqa: E402
+from anima.commands.command_actions import CommandActionHandler  # noqa: E402
+from anima.prompts.prompt_builder import build_final_prompt  # noqa: E402
+from anima.prompts.prompt_presets import (  # noqa: E402
     active_style_tags,
     artist_presets,
     fixed_character_tags,

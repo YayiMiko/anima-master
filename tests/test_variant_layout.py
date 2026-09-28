@@ -9,8 +9,8 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from prompt_presets import DEFAULT_QUALITY_TAGS  # noqa: E402
-from prompt_templates import (  # noqa: E402
+from anima.prompts.prompt_presets import DEFAULT_QUALITY_TAGS  # noqa: E402
+from anima.prompts.prompt_templates import (  # noqa: E402
     DEFAULT_LLM_PROMPT_TEMPLATE,
 )
 

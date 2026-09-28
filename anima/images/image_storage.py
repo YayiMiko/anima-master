@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 try:
     from .image_manifest import ImageInputManifest
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from image_manifest import ImageInputManifest
+    from anima.images.image_manifest import ImageInputManifest
 
 if TYPE_CHECKING:
     from astrbot.api.event import AstrMessageEvent

@@ -53,6 +53,7 @@ Anima 绘图大师是 AstrBot 插件：在聊天中发送自然语言，插件�
 - [完整指令与尺寸](docs/commands.md)
 - [部署拓扑](docs/deployment.md)
 - [故障排查](docs/troubleshooting.md)
+- [项目结构](docs/architecture.md)
 - [可选工作流变体](variants/README.md)
 
 ## License

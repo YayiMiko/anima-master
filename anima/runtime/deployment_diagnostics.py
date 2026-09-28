@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 try:
-    from .image_input_diagnostics import image_input_diagnostic_lines
+    from ..images.image_input_diagnostics import image_input_diagnostic_lines
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from image_input_diagnostics import image_input_diagnostic_lines
+    from anima.images.image_input_diagnostics import image_input_diagnostic_lines
 
 
 def _flag(value: Any) -> str:

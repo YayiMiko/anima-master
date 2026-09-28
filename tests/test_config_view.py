@@ -7,7 +7,7 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from config_view import build_config_debug_lines  # noqa: E402
+from anima.runtime.config_view import build_config_debug_lines  # noqa: E402
 
 
 def test_config_debug_lines_show_core_user_state(tmp_path: Path):

@@ -8,10 +8,10 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from prompt_pipeline import PromptPipeline  # noqa: E402
-from prompt_presets import looks_like_danbooru_tags  # noqa: E402
-from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
-from task_summary import (  # noqa: E402
+from anima.prompts.prompt_pipeline import PromptPipeline  # noqa: E402
+from anima.prompts.prompt_presets import looks_like_danbooru_tags  # noqa: E402
+from anima.prompts.danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
+from anima.runtime.task_summary import (  # noqa: E402
     apply_verification_summary,
     build_last_task_debug_lines,
     build_strategy_summary,

@@ -12,7 +12,7 @@ from astrbot.core.utils.quoted_message.onebot_client import OneBotClient
 try:
     from .image_storage import SUPPORTED_IMAGE_EXTS
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from image_storage import SUPPORTED_IMAGE_EXTS
+    from anima.images.image_storage import SUPPORTED_IMAGE_EXTS
 
 
 class OneBotImageResolver:
