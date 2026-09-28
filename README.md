@@ -11,6 +11,8 @@ Anima 绘图大师是 AstrBot 插件：在聊天中发送自然语言，插件�
 1. 准备 [AstrBot](https://github.com/AstrBotDevs/AstrBot)、可访问的 [ComfyUI](https://github.com/comfyanonymous/ComfyUI)，以及 Anima 模型、文本编码器和 VAE。
 2. 将本仓库安装为 AstrBot 插件。在插件配置页填写 ComfyUI 地址，并选择与 ComfyUI 中完全同名的模型文件：
 
+   ComfyUI 地址和模型文件位于默认显示的配置组；其他设置可通过“显示高级设置”展开。
+
    ```text
    comfyui_base_url = AstrBot 能访问到的 ComfyUI 地址
    workflow = anima_t2i
