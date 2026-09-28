@@ -7,7 +7,7 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from command_router import (  # noqa: E402
+from anima.commands.command_router import (  # noqa: E402
     help_text,
     parse_generation_size,
     parse_hard_route,
@@ -31,6 +31,7 @@ def test_parse_empty_anm_as_help():
 
 def test_parse_status_and_debug_status():
     assert parse_hard_route("/anm 状态") == ("status", "")
+    assert parse_hard_route("/anm 诊断") == ("diagnose", "")
     assert parse_hard_route("/anm 调试状态") == ("debug_status", "")
 
 
@@ -73,6 +74,9 @@ def test_help_text_uses_catalog_visibility():
     text = help_text(img2img_enabled=False)
 
     assert "/anm 生图 <描述>" in text
+    assert "/anm 状态" in text
+    assert "/anm 诊断" not in text
+    assert "/anm 调试状态" not in text
     assert "/anm 多人 <描述>" in text
     assert "/anm 无优化 <tags>" in text
     assert "/anm 创建画师预设" in text

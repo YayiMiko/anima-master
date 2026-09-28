@@ -13,9 +13,9 @@ try:
     from .image_storage import ImageInputStorage
     from .onebot_image_resolver import OneBotImageResolver
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from image_manifest import ImageInputManifest
-    from image_storage import ImageInputStorage
-    from onebot_image_resolver import OneBotImageResolver
+    from anima.images.image_manifest import ImageInputManifest
+    from anima.images.image_storage import ImageInputStorage
+    from anima.images.onebot_image_resolver import OneBotImageResolver
 
 
 class ImageInputResolver:

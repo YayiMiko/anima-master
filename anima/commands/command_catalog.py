@@ -25,13 +25,11 @@ COMMAND_ENTRIES: tuple[CommandEntry, ...] = (
         "diagnose",
         ("diagnose", "诊断"),
         "- /anm 诊断：检查服务器、网络和 ComfyUI 连接",
-        True,
     ),
     CommandEntry(
         "debug_status",
         ("debug_status", "debug", "调试状态", "调试"),
         "- /anm 调试状态：查看插件关键配置和上次任务摘要",
-        True,
     ),
     CommandEntry(
         "generate",

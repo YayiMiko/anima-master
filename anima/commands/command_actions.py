@@ -6,46 +6,53 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .agent_tools.comfyui_sizes import allowed_sizes
+    from ...agent_tools.comfyui_sizes import allowed_sizes
     from .command_catalog import COMMAND_ENTRIES
     from .command_router import (
         DEFAULT_GENERATION_SIZES,
         help_text,
         parse_generation_size,
     )
-    from .config_defaults import persist_flat_config_key
-    from .deployment_diagnostics import compact_status_text, diagnostic_text
-    from .multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS
-    from .prompt_presets import (
+    from ..runtime.config_defaults import persist_flat_config_key
+    from ..runtime.deployment_diagnostics import compact_status_text, diagnostic_text
+    from ..prompts.multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS
+    from ..prompts.prompt_presets import (
         DEFAULT_NEGATIVE_PROMPT,
         active_artist_preset_name,
         artist_presets,
         fixed_character_tags,
         merge_tag_text,
     )
-    from .tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
+    from ..prompts.tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from agent_tools.comfyui_sizes import allowed_sizes
-    from command_catalog import COMMAND_ENTRIES
-    from command_router import (
+    from anima.commands.command_catalog import COMMAND_ENTRIES
+    from anima.commands.command_router import (
         DEFAULT_GENERATION_SIZES,
         help_text,
         parse_generation_size,
     )
-    from config_defaults import persist_flat_config_key
-    from deployment_diagnostics import compact_status_text, diagnostic_text
-    from multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS
-    from prompt_presets import (
+    from anima.runtime.config_defaults import persist_flat_config_key
+    from anima.runtime.deployment_diagnostics import (
+        compact_status_text,
+        diagnostic_text,
+    )
+    from anima.prompts.multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS
+    from anima.prompts.prompt_presets import (
         DEFAULT_NEGATIVE_PROMPT,
         active_artist_preset_name,
         artist_presets,
         fixed_character_tags,
         merge_tag_text,
     )
-    from tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
+    from anima.prompts.tag_cleaner import (
+        canonical_tag_text,
+        join_prompt_parts,
+        split_tags,
+    )
 
 
-SCHEMA_PATH = Path(__file__).with_name("_conf_schema.json")
+SCHEMA_PATH = Path(__file__).resolve().parents[2] / "_conf_schema.json"
 
 
 class CommandActionHandler:

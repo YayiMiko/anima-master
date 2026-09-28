@@ -7,7 +7,7 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from outfit_transfer import (
+from anima.prompts.outfit_transfer import (  # noqa: E402
     build_outfit_transfer_context,
     detect_outfit_transfer,
     filter_outfit_tags,
@@ -15,7 +15,9 @@ from outfit_transfer import (
 
 
 def test_detects_named_outfit_transfer_to_fixed_character():
-    plan = detect_outfit_transfer("联网检索碧蓝档案角色妃咲，深度思考后将其服饰应用于狐莉身上", "狐莉")
+    plan = detect_outfit_transfer(
+        "联网检索碧蓝档案角色妃咲，深度思考后将其服饰应用于狐莉身上", "狐莉"
+    )
 
     assert plan.enabled is True
     assert plan.source_subject == "妃咲"
@@ -45,8 +47,15 @@ def test_filter_outfit_tags_drops_identity_features():
 
 
 def test_outfit_transfer_context_filters_reference_tags():
-    plan = detect_outfit_transfer("狐莉穿上图中角色的衣服\n参考图视觉反推 tags：blue hair, red eyes, white dress, ribbon, boots", "狐莉")
-    context = build_outfit_transfer_context(plan, prompt=plan.directive_prompt + "\n参考图视觉反推 tags：blue hair, red eyes, white dress, ribbon, boots")
+    plan = detect_outfit_transfer(
+        "狐莉穿上图中角色的衣服\n参考图视觉反推 tags：blue hair, red eyes, white dress, ribbon, boots",
+        "狐莉",
+    )
+    context = build_outfit_transfer_context(
+        plan,
+        prompt=plan.directive_prompt
+        + "\n参考图视觉反推 tags：blue hair, red eyes, white dress, ribbon, boots",
+    )
 
     assert context.enabled is True
     assert context.outfit_summary_source == "reference_filter"

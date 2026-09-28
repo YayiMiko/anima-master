@@ -9,14 +9,14 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
-from multi_person_prompt import (  # noqa: E402
+from anima.prompts.danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
+from anima.prompts.multi_person_prompt import (  # noqa: E402
     MultiPersonCharacter,
     build_multi_person_plan_prompt,
     parse_multi_person_plan,
     render_multi_person_character,
 )
-from prompt_pipeline import PromptPipeline  # noqa: E402
+from anima.prompts.prompt_pipeline import PromptPipeline  # noqa: E402
 
 
 class _Logger:

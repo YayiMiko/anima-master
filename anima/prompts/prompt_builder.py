@@ -21,9 +21,15 @@ try:
         join_prompt_parts,
     )
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from prompt_background import DEFAULT_PORTRAIT, apply_default_portrait_tags
-    from prompt_constraints import PromptConstraintPlan, apply_prompt_constraints
-    from prompt_presets import (
+    from anima.prompts.prompt_background import (
+        DEFAULT_PORTRAIT,
+        apply_default_portrait_tags,
+    )
+    from anima.prompts.prompt_constraints import (
+        PromptConstraintPlan,
+        apply_prompt_constraints,
+    )
+    from anima.prompts.prompt_presets import (
         DEFAULT_CHARACTER_TAGS,
         DEFAULT_QUALITY_TAGS,
         active_artist_tags,
@@ -34,7 +40,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         wants_default_style,
         wants_sensual_mode,
     )
-    from tag_cleaner import (
+    from anima.prompts.tag_cleaner import (
         DEFAULT_MAX_CONTENT_TAGS,
         clean_content_tags,
         join_prompt_parts,

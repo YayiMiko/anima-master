@@ -7,18 +7,18 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from multi_person_prompt import (  # noqa: E402
+from anima.prompts.multi_person_prompt import (  # noqa: E402
     build_multi_person_plan_prompt,
     parse_multi_person_plan,
 )
-from prompt_background import (  # noqa: E402
+from anima.prompts.prompt_background import (  # noqa: E402
     DEFAULT_PORTRAIT,
     EXPLICIT_SCENE,
     apply_default_portrait_tags,
     extract_background_mode,
 )
-from prompt_builder import build_final_prompt  # noqa: E402
-from prompt_templates import build_llm_prompt  # noqa: E402
+from anima.prompts.prompt_builder import build_final_prompt  # noqa: E402
+from anima.prompts.prompt_templates import build_llm_prompt  # noqa: E402
 
 
 def test_background_marker_is_removed_before_tag_processing() -> None:

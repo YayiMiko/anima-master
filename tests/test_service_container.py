@@ -7,7 +7,7 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-import service_container as sc
+import anima.runtime.service_container as sc  # noqa: E402
 
 
 def test_resolve_service_paths_prefers_plugin_local_tools(tmp_path: Path, monkeypatch):
@@ -19,7 +19,9 @@ def test_resolve_service_paths_prefers_plugin_local_tools(tmp_path: Path, monkey
     (agent_tools / "image_prompt_agent.py").write_text("", encoding="utf-8")
 
     monkeypatch.setattr(sc, "get_astrbot_root", lambda: str(root))
-    monkeypatch.setattr(sc, "__file__", str(plugin_dir / "service_container.py"))
+    monkeypatch.setattr(
+        sc, "__file__", str(plugin_dir / "anima" / "runtime" / "service_container.py")
+    )
 
     paths = sc.resolve_service_paths()
 

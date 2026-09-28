@@ -10,7 +10,7 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from storage_retention import StorageRetentionManager, prune_storage  # noqa: E402
+from anima.runtime.storage_retention import StorageRetentionManager, prune_storage  # noqa: E402
 
 
 class _Logger:
@@ -64,8 +64,7 @@ def test_prune_storage_removes_only_expired_scoped_files_and_compacts_manifest(
     assert live_input.exists()
     assert outside.exists()
     records = [
-        json.loads(line)
-        for line in manifest.read_text(encoding="utf-8").splitlines()
+        json.loads(line) for line in manifest.read_text(encoding="utf-8").splitlines()
     ]
     assert records == [{"kind": "image", "path": str(live_input)}]
 

@@ -8,8 +8,8 @@ try:
     from . import anima_verify
     from .task_summary import apply_verification_summary
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    import anima_verify
-    from task_summary import apply_verification_summary
+    from anima.runtime import anima_verify
+    from anima.runtime.task_summary import apply_verification_summary
 
 
 @dataclass

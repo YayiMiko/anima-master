@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .prompt_presets import (
+    from ..prompts.prompt_presets import (
         active_artist_preset_name,
         active_artist_tags,
         apply_config_preset,
@@ -16,7 +16,7 @@ try:
     )
     from .task_summary import build_last_task_debug_lines, build_strategy_summary
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from prompt_presets import (
+    from anima.prompts.prompt_presets import (
         active_artist_preset_name,
         active_artist_tags,
         apply_config_preset,
@@ -24,7 +24,10 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         chiyo_profile_display_name,
         fixed_character_tags,
     )
-    from task_summary import build_last_task_debug_lines, build_strategy_summary
+    from anima.runtime.task_summary import (
+        build_last_task_debug_lines,
+        build_strategy_summary,
+    )
 
 
 def _bool(config: dict[str, Any], key: str, default: bool) -> bool:
@@ -336,20 +339,20 @@ class TaskRecorder:
             f"- 千代预设：{chiyo_profile_display_name(config)}",
             f"- 低 CFG 提示词约束：{_bool(config, 'low_cfg_harness_enabled', False)}",
             f"- 画师 tags：{'已配置' if artist_tags else '未配置'}",
-            f"- 当前画师预设：{active_artist or '默认画师 tags'}",
-            f"- 已保存的画师预设：{', '.join(presets) if presets else '无'}",
-            f"- 角色：{', '.join(characters) if characters else '无'}",
+            f"- 当前画师预设：{'已启用' if active_artist else '默认画师 tags'}",
+            f"- 已保存的画师预设：{len(presets)} 个",
+            f"- 固定角色：{len(characters)} 个",
             f"- 联网搜索：{_bool(config, 'prompt_builder_web_search_enabled', True)}",
-            f"- 深度思考：{_bool(config, 'prompt_builder_deep_thinking_enabled', True)} / {_str(config, 'prompt_builder_reasoning_effort', 'high')}",
+            f"- 深度思考：{_bool(config, 'prompt_builder_deep_thinking_enabled', True)}",
             f"- Danbooru 核心 tag 查询：{_bool(config, 'danbooru_core_tag_lookup_enabled', True)}",
             f"- 图生图：{_bool(config, 'img2img_enabled', False)}",
             f"- 发送到聊天：{_bool(config, 'send_result_to_chat', True)} / 最多 {_int(config, 'max_send_images', 1)} 张",
-            f"- ComfyUI：{_str(config, 'comfyui_base_url', 'http://127.0.0.1:8188')}",
-            f"- 工作流：{_str(config, 'custom_workflow_path') if _bool(config, 'custom_workflow_enabled', False) else _str(config, 'workflow', 'anima_t2i')}",
+            f"- ComfyUI 地址：{'已配置' if _str(config, 'comfyui_base_url') else '未配置'}",
+            f"- 工作流：{'自定义' if _bool(config, 'custom_workflow_enabled', False) else '内置'}",
             f"- 默认尺寸：{_int(config, 'width', 1024)}x{_int(config, 'height', 1536)}",
-            f"- 模型：UNET={_str(config, 'unet_name', '') or '未配置'}，CLIP={_str(config, 'clip_name', '') or '未配置'}，VAE={_str(config, 'vae_name', '') or '未配置'}",
+            f"- 模型：UNET={'已配置' if _str(config, 'unet_name') else '未配置'}，CLIP={'已配置' if _str(config, 'clip_name') else '未配置'}，VAE={'已配置' if _str(config, 'vae_name') else '未配置'}",
             f"- 调试开关：prompt={_bool(config, 'debug_prompt_enabled', False)}，reference={_bool(config, 'debug_image_reference_enabled', False)}，send={_bool(config, 'debug_send_payload_enabled', False)}",
-            f"- 上次任务：{self.path if self.path.exists() else '暂无'}",
+            f"- 上次任务：{'有记录' if self.path.exists() else '暂无'}",
         ]
         if last_task:
             lines.extend(["", *build_last_task_debug_lines(last_task)])

@@ -8,10 +8,10 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from prompt_pipeline import PromptPipeline  # noqa: E402
-from prompt_presets import looks_like_danbooru_tags  # noqa: E402
-from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
-from task_summary import (  # noqa: E402
+from anima.prompts.prompt_pipeline import PromptPipeline  # noqa: E402
+from anima.prompts.prompt_presets import looks_like_danbooru_tags  # noqa: E402
+from anima.prompts.danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
+from anima.runtime.task_summary import (  # noqa: E402
     apply_verification_summary,
     build_last_task_debug_lines,
     build_strategy_summary,
@@ -450,9 +450,9 @@ def test_last_task_debug_lines_use_strategy_summary():
 
     text = "\n".join(lines)
     assert "上次任务摘要" in text
-    assert "角色：狐莉" in text
+    assert "固定角色：已使用" in text
     assert "raw=True" in text
     assert (
         "自检：enabled=True 多人强制=False 角色强制=False passed=True retry=0" in text
     )
-    assert "阶段事件：provider=ok，prompt_llm=ok" in text
+    assert "阶段事件：2 条" in text

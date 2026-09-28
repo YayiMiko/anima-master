@@ -21,7 +21,7 @@ try:
     )
     from .comfyui_startup import ComfyUIStartupManager
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from chat_delivery import (
+    from anima.runtime.chat_delivery import (
         ack_timeout_delivery,
         is_ack_timeout,
         no_output_delivery,
@@ -30,7 +30,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         sent_delivery,
         skipped_delivery,
     )
-    from comfyui_startup import ComfyUIStartupManager
+    from anima.runtime.comfyui_startup import ComfyUIStartupManager
 
 try:
     from aiocqhttp.exceptions import ActionFailed
@@ -256,7 +256,7 @@ class ComfyUIRuntime:
                         type(exc).__name__,
                         str(exc)[:500],
                     )
-                    message = "ComfyUI 已生成图片，但发送失败：" + ", ".join(outputs)
+                    message = "ComfyUI 已生成图片，但发送失败。请查看服务器日志。"
                     payload["delivery"] = send_failed_delivery(
                         outputs, output, exc, message
                     )
@@ -268,9 +268,9 @@ class ComfyUIRuntime:
                             str(notice_exc)[:500],
                         )
                     return message
-            message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
+            message = "ComfyUI 已生成并发送图片。"
             payload["delivery"] = sent_delivery(outputs, message)
             return message
-        message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
+        message = "ComfyUI 已生成图片，聊天发送已关闭。"
         payload["delivery"] = skipped_delivery(outputs, message)
         return message

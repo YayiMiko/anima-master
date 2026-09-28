@@ -15,7 +15,7 @@ for path in (PLUGIN_DIR, TOOLS_DIR):
         sys.path.insert(0, str(path))
 
 import comfyui_agent  # noqa: E402
-import comfyui_startup  # noqa: E402
+import anima.runtime.comfyui_startup as comfyui_startup  # noqa: E402
 import comfyui_status  # noqa: E402
 
 
@@ -60,7 +60,9 @@ def _manager(
     return manager
 
 
-def test_status_uses_targeted_object_info_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_status_uses_targeted_object_info_endpoints(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     paths: list[str] = []
     config = {
         "comfyui_base_url": "http://127.0.0.1:8188",
@@ -101,10 +103,14 @@ def test_status_uses_targeted_object_info_endpoints(monkeypatch: pytest.MonkeyPa
     assert payload["clip_available"] is True
     assert payload["vae_available"] is True
     assert "/object_info" not in paths
-    assert {f"/object_info/{name}" for name in comfyui_status.CAPABILITY_NODE_NAMES} <= set(paths)
+    assert {
+        f"/object_info/{name}" for name in comfyui_status.CAPABILITY_NODE_NAMES
+    } <= set(paths)
 
 
-def test_quick_status_skips_capability_inventory(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_quick_status_skips_capability_inventory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     paths: list[str] = []
 
     class _Client:
@@ -151,7 +157,9 @@ async def test_recent_validation_uses_lightweight_health_probe(tmp_path: Path) -
 
 
 @pytest.mark.asyncio
-async def test_reachable_api_failure_does_not_start_another_process(tmp_path: Path) -> None:
+async def test_reachable_api_failure_does_not_start_another_process(
+    tmp_path: Path,
+) -> None:
     manager = _manager(
         tmp_path,
         [

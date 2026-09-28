@@ -15,7 +15,7 @@ try:
         resolve_core_tags,
     )
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
-    from danbooru_tags import (
+    from anima.prompts.danbooru_tags import (
         DEFAULT_DONMAI_BASE_URLS,
         DEFAULT_USER_AGENT,
         character_resolution_requested,

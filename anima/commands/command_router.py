@@ -3,7 +3,7 @@ import re
 try:
     from .command_catalog import build_help_text
 except ImportError:  # pragma: no cover - direct script-style import.
-    from command_catalog import build_help_text
+    from anima.commands.command_catalog import build_help_text
 
 _ROUTE_PREFIX_RE = re.compile(r"^\s*/?", re.IGNORECASE)
 _SPACES_RE = re.compile(r"\s+")

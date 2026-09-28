@@ -8,11 +8,11 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from prompt_builder import build_final_prompt  # noqa: E402
-from prompt_constraints import (  # noqa: E402
+from anima.prompts.prompt_builder import build_final_prompt  # noqa: E402
+from anima.prompts.prompt_constraints import (  # noqa: E402
     parse_constraint_plan,
 )
-from tag_cleaner import split_tags  # noqa: E402
+from anima.prompts.tag_cleaner import split_tags  # noqa: E402
 
 
 def test_low_cfg_constraint_plan_reorders_weights_removes_and_limits() -> None:

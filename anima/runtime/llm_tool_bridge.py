@@ -3,6 +3,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+try:
+    from .deployment_diagnostics import compact_status_text
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from anima.runtime.deployment_diagnostics import compact_status_text
+
 
 class LLMToolBridge:
     """Bridge AstrBot LLM tool methods to Anima plugin services."""
@@ -56,20 +61,7 @@ class LLMToolBridge:
             Compact English status text for the model.
         """
         payload = await self._run_tool(["status"])
-        if not payload.get("ok"):
-            return f"ComfyUI 状态检查失败：{payload.get('error')}"
-        return (
-            "ComfyUI 状态："
-            f"地址={payload.get('base_url')}，"
-            f"工作流={payload.get('workflow')}，"
-            f"允许尺寸={payload.get('allowed_sizes')}，"
-            f"版本={payload.get('comfyui_version')}，"
-            f"GPU={payload.get('gpu')}，"
-            f"可用显存={payload.get('vram_free_mb')}，"
-            f"UNET 可用={payload.get('unet_available')}，"
-            f"CLIP 可用={payload.get('clip_available')}，"
-            f"VAE 可用={payload.get('vae_available')}"
-        )
+        return compact_status_text(payload)
 
     async def generate(
         self,
