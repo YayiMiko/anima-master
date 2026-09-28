@@ -27,7 +27,7 @@ vae_name = 你的 VAE 文件名
 
 模型文件名必须和 ComfyUI 下拉框中的文件名一致，只填文件名，不填本机路径。
 
-这些项目分别在配置页的“ComfyUI 连接”和“出图参数”里。多数用户可以先用绘世启动器、ComfyUI portable 或自己的脚本手动启动 ComfyUI。只有开启“由 AstrBot 启动 ComfyUI”时，才需要额外填写 `startup_command`。
+这些项目分别在默认显示的“ComfyUI 连接”和“模型文件”里。若使用合适的快捷预设，可先套用预设再核对模型文件名。多数用户可以先用绘世启动器、ComfyUI portable 或自己的脚本手动启动 ComfyUI。只有开启“由 AstrBot 启动 ComfyUI”时，才需要额外填写 `startup_command`。
 
 ## 第一次测试
 

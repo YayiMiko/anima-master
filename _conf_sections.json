@@ -3,9 +3,10 @@
     {
       "key": "anima_master_basic",
       "description": "基础设置",
-      "hint": "从这里开始。选择一套预设可以快速配置好画师、模型和参数。",
+      "hint": "连接、模型和出图参数直接显示，打开「显示高级设置」可查看其余配置。",
       "items": [
         "chiyo_preset",
+        "show_advanced_settings",
         "reset_to_defaults"
       ]
     },

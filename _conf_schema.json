@@ -2,7 +2,7 @@
   "anima_master_basic": {
     "description": "基础设置",
     "type": "object",
-    "hint": "从这里开始。选择一套预设可以快速配置好画师、模型和参数。",
+    "hint": "常用连接、模型和出图参数直接显示；打开「显示高级设置」可查看提示词、角色、多人生成与权限等配置。",
     "items": {
       "chiyo_preset": {
         "description": "快捷预设",
@@ -21,6 +21,12 @@
           "千代turbo"
         ],
         "hint": "一键套用一套画师、模型和参数。千代base 用 anima_baseV10、CFG 5；aesthetic 用 anima_aestheticV11、CFG 3，不注入默认正负面词；turbo 用 Turbo LoRA、10 步、CFG 1。会选择后把狐莉加入角色，但只有指令里提到狐莉才会用到。"
+      },
+      "show_advanced_settings": {
+        "description": "显示高级设置",
+        "type": "bool",
+        "default": false,
+        "hint": "展开默认提示词、角色、多人生成、发送权限等完整配置。只改变配置页显示，不影响生图。"
       },
       "reset_to_defaults": {
         "description": "恢复默认配置",
@@ -280,6 +286,9 @@
     "description": "默认提示词",
     "type": "object",
     "hint": "每次出图都会自动加到提示词里的正负面词。",
+    "condition": {
+      "anima_master_basic.show_advanced_settings": true
+    },
     "items": {
       "quality_prefix": {
         "description": "质量词前缀",
@@ -299,6 +308,9 @@
     "description": "提示词生成",
     "type": "object",
     "hint": "把中文描述转成画图标签的相关设置。",
+    "condition": {
+      "anima_master_basic.show_advanced_settings": true
+    },
     "items": {
       "prompt_optimize_enabled": {
         "description": "启用自然语言优化",
@@ -423,6 +435,9 @@
     "description": "角色与画风",
     "type": "object",
     "hint": "固定角色、画师预设和画风，以及涩气表现力相关设置。",
+    "condition": {
+      "anima_master_basic.show_advanced_settings": true
+    },
     "items": {
       "fixed_characters": {
         "description": "角色",
@@ -538,6 +553,9 @@
     "description": "角色检索",
     "type": "object",
     "hint": "用于校正现有作品角色的标签。只在需要时访问 Donmai / Danbooru。",
+    "condition": {
+      "anima_master_basic.show_advanced_settings": true
+    },
     "items": {
       "danbooru_core_tag_lookup_enabled": {
         "description": "联网校正角色标签",
@@ -591,6 +609,9 @@
     "description": "生成校验",
     "type": "object",
     "hint": "生成后用视觉模型检查图片，不合格会重画。平时可以开着，只在需要时调。",
+    "condition": {
+      "anima_master_basic.show_advanced_settings": true
+    },
     "items": {
       "enable_verify": {
         "description": "启用生成后自检",
@@ -634,6 +655,9 @@
     "description": "多人生成",
     "type": "object",
     "hint": "只影响 /anm 多人：候选采样、视觉检查和并发。",
+    "condition": {
+      "anima_master_basic.show_advanced_settings": true
+    },
     "items": {
       "multi_candidate_count": {
         "description": "候选数量",
@@ -696,6 +720,9 @@
     "description": "发送与权限",
     "type": "object",
     "hint": "图片是否发回聊天，以及谁可以使用插件。",
+    "condition": {
+      "anima_master_basic.show_advanced_settings": true
+    },
     "items": {
       "send_result_to_chat": {
         "description": "发送图片到聊天",
@@ -735,6 +762,9 @@
     "description": "可选功能",
     "type": "object",
     "hint": "图生图、放大、去背景等附加能力，不影响基础文生图。",
+    "condition": {
+      "anima_master_basic.show_advanced_settings": true
+    },
     "items": {
       "img2img_enabled": {
         "description": "启用图生图",
@@ -793,6 +823,9 @@
     "description": "调试",
     "type": "object",
     "hint": "只在排查问题时临时开启，平时保持关闭。",
+    "condition": {
+      "anima_master_basic.show_advanced_settings": true
+    },
     "items": {
       "debug_prompt_enabled": {
         "description": "保存提示词日志",
