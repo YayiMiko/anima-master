@@ -450,9 +450,9 @@ def test_last_task_debug_lines_use_strategy_summary():
 
     text = "\n".join(lines)
     assert "上次任务摘要" in text
-    assert "角色：狐莉" in text
+    assert "固定角色：已使用" in text
     assert "raw=True" in text
     assert (
         "自检：enabled=True 多人强制=False 角色强制=False passed=True retry=0" in text
     )
-    assert "阶段事件：provider=ok，prompt_llm=ok" in text
+    assert "阶段事件：2 条" in text

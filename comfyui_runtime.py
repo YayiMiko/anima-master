@@ -256,7 +256,7 @@ class ComfyUIRuntime:
                         type(exc).__name__,
                         str(exc)[:500],
                     )
-                    message = "ComfyUI 已生成图片，但发送失败：" + ", ".join(outputs)
+                    message = "ComfyUI 已生成图片，但发送失败。请查看服务器日志。"
                     payload["delivery"] = send_failed_delivery(
                         outputs, output, exc, message
                     )
@@ -268,9 +268,9 @@ class ComfyUIRuntime:
                             str(notice_exc)[:500],
                         )
                     return message
-            message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
+            message = "ComfyUI 已生成并发送图片。"
             payload["delivery"] = sent_delivery(outputs, message)
             return message
-        message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
+        message = "ComfyUI 已生成图片，聊天发送已关闭。"
         payload["delivery"] = skipped_delivery(outputs, message)
         return message

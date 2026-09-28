@@ -76,27 +76,27 @@ def build_config_debug_lines(
         f"- 千代预设：{chiyo_profile_display_name(prompt_config)}",
         f"- 低 CFG 提示词约束：{_bool(config, 'low_cfg_harness_enabled', False)}",
         f"- 画师 tags：{'已配置' if artist_tags else '未配置'}",
-        f"- 当前画师预设：{active_artist or '默认画师 tags'}",
-        f"- 已保存的画师预设：{', '.join(presets) if presets else '无'}",
-        f"- 角色：{', '.join(characters) if characters else '无'}",
+        f"- 当前画师预设：{'已启用' if active_artist else '默认画师 tags'}",
+        f"- 已保存的画师预设：{len(presets)} 个",
+        f"- 固定角色：{len(characters)} 个",
         f"- 联网搜索：{_bool(config, 'prompt_builder_web_search_enabled', True)}",
-        f"- 深度思考：{_bool(config, 'prompt_builder_deep_thinking_enabled', True)} / {_str(config, 'prompt_builder_reasoning_effort', 'high')}",
+        f"- 深度思考：{_bool(config, 'prompt_builder_deep_thinking_enabled', True)}",
         f"- Danbooru 核心 tag 查询：{_bool(config, 'danbooru_core_tag_lookup_enabled', True)}",
         f"- 图生图：{_bool(config, 'img2img_enabled', False)}",
         f"- 发送到聊天：{_bool(config, 'send_result_to_chat', True)} / 最多 {_int(config, 'max_send_images', 1)} 张",
         f"- 生成后自检：{_bool(config, 'enable_verify', False)} / 分数线 {_int(config, 'verify_pass_score', 7)} / 最多重画 {_int(config, 'max_verify_retry', 1)} 次",
         f"- 多人候选：{_int(config, 'multi_candidate_count', 2)} 张 / 自检 {_bool(config, 'multi_verify_enabled', True)} / 分数线 {_int(config, 'multi_verify_pass_score', 6)} / 降级发送 {_bool(config, 'multi_send_degraded_candidate', True)} / 并发 {_int(config, 'multi_max_concurrent_generations', 1)}",
-        f"- ComfyUI：{_str(config, 'comfyui_base_url', 'http://127.0.0.1:8188')}",
-        f"- 工作流：{_str(config, 'custom_workflow_path') if _bool(config, 'custom_workflow_enabled', False) else _str(config, 'workflow', 'anima_t2i')}",
+        f"- ComfyUI 地址：{'已配置' if _str(config, 'comfyui_base_url') else '未配置'}",
+        f"- 工作流：{'自定义' if _bool(config, 'custom_workflow_enabled', False) else '内置'}",
         f"- 默认尺寸：{_int(config, 'width', 1024)}x{_int(config, 'height', 1536)}",
-        f"- 模型：UNET={_str(config, 'unet_name', '') or '未配置'}，CLIP={_str(config, 'clip_name', '') or '未配置'}，VAE={_str(config, 'vae_name', '') or '未配置'}",
+        f"- 模型：UNET={'已配置' if _str(config, 'unet_name') else '未配置'}，CLIP={'已配置' if _str(config, 'clip_name') else '未配置'}，VAE={'已配置' if _str(config, 'vae_name') else '未配置'}",
         f"- 调试开关：prompt={_bool(config, 'debug_prompt_enabled', False)}，reference={_bool(config, 'debug_image_reference_enabled', False)}，send={_bool(config, 'debug_send_payload_enabled', False)}",
-        f"- 上次任务：{task_path if task_exists else '暂无'}",
+        f"- 上次任务：{'有记录' if task_exists else '暂无'}",
     ]
     lines.extend(
         [
-            f"- 当前画风：{active_style or ('已配置' if style_tags else '未配置')}",
-            f"- 已保存画风：{', '.join(style_names) if style_names else '无'}",
+            f"- 当前画风：{'已启用' if active_style or style_tags else '未配置'}",
+            f"- 已保存画风：{len(style_names)} 个",
         ]
     )
     return lines

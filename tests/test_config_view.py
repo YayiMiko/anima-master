@@ -36,10 +36,12 @@ def test_config_debug_lines_show_core_user_state(tmp_path: Path):
     text = "\n".join(lines)
 
     assert "千代预设：千代base" in text
-    assert "当前画师预设：千代base" in text
-    assert "角色：" in text and "狐莉" in text
-    assert "ComfyUI：http://127.0.0.1:8188" in text
-    assert "工作流：my_workflow" in text
+    assert "当前画师预设：已启用" in text
+    assert "固定角色：1 个" in text and "狐莉" not in text
+    assert "ComfyUI 地址：已配置" in text
+    assert "127.0.0.1" not in text
+    assert "工作流：内置" in text
+    assert "my_workflow" not in text
     assert "默认尺寸：1024x1536" in text
     assert "生成后自检：True / 分数线 8 / 最多重画 2 次" in text
     assert "上次任务：暂无" in text
@@ -55,5 +57,5 @@ def test_config_debug_lines_show_effective_turbo_profile(tmp_path: Path):
 
     assert "千代预设：千代turbo" in text
     assert "低 CFG 提示词约束：True" in text
-    assert "工作流：variants/turbo/workflows/comfyui_00051_api.json" in text
-    assert "UNET=anima_baseV10.safetensors" in text
+    assert "工作流：自定义" in text
+    assert "UNET=已配置" in text

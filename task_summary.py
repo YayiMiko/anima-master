@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+try:
+    from .deployment_diagnostics import safe_error_summary
+except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from deployment_diagnostics import safe_error_summary
+
 
 def _as_dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
@@ -137,19 +142,18 @@ def build_last_task_debug_lines(last_task: dict[str, Any]) -> list[str]:
     stage_events = prompt_summary.get("stage_events")
     if not isinstance(stage_events, list):
         stage_events = []
-    event_text = _format_stage_events(stage_events[-6:])
     return [
         "",
         "上次任务摘要：",
         f"- 时间：{last_task.get('time') or '未知'}",
         f"- 动作：{last_task.get('action') or '未知'} / 成功：{last_task.get('ok')}",
-        f"- 错误：{last_task.get('error') or '无'}",
+        f"- 错误：{safe_error_summary(last_task.get('error'))}",
         (
             "- 引用图："
             f"requested={strategy_summary.get('reference_requested', last_task.get('reference_image_requested'))} "
             f"applied={strategy_summary.get('reference_applied', last_task.get('reference_context_applied'))}"
         ),
-        f"- 角色：{fixed_character_name}",
+        f"- 固定角色：{'已使用' if fixed_character_name != '无' else '未使用'}",
         (
             "- 搜索/思考："
             f"{strategy_summary.get('web_search', prompt_summary.get('web_search'))} / "
@@ -168,7 +172,7 @@ def build_last_task_debug_lines(last_task: dict[str, Any]) -> list[str]:
             f"固定={strategy_summary.get('fixed_character_count', 0)} "
             f"在线={strategy_summary.get('danbooru_resolved_count', 0)} "
             f"未解析={strategy_summary.get('unresolved_character_count', 0)} "
-            f"位置={','.join(strategy_summary.get('character_slots') or []) or '无'} "
+            f"位置数={len(strategy_summary.get('character_slots') or [])} "
             f"互动={strategy_summary.get('interaction_count', 0)} "
             f"接触组={strategy_summary.get('grouped_contact', False)} "
             f"别名归一={strategy_summary.get('interaction_aliases_normalized', False)}"
@@ -186,24 +190,7 @@ def build_last_task_debug_lines(last_task: dict[str, Any]) -> list[str]:
             f"passed={verification_brief.get('passed')} "
             f"retry={verification_brief.get('retry_count', 0)}"
         ),
-        f"- 阶段事件：{event_text or '无'}",
+        f"- 阶段事件：{len(stage_events)} 条",
         f"- 最终 prompt 长度：{final_prompt_chars}",
         f"- 输出：{len(last_task.get('outputs') or [])} 张",
     ]
-
-
-def _format_stage_events(events: list[Any]) -> str:
-    parts: list[str] = []
-    for event in events:
-        if not isinstance(event, dict):
-            continue
-        stage = str(event.get("stage") or "").strip()
-        status = str(event.get("status") or "").strip()
-        reason = str(event.get("reason") or "").strip()
-        if not stage or not status:
-            continue
-        item = f"{stage}={status}"
-        if reason:
-            item += f":{reason}"
-        parts.append(item)
-    return "，".join(parts)
