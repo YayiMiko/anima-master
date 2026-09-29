@@ -144,6 +144,7 @@ def test_prompt_pipeline_uses_default_creative_generation():
             self.calls.append(kwargs)
             return _Response(
                 ", ".join(f"creative visual detail {index}" for index in range(52))
+                + ", background_mode_default_portrait"
             )
 
     class _Plan:
@@ -213,7 +214,7 @@ def test_named_character_uses_evidence_candidate_and_stable_anchors():
     class _Context:
         def __init__(self):
             self.outputs = [
-                "wrong_name_(example_work), 1girl, black hair, red eyes, white dress",
+                "wrong_name_(example_work), 1girl, black hair, red eyes, white dress, background_mode_default_portrait",
                 (
                     '{"source_name":"伊诺","copyright":"example work",'
                     '"tag_candidates":["correct_name_(example_work)"]}'

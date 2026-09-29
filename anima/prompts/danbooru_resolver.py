@@ -66,6 +66,7 @@ class DanbooruResolver:
         self._int = get_int
         self._float = get_float
         self._str = get_str
+        self._lookup_slots = asyncio.Semaphore(2)
 
     def required_core_tags_for_prompt(self, user_prompt: str) -> tuple[str, ...]:
         """Return locally known character anchors explicitly requested by the user.
@@ -156,7 +157,9 @@ class DanbooruResolver:
             or DEFAULT_USER_AGENT
         )
         try:
-            result = await asyncio.wait_for(
+            started = asyncio.get_running_loop().time()
+            await asyncio.wait_for(self._lookup_slots.acquire(), timeout=timeout)
+            lookup_task = asyncio.create_task(
                 asyncio.to_thread(
                     resolve_core_tags,
                     llm_content,
@@ -168,8 +171,19 @@ class DanbooruResolver:
                     donmai_base_urls=self._base_urls(),
                     user_agent=user_agent,
                     cache=self._cache,
+                )
+            )
+            # The blocking thread can outlive the request timeout. Keep its slot
+            # until it really exits, so failed sites cannot accumulate workers.
+            lookup_task.add_done_callback(lambda _: self._lookup_slots.release())
+            lookup_task.add_done_callback(
+                lambda task: task.exception() if not task.cancelled() else None
+            )
+            result = await asyncio.wait_for(
+                asyncio.shield(lookup_task),
+                timeout=max(
+                    0.001, timeout - (asyncio.get_running_loop().time() - started)
                 ),
-                timeout=timeout,
             )
         except TimeoutError:
             self.logger.warning(

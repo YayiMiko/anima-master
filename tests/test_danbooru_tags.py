@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -409,3 +410,53 @@ def test_danbooru_resolver_enforces_total_lookup_budget(monkeypatch) -> None:
     assert result == "candidate_character, 1girl"
     assert elapsed < 1.3
     assert any("total" in warning for warning in logger.warnings)
+
+
+def test_timed_out_lookups_do_not_start_unbounded_threads(monkeypatch) -> None:
+    release = threading.Event()
+    started = 0
+    lock = threading.Lock()
+
+    def blocked_resolve(text, **_kwargs):
+        nonlocal started
+        with lock:
+            started += 1
+        release.wait(3)
+        return tags_module.CoreTagResolution(text, (), ())
+
+    class Logger:
+        def warning(self, *_args):
+            pass
+
+        def info(self, *_args):
+            pass
+
+    monkeypatch.setattr(resolver_module, "resolve_core_tags", blocked_resolve)
+    resolver = DanbooruResolver(
+        logger=Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, _default: 1.0,
+        get_str=lambda _key, default: default,
+    )
+
+    async def scenario():
+        try:
+            return await asyncio.gather(
+                *(
+                    resolver.resolve_detailed(
+                        llm_content="candidate_character, 1girl",
+                        user_prompt="候选角色",
+                        fixed_character=False,
+                    )
+                    for _ in range(3)
+                )
+            )
+        finally:
+            release.set()
+            await asyncio.sleep(0.1)
+
+    outcomes = asyncio.run(scenario())
+    assert started == 2
+    assert all(item.text == "candidate_character, 1girl" for item in outcomes)

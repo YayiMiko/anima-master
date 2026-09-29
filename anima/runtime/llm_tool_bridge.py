@@ -107,7 +107,7 @@ class LLMToolBridge:
         Returns:
             Edit result summary.
         """
-        return await self._edit(event, prompt)
+        return await self._edit(event, prompt) or "改图结果已直接发送到聊天。"
 
     async def remove_bg(self, event: Any) -> str:
         """Remove image background when the feature is enabled.

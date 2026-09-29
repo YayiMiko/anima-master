@@ -12,6 +12,7 @@ try:
         build_multi_person_plan_prompt,
         parse_multi_person_plan,
         render_multi_person_character,
+        requested_person_count,
     )
     from .outfit_transfer import (
         build_outfit_summary_prompt,
@@ -48,6 +49,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         build_multi_person_plan_prompt,
         parse_multi_person_plan,
         render_multi_person_character,
+        requested_person_count,
     )
     from anima.prompts.outfit_transfer import (
         build_outfit_summary_prompt,
@@ -394,6 +396,7 @@ class PromptPipeline:
         )
         raw_plan = ""
         plan = None
+        explicit_count = requested_person_count(original_user_prompt or prompt)
         planner_error = "invalid_plan"
         planner_retry_count = 0
         for attempt in range(2):
@@ -412,7 +415,11 @@ class PromptPipeline:
                 )
             else:
                 candidate = parse_multi_person_plan(raw_plan)
-                if candidate is not None:
+                if candidate is None:
+                    planner_error = "invalid_plan"
+                elif explicit_count and len(candidate.characters) != explicit_count:
+                    planner_error = "requested_character_count_mismatch"
+                else:
                     allowed_aliases = {
                         f"CHARACTER {letter}"
                         for letter in "ABCD"[: len(candidate.characters)]
@@ -435,8 +442,6 @@ class PromptPipeline:
                     else:
                         plan = candidate
                         break
-                else:
-                    planner_error = "invalid_plan"
             if attempt == 0:
                 planner_retry_count = 1
                 plan_prompt += (
@@ -444,6 +449,11 @@ class PromptPipeline:
                     "Keep 2 to 4 characters, reference only defined Character aliases "
                     "inside interactions, and preserve one coherent shared scene."
                 )
+                if explicit_count:
+                    plan_prompt += (
+                        f" The original user explicitly requested {explicit_count} "
+                        "people; return exactly that many character objects."
+                    )
         if plan is None:
             self.logger.warning(
                 "[comfyui_agent] multi-person planner stopped: %s", planner_error
@@ -912,6 +922,7 @@ class PromptPipeline:
                 "multi_person_plan_failed": False,
                 "multi_person_planner_retry_count": planner_retry_count,
                 "planned_character_count": len(plan.characters),
+                "requested_character_count": explicit_count,
                 "resolved_character_count": resolved_count,
                 "fixed_character_count": fixed_character_count,
                 "danbooru_resolved_count": danbooru_resolved_count,
@@ -1200,8 +1211,30 @@ class PromptPipeline:
             if background_mode:
                 background_mode_source = "llm_marker"
             else:
-                background_mode = DEFAULT_PORTRAIT
-                background_mode_source = "missing_marker_default"
+                background_mode_source = "missing_marker_unresolved"
+                try:
+                    response = await self.context.llm_generate(
+                        chat_provider_id=provider_id,
+                        prompt=(
+                            "Determine whether the user's ORIGINAL text explicitly asks "
+                            "for a location, environment, weather scene, or background. "
+                            "Ignore any reference-image description and generated tags. "
+                            "Reply with exactly background_mode_explicit_scene or "
+                            "background_mode_default_portrait.\n"
+                            f"Original user text: {background_intent_prompt}"
+                        ),
+                        system_prompt="You classify image background intent. Return one marker only.",
+                        max_tokens=30,
+                    )
+                    _, background_mode = extract_background_mode(
+                        str(getattr(response, "completion_text", "") or "")
+                    )
+                    if background_mode:
+                        background_mode_source = "llm_fallback"
+                except Exception as exc:
+                    self.logger.warning(
+                        "[comfyui_agent] background intent fallback failed: %s", exc
+                    )
         llm_failed = bool(llm_error and not str(llm_content or "").strip())
         character_resolution = await self._danbooru_resolver.resolve_detailed(
             llm_content=llm_content,

@@ -61,6 +61,71 @@ def test_unknown_action_returns_error():
     assert result == "未知 Anima 指令。"
 
 
+def test_global_configuration_commands_follow_plugin_usage_permission():
+    handler = _handler(config={"artist_presets": []})
+    event = object()
+
+    created = asyncio.run(
+        handler.handle_action(event, "create_artist_preset", "test=artist_name")
+    )
+    appended = asyncio.run(
+        handler.handle_action(event, "append_artist_tags", "test=@artist_extra")
+    )
+    switched = asyncio.run(handler.handle_action(event, "use_artist_preset", "test"))
+    character = asyncio.run(
+        handler.handle_action(event, "add_fixed_character", "狐莉=1girl, fox girl")
+    )
+    deleted = asyncio.run(handler.handle_action(event, "delete_artist_preset", "test"))
+    default = asyncio.run(
+        handler.handle_action(event, "set_artist_tags", "@artist_default")
+    )
+
+    assert "已保存并启用" in created
+    assert "已追加并启用" in appended
+    assert "已启用" in switched
+    assert "已保存角色" in character
+    assert "已删除" in deleted
+    assert "已设置默认画师 tags" in default
+    assert handler.config["artist_presets"] == []
+    assert handler.config["fixed_characters"] == ["狐莉=1girl, fox girl,"]
+
+    handler._is_allowed = lambda _event: False
+    denied = asyncio.run(
+        handler.handle_action(event, "create_artist_preset", "blocked=@artist")
+    )
+    assert "没有使用权限" in denied
+    assert handler.config["artist_presets"] == []
+
+
+def test_edit_result_is_sent_only_once() -> None:
+    sent = []
+
+    async def send_payload(_event, payload):
+        sent.append(payload)
+        return "image sent"
+
+    handler = CommandActionHandler(
+        config={"img2img_enabled": True},
+        task_recorder=_Recorder(),
+        reference_context=None,
+        is_allowed=lambda event: True,
+        run_tool=lambda args: asyncio.sleep(0, result={"ok": True}),
+        ensure_ready=lambda event: asyncio.sleep(0, result={"ok": True}),
+        send_payload=send_payload,
+        generate=lambda *args, **kwargs: _noop_async(),
+        event_image_input=lambda event: asyncio.sleep(0, result="image.png"),
+        build_prompt=lambda *args, **kwargs: _noop_async(),
+        format_spell_payload=lambda payload: "spell",
+        get_bool=lambda key, default: key == "img2img_enabled" or default,
+        shorten=lambda text, limit: text[:limit],
+    )
+
+    result = asyncio.run(handler.handle_action(object(), "edit", "change clothing"))
+
+    assert result is None
+    assert sent == [{"ok": True}]
+
+
 def test_generate_action_passes_one_time_size_override():
     calls = []
 

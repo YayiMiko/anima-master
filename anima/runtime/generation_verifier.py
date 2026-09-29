@@ -195,7 +195,11 @@ class GenerationVerifier:
         prepared_prompt_summary = payload.get("_prepared_prompt_summary")
         if not isinstance(prepared_prompt_summary, dict):
             prepared_prompt_summary = prompt_summary
-        expected_count = int(prompt_summary.get("planned_character_count") or 2)
+        expected_count = int(
+            prompt_summary.get("requested_character_count")
+            or prompt_summary.get("planned_character_count")
+            or 2
+        )
         while (
             not verdict.skipped
             and (

@@ -75,6 +75,8 @@ def compact_status_text(payload: dict[str, Any]) -> str:
         f"CLIP {_flag(payload.get('clip_available'))} / "
         f"VAE {_flag(payload.get('vae_available'))}"
     )
+    if payload.get("custom_workflow_validation_deferred"):
+        model_status = "自定义工作流（提交时校验）"
     return "\n".join(
         [
             "ComfyUI 助手状态：",
@@ -132,8 +134,16 @@ def diagnostic_text(
                 [
                     f"- ComfyUI：{payload.get('comfyui_version') or '未知'}",
                     f"- 显存：{payload.get('vram_free_mb')} / {payload.get('vram_total_mb')} MB",
-                    f"- 模型：UNET {_flag(payload.get('unet_available'))} / CLIP {_flag(payload.get('clip_available'))} / VAE {_flag(payload.get('vae_available'))}",
-                    f"- 附加组件：图生图 {_flag(payload.get('img2img_available'))} / 放大 {_flag(payload.get('upscale_available'))} / 去背景 {_flag(payload.get('remove_bg_available'))}",
+                    (
+                        "- 模型：自定义工作流（提交时校验）"
+                        if payload.get("custom_workflow_validation_deferred")
+                        else f"- 模型：UNET {_flag(payload.get('unet_available'))} / CLIP {_flag(payload.get('clip_available'))} / VAE {_flag(payload.get('vae_available'))}"
+                    ),
+                    (
+                        "- 附加组件：由自定义工作流决定"
+                        if payload.get("custom_workflow_validation_deferred")
+                        else f"- 附加组件：图生图 {_flag(payload.get('img2img_available'))} / 放大 {_flag(payload.get('upscale_available'))} / 去背景 {_flag(payload.get('remove_bg_available'))}"
+                    ),
                 ],
             )
         )

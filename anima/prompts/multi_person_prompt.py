@@ -82,6 +82,61 @@ _SAFE_SPATIAL_MODES = {
 }
 
 
+def requested_person_count(user_prompt: str) -> int | None:
+    """Read an unambiguous explicit person count from the user's own words.
+
+    Args:
+        user_prompt: Original request, without reference-image expansion.
+
+    Returns:
+        An explicit total from two to four, or None when not specified.
+    """
+    numbers = {
+        "一": 1,
+        "二": 2,
+        "两": 2,
+        "三": 3,
+        "四": 4,
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+    }
+    matches = re.findall(
+        r"(?<![A-Za-z0-9_])([1-4]|一|二|两|三|四|one|two|three|four)\s*"
+        r"(?:个|名|位)?\s*"
+        r"(人物|人|角色|女孩|男孩|少女|少年|女生|男生|"
+        r"people|persons?|characters?|girls?|boys?|women|men)(?![A-Za-z])",
+        str(user_prompt or ""),
+        flags=re.IGNORECASE,
+    )
+    if not matches:
+        return None
+    counts = [
+        (int(number) if number.isdigit() else numbers[number.lower()], label.lower())
+        for number, label in matches
+    ]
+    totals = [
+        count
+        for count, label in counts
+        if label
+        in {
+            "人",
+            "人物",
+            "角色",
+            "people",
+            "person",
+            "persons",
+            "character",
+            "characters",
+        }
+    ]
+    if totals:
+        return totals[0] if len(set(totals)) == 1 and 2 <= totals[0] <= 4 else None
+    total = sum(count for count, _ in counts)
+    return total if 2 <= total <= 4 else None
+
+
 def build_multi_person_plan_prompt(
     user_prompt: str,
     *,

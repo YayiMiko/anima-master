@@ -310,14 +310,15 @@ class CommandActionHandler:
             self._image_input_summary(),
         )
 
-    async def edit(self, event: Any, prompt: str) -> str:
+    async def edit(self, event: Any, prompt: str) -> str | None:
         if not self._bool("img2img_enabled", False):
             return "图生图/改图功能已关闭。当前先保留文生图、法术解析和图片反推主线。"
         if not self._is_allowed(event):
             return "ComfyUI 助手已关闭，或当前用户没有使用权限。"
         ready = await self._ensure_ready(event)
         if not ready.get("ok"):
-            return await self._send_payload(event, ready)
+            await self._send_payload(event, ready)
+            return None
         prompt = str(prompt or "").strip()
         if not prompt:
             return "请在后面写改图提示词。"
@@ -329,7 +330,8 @@ class CommandActionHandler:
         payload = await self._run_tool(
             ["edit", "--prompt", prompt, "--input", image_input]
         )
-        return await self._send_payload(event, payload)
+        await self._send_payload(event, payload)
+        return None
 
     async def spell(self, event: Any) -> str:
         if not self._is_allowed(event):
