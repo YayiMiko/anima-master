@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from anima.prompts.multi_person_prompt import (  # noqa: E402
     build_multi_person_plan_prompt,
     parse_multi_person_plan,
 )
+from anima.prompts.danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
 from anima.prompts.prompt_background import (  # noqa: E402
     DEFAULT_PORTRAIT,
     EXPLICIT_SCENE,
@@ -18,6 +20,7 @@ from anima.prompts.prompt_background import (  # noqa: E402
     extract_background_mode,
 )
 from anima.prompts.prompt_builder import build_final_prompt  # noqa: E402
+from anima.prompts.prompt_pipeline import PromptPipeline  # noqa: E402
 from anima.prompts.prompt_templates import build_llm_prompt  # noqa: E402
 
 
@@ -110,3 +113,72 @@ def test_multi_person_plan_uses_llm_background_mode_and_original_text() -> None:
 
     assert plan is not None
     assert plan.background_mode == DEFAULT_PORTRAIT
+
+
+def test_missing_background_marker_asks_llm_again_before_adding_white() -> None:
+    class Context:
+        def __init__(self, marker: str):
+            self.marker = marker
+            self.calls = []
+
+        async def get_current_chat_provider_id(self, umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.calls.append(kwargs)
+            content = "1girl, beach, sunset" if len(self.calls) == 1 else self.marker
+            return type("Response", (), {"completion_text": content})()
+
+    class Resolver:
+        def required_core_tags_for_prompt(self, prompt):
+            return ()
+
+        async def resolve_detailed(self, *, llm_content, **kwargs):
+            return DanbooruResolveOutcome(text=llm_content)
+
+    class Researcher:
+        def plan(self, prompt):
+            return type(
+                "Plan",
+                (),
+                {
+                    "use_web_search": False,
+                    "use_deep_thinking": False,
+                    "search_reason": "",
+                    "thinking_reason": "",
+                },
+            )()
+
+    class Logger:
+        def info(self, *args):
+            pass
+
+        def warning(self, *args):
+            pass
+
+    async def build(marker: str):
+        context = Context(marker)
+        config = {"chiyo_preset_enabled": False}
+        pipeline = PromptPipeline(
+            context=context,
+            config=config,
+            logger=Logger(),
+            danbooru_resolver=Resolver(),
+            researcher=Researcher(),
+            get_bool=lambda key, default: bool(config.get(key, default)),
+            get_int=lambda key, default: int(config.get(key, default)),
+            get_float=lambda key, default: float(config.get(key, default)),
+            get_str=lambda key, default: str(config.get(key, default)),
+            shorten=lambda text, limit: text[:limit],
+        )
+        event = type("Event", (), {"unified_msg_origin": "session"})()
+        return await pipeline.build(event, "海边日落的女孩"), context.calls
+
+    result, calls = asyncio.run(build("background_mode_explicit_scene"))
+    assert len(calls) == 2
+    assert result.summary["background_mode_source"] == "llm_fallback"
+    assert "white background" not in result.final_prompt
+
+    result, _ = asyncio.run(build("unexpected output"))
+    assert result.summary["background_mode"] == "unresolved"
+    assert "white background" not in result.final_prompt

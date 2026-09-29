@@ -305,7 +305,7 @@ class ComfyUIAgentPlugin(Star):
             if multi_person:
                 self._multi_generation_semaphore.release()
 
-    async def _edit(self, event: AstrMessageEvent, prompt: str) -> str:
+    async def _edit(self, event: AstrMessageEvent, prompt: str) -> str | None:
         return await self._action_handler.edit(event, prompt)
 
     async def _spell(self, event: AstrMessageEvent) -> str:
@@ -394,9 +394,9 @@ class ComfyUIAgentPlugin(Star):
     @comfyui_group.command("edit", alias={"改图", "图生图", "风格化", "重绘"})
     async def cmd_edit(self, event: AstrMessageEvent, prompt: GreedyStr):
         event.stop_event()
-        yield event.plain_result(
-            await self._handle_action(event, "edit", str(prompt or "").strip())
-        )
+        message = await self._handle_action(event, "edit", str(prompt or "").strip())
+        if message:
+            yield event.plain_result(message)
 
     @comfyui_group.command("upscale", alias={"放大", "高清", "高清修复"})
     async def cmd_upscale(self, event: AstrMessageEvent):

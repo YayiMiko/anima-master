@@ -15,6 +15,7 @@ from anima.prompts.multi_person_prompt import (  # noqa: E402
     build_multi_person_plan_prompt,
     parse_multi_person_plan,
     render_multi_person_character,
+    requested_person_count,
 )
 from anima.prompts.prompt_pipeline import PromptPipeline  # noqa: E402
 
@@ -114,6 +115,54 @@ def test_multi_person_plan_parser_requires_two_to_four_characters() -> None:
         }
     )
     assert parse_multi_person_plan(invalid) is None
+
+
+def test_requested_person_count_handles_totals_and_gender_sums() -> None:
+    assert requested_person_count("两名少女并肩站立") == 2
+    assert requested_person_count("2girls and 1boy") == 3
+    assert requested_person_count("两名少女和一名少年") == 3
+    assert requested_person_count("3 people, 2 girls and 1 boy") == 3
+    assert requested_person_count("空和荧相遇") is None
+
+
+def test_multi_person_pipeline_rejects_count_mismatch_before_generation() -> None:
+    class Context:
+        def __init__(self):
+            self.calls = 0
+
+        async def get_current_chat_provider_id(self, umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.calls += 1
+            return _Response(_plan_json())
+
+    class Resolver:
+        def required_core_tags_for_prompt(self, prompt):
+            return ()
+
+    context = Context()
+    config = {"chiyo_preset_enabled": False}
+    pipeline = PromptPipeline(
+        context=context,
+        config=config,
+        logger=_Logger(),
+        danbooru_resolver=Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda key, default: bool(config.get(key, default)),
+        get_int=lambda key, default: int(config.get(key, default)),
+        get_float=lambda key, default: float(config.get(key, default)),
+        get_str=lambda key, default: str(config.get(key, default)),
+        shorten=lambda text, limit: text[:limit],
+    )
+
+    result = asyncio.run(
+        pipeline.build(_Event(), "三名少女站在一起", multi_person=True)
+    )
+
+    assert context.calls == 2
+    assert result.final_prompt == ""
+    assert result.summary["multi_person_error"] == "requested_character_count_mismatch"
 
 
 def test_multi_person_parser_replaces_panel_like_slots_and_composition() -> None:

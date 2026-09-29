@@ -123,6 +123,10 @@ def build_status_payload(
         if not include_capabilities:
             payload["capabilities_checked"] = False
             return payload
+        if bool(config.get("custom_workflow_enabled", False)):
+            payload["capabilities_checked"] = False
+            payload["custom_workflow_validation_deferred"] = True
+            return payload
 
         object_info: dict[str, Any] = {}
         for node_name in CAPABILITY_NODE_NAMES:

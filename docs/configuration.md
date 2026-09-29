@@ -118,6 +118,8 @@ ComfyUI 地址和工作流位于“ComfyUI 连接”，模型文件名位于“�
 - `admin_only`：是否仅管理员可用。
 - `allowed_sender_ids`：允许使用的用户 ID 列表。
 
+即使允许普通用户生图，聊天指令修改全局画师预设或固定角色仍要求 AstrBot 管理员身份；查看预设不受此限制。
+
 ## 由 AstrBot 启动 ComfyUI
 
 `auto_start` 不是开机自启。它只会在 ComfyUI 离线且收到绘图请求时，在 AstrBot 所在机器上执行 `startup_command`。

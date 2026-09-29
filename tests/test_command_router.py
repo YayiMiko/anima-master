@@ -47,6 +47,14 @@ def test_parse_generate_and_raw_generate():
     )
 
 
+def test_bare_prefix_requires_command_boundary() -> None:
+    assert parse_hard_route("anmore") is None
+    assert parse_hard_route("/anmore") is None
+    assert parse_hard_route("anma beautiful girl") is None
+    assert parse_hard_route("anm 画一张少女") == ("generate", "画一张少女")
+    assert parse_hard_route("/anm画一张少女") == ("generate", "画一张少女")
+
+
 def test_parse_spell_and_reverse():
     assert parse_hard_route("/anm 解析法术") == ("spell", "")
     assert parse_hard_route("/anm 反推") == ("reverse", "")

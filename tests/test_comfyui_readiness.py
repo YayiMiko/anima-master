@@ -16,6 +16,7 @@ for path in (PLUGIN_DIR, TOOLS_DIR):
 
 import comfyui_agent  # noqa: E402
 import anima.runtime.comfyui_startup as comfyui_startup  # noqa: E402
+from anima.runtime.deployment_diagnostics import compact_status_text  # noqa: E402
 import comfyui_status  # noqa: E402
 
 
@@ -133,6 +134,51 @@ def test_quick_status_skips_capability_inventory(
     assert paths == ["/system_stats"]
     assert payload["comfyui_api_reachable"] is True
     assert payload["capabilities_checked"] is False
+
+
+def test_custom_workflow_status_checks_api_without_default_model_inventory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    paths: list[str] = []
+
+    class _Client:
+        def __init__(self, config: dict[str, object]) -> None:
+            pass
+
+        def get_json(self, path: str, timeout: int = 10) -> dict[str, object]:
+            paths.append(path)
+            return {"system": {}, "devices": []}
+
+    monkeypatch.setattr(comfyui_status, "ComfyUIHttpClient", _Client)
+    monkeypatch.setattr(comfyui_status.socket, "getaddrinfo", lambda *args: [])
+
+    payload = comfyui_status.build_status_payload(
+        {"comfyui_base_url": "http://127.0.0.1:8188", "custom_workflow_enabled": True},
+        [],
+    )
+
+    assert paths == ["/system_stats"]
+    assert payload["custom_workflow_validation_deferred"] is True
+    assert payload["comfyui_api_reachable"] is True
+    assert "自定义工作流（提交时校验）" in compact_status_text(payload)
+
+
+def test_custom_workflow_readiness_does_not_require_default_models(
+    tmp_path: Path,
+) -> None:
+    manager = _manager(tmp_path, [])
+    status = {
+        "ok": True,
+        "comfyui_api_reachable": True,
+        "unet_available": False,
+        "clip_available": False,
+        "vae_available": False,
+    }
+
+    assert manager.is_ready(status) is False
+    manager.config["custom_workflow_enabled"] = True
+    assert manager.is_ready(status) is True
+    assert manager.is_ready({**status, "comfyui_api_reachable": False}) is False
 
 
 @pytest.mark.asyncio

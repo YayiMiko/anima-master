@@ -135,14 +135,18 @@ def parse_hard_route(text: str) -> tuple[str, str] | None:
         A tuple of action and prompt when the message should be handled by
         Anima, otherwise None.
     """
-    normalized = normalize_route_text(text)
+    raw = str(text or "").strip()
+    normalized = normalize_route_text(raw)
     lowered = normalized.lower()
     prefixes = ("anm", "comfyui", "anima")
 
     for prefix in prefixes:
         if not lowered.startswith(prefix.lower()):
             continue
-        rest = normalized[len(prefix) :].strip(" ，,：:")
+        suffix = normalized[len(prefix) :]
+        if suffix and suffix[0] not in " \t\r\n，,：:":
+            continue
+        rest = suffix.strip(" ，,：:")
         if not rest:
             return "help", ""
         rest_lower = rest.lower()

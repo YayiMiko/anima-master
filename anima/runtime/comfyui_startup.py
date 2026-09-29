@@ -77,8 +77,11 @@ class ComfyUIStartupManager:
             payload: Status payload returned by the helper.
 
         Returns:
-            True when ComfyUI and required model files are available.
+            True when ComfyUI is reachable and the active workflow can start.
         """
+        if self._bool("custom_workflow_enabled", False):
+            # A custom graph may use different model loaders and filenames.
+            return bool(payload.get("ok") and payload.get("comfyui_api_reachable"))
         return bool(
             payload.get("ok")
             and payload.get("unet_available")
