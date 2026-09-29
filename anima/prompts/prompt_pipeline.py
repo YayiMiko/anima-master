@@ -1211,30 +1211,8 @@ class PromptPipeline:
             if background_mode:
                 background_mode_source = "llm_marker"
             else:
-                background_mode_source = "missing_marker_unresolved"
-                try:
-                    response = await self.context.llm_generate(
-                        chat_provider_id=provider_id,
-                        prompt=(
-                            "Determine whether the user's ORIGINAL text explicitly asks "
-                            "for a location, environment, weather scene, or background. "
-                            "Ignore any reference-image description and generated tags. "
-                            "Reply with exactly background_mode_explicit_scene or "
-                            "background_mode_default_portrait.\n"
-                            f"Original user text: {background_intent_prompt}"
-                        ),
-                        system_prompt="You classify image background intent. Return one marker only.",
-                        max_tokens=30,
-                    )
-                    _, background_mode = extract_background_mode(
-                        str(getattr(response, "completion_text", "") or "")
-                    )
-                    if background_mode:
-                        background_mode_source = "llm_fallback"
-                except Exception as exc:
-                    self.logger.warning(
-                        "[comfyui_agent] background intent fallback failed: %s", exc
-                    )
+                background_mode = DEFAULT_PORTRAIT
+                background_mode_source = "missing_marker_default"
         llm_failed = bool(llm_error and not str(llm_content or "").strip())
         character_resolution = await self._danbooru_resolver.resolve_detailed(
             llm_content=llm_content,
