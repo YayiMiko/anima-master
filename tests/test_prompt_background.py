@@ -115,10 +115,9 @@ def test_multi_person_plan_uses_llm_background_mode_and_original_text() -> None:
     assert plan.background_mode == DEFAULT_PORTRAIT
 
 
-def test_missing_background_marker_asks_llm_again_before_adding_white() -> None:
+def test_missing_background_marker_defaults_to_white_without_second_llm_call() -> None:
     class Context:
-        def __init__(self, marker: str):
-            self.marker = marker
+        def __init__(self):
             self.calls = []
 
         async def get_current_chat_provider_id(self, umo):
@@ -126,8 +125,7 @@ def test_missing_background_marker_asks_llm_again_before_adding_white() -> None:
 
         async def llm_generate(self, **kwargs):
             self.calls.append(kwargs)
-            content = "1girl, beach, sunset" if len(self.calls) == 1 else self.marker
-            return type("Response", (), {"completion_text": content})()
+            return type("Response", (), {"completion_text": "1girl, white dress"})()
 
     class Resolver:
         def required_core_tags_for_prompt(self, prompt):
@@ -156,8 +154,8 @@ def test_missing_background_marker_asks_llm_again_before_adding_white() -> None:
         def warning(self, *args):
             pass
 
-    async def build(marker: str):
-        context = Context(marker)
+    async def build():
+        context = Context()
         config = {"chiyo_preset_enabled": False}
         pipeline = PromptPipeline(
             context=context,
@@ -172,13 +170,10 @@ def test_missing_background_marker_asks_llm_again_before_adding_white() -> None:
             shorten=lambda text, limit: text[:limit],
         )
         event = type("Event", (), {"unified_msg_origin": "session"})()
-        return await pipeline.build(event, "海边日落的女孩"), context.calls
+        return await pipeline.build(event, "白裙女孩"), context.calls
 
-    result, calls = asyncio.run(build("background_mode_explicit_scene"))
-    assert len(calls) == 2
-    assert result.summary["background_mode_source"] == "llm_fallback"
-    assert "white background" not in result.final_prompt
-
-    result, _ = asyncio.run(build("unexpected output"))
-    assert result.summary["background_mode"] == "unresolved"
-    assert "white background" not in result.final_prompt
+    result, calls = asyncio.run(build())
+    assert len(calls) == 1
+    assert result.summary["background_mode_source"] == "missing_marker_default"
+    assert result.summary["background_mode"] == DEFAULT_PORTRAIT
+    assert "white background" in result.final_prompt
