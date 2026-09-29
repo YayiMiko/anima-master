@@ -377,19 +377,6 @@ class CommandActionHandler:
         """
         if not self._is_allowed(event):
             return "ComfyUI 助手已关闭，或当前用户没有使用权限。"
-        if (
-            action
-            in {
-                "set_artist_tags",
-                "create_artist_preset",
-                "append_artist_tags",
-                "use_artist_preset",
-                "delete_artist_preset",
-                "add_fixed_character",
-            }
-            and not event.is_admin()
-        ):
-            return "只有管理员可以修改全局画师预设和固定角色。"
         if action == "help":
             return help_text(self._bool("img2img_enabled", False))
         if action == "status":

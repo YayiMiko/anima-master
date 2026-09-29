@@ -61,38 +61,40 @@ def test_unknown_action_returns_error():
     assert result == "未知 Anima 指令。"
 
 
-def test_global_configuration_commands_require_admin():
-    class Event:
-        def __init__(self, admin: bool):
-            self.admin = admin
-
-        def is_admin(self) -> bool:
-            return self.admin
-
+def test_global_configuration_commands_follow_plugin_usage_permission():
     handler = _handler(config={"artist_presets": []})
-    blocked = asyncio.run(
-        handler.handle_action(Event(False), "create_artist_preset", "test=artist_name")
-    )
-    assert blocked == "只有管理员可以修改全局画师预设和固定角色。"
-    assert handler.config["artist_presets"] == []
-    for action in (
-        "set_artist_tags",
-        "append_artist_tags",
-        "use_artist_preset",
-        "delete_artist_preset",
-        "add_fixed_character",
-    ):
-        assert (
-            asyncio.run(handler.handle_action(Event(False), action, "test=artist_name"))
-            == blocked
-        )
-    assert handler.config["artist_presets"] == []
+    event = object()
 
-    allowed = asyncio.run(
-        handler.handle_action(Event(True), "create_artist_preset", "test=artist_name")
+    created = asyncio.run(
+        handler.handle_action(event, "create_artist_preset", "test=artist_name")
     )
-    assert "已保存并启用" in allowed
-    assert handler.config["artist_presets"] == ["test=artist_name,"]
+    appended = asyncio.run(
+        handler.handle_action(event, "append_artist_tags", "test=@artist_extra")
+    )
+    switched = asyncio.run(handler.handle_action(event, "use_artist_preset", "test"))
+    character = asyncio.run(
+        handler.handle_action(event, "add_fixed_character", "狐莉=1girl, fox girl")
+    )
+    deleted = asyncio.run(handler.handle_action(event, "delete_artist_preset", "test"))
+    default = asyncio.run(
+        handler.handle_action(event, "set_artist_tags", "@artist_default")
+    )
+
+    assert "已保存并启用" in created
+    assert "已追加并启用" in appended
+    assert "已启用" in switched
+    assert "已保存角色" in character
+    assert "已删除" in deleted
+    assert "已设置默认画师 tags" in default
+    assert handler.config["artist_presets"] == []
+    assert handler.config["fixed_characters"] == ["狐莉=1girl, fox girl,"]
+
+    handler._is_allowed = lambda _event: False
+    denied = asyncio.run(
+        handler.handle_action(event, "create_artist_preset", "blocked=@artist")
+    )
+    assert "没有使用权限" in denied
+    assert handler.config["artist_presets"] == []
 
 
 def test_edit_result_is_sent_only_once() -> None:
